@@ -8,13 +8,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
+  Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
+import { useEffect } from 'react';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -48,6 +49,10 @@ export default function SignupScreen() {
     if (value !== password) return 'Passwords do not match';
     return null;
   }
+
+  useEffect(() => {
+    router.push('/(auth)/onboarding');
+  }, []);
   async function handleSignUp() {
     setError('');
     const usernameError = validateUsername(username);

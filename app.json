@@ -9,12 +9,17 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/rimrun-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "RimRun uses your location to show nearby basketball courts on the map.",
+        "NSPhotoLibraryUsageDescription": "RimRun needs access to your photos to set your profile picture.",
+        "NSPhotoLibraryAddUsageDescription": "RimRun needs access to your photos to set your profile picture."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,6 +28,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
+      , "permissions": ["CAMERA","READ_MEDIA_IMAGES", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
