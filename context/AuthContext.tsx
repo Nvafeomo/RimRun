@@ -1,14 +1,14 @@
-import React, {
-    createContext,
-    useContext,
-    useEffect,
-    useState,
-    ReactNode,
-  } from 'react';
-  import type { Session, User } from '@supabase/supabase-js';
-  import { supabase } from '../lib/supabase';
-  
-  type AuthContextValue = {
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
+import type { Session, User } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
+
+type AuthContextValue = {
     user: User | null;
     session: Session | null;
     loading: boolean;
@@ -98,7 +98,7 @@ import React, {
         }
         email = data.email;
       }
-      
+
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         throw error;

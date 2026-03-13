@@ -1,8 +1,21 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Image,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { colors, spacing, borderRadius } from '../../constants/theme';
+
 export default function SignupScreen() {
   const router = useRouter();
   const [username, setUsername] = useState('');
@@ -42,11 +55,13 @@ export default function SignupScreen() {
     const passwordError = validatePassword(password);
     const confirmPasswordError = validateConfirmPassword(confirmPassword);
     if (usernameError || emailError || passwordError || confirmPasswordError) {
-      setError(usernameError || emailError || passwordError || confirmPasswordError || 'Invalid credentials');
+      setError(
+        usernameError || emailError || passwordError || confirmPasswordError || 'Invalid credentials'
+      );
       return;
     }
     setSubmitting(true);
-    
+
     try {
       await signUp(email.trim(), password, username.trim().toLowerCase());
       router.replace('/(app)');
@@ -56,150 +71,209 @@ export default function SignupScreen() {
       setSubmitting(false);
     }
   }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Create An Account</Text>
-        <Text style={styles.subtitle}>Sign Up to Continue</Text>
-        <View style={styles.form}>
-          {error && <Text style={styles.error}>{error}</Text>}
-          <TextInput 
-          placeholder="Username" 
-          keyboardType="default" 
-          autoCapitalize="none" 
-          autoComplete="username" 
-          autoCorrect={false} 
-          style = {styles.input}
-          value={username}
-          onChangeText={setUsername}
-          />
-          <TextInput 
-          placeholder="Email" 
-          keyboardType="email-address" 
-          autoCapitalize="none" 
-          autoComplete="email" 
-          autoCorrect={false} 
-          style = {styles.input}
-          value={email}
-          onChangeText={setEmail}
-          />
-          <TextInput 
-          placeholder="Password" 
-          keyboardType="default" 
-          autoCapitalize="none" 
-          autoComplete="password" 
-          autoCorrect={false} 
-          secureTextEntry={true} 
-          style = {styles.input}
-          value={password}
-          onChangeText={setPassword}
-          />
-          <TextInput 
-          placeholder="Confirm Password" 
-          keyboardType="default" 
-          autoCapitalize="none" 
-          autoComplete="password" 
-          autoCorrect={false} 
-          secureTextEntry={true} 
-          style = {styles.input}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          />
-          <TouchableOpacity 
-            style={styles.button} 
-            onPress={handleSignUp} 
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.buttonText}>Sign Up</Text>
-            )}
-          </TouchableOpacity>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/rimrun-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.title}>RimRun</Text>
+            <Text style={styles.subtitle}>Find courts. Run the game.</Text>
+          </View>
 
-          <TouchableOpacity style = {styles.linkButton} onPress={() => router.push('/login')}>
-            <Text style = {styles.linkButtonText}>Already have an account? <Text style = {styles.linkButtonTextBold}>Sign In</Text></Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Create Account</Text>
+            
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <TextInput
+              placeholder="Username"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="default"
+              autoCapitalize="none"
+              autoComplete="username"
+              autoCorrect={false}
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+            />
+            <TextInput
+              placeholder="Email"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              autoCorrect={false}
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+            />
+            <TextInput
+              placeholder="Password"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="default"
+              autoCapitalize="none"
+              autoComplete="password"
+              autoCorrect={false}
+              secureTextEntry
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+            />
+            <TextInput
+              placeholder="Confirm Password"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="default"
+              autoCapitalize="none"
+              autoComplete="password"
+              autoCorrect={false}
+              secureTextEntry
+              style={styles.input}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+            />
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleSignUp}
+              disabled={submitting}
+              activeOpacity={0.8}
+            >
+              {submitting ? (
+                <ActivityIndicator color={colors.text} />
+              ) : (
+                <Text style={styles.buttonText}>Sign Up</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => router.push('/login')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.linkButtonText}>
+              Already have an account? <Text style={styles.linkButtonTextBold}>Sign In</Text>
+            </Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    
+    backgroundColor: colors.background,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: spacing.sm,
+  },
+  title: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cardTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
   },
   error: {
-    color: 'red',
-    marginBottom: 15,
+    color: colors.error,
     fontSize: 14,
+    marginBottom: spacing.md,
+    textAlign: 'center',
   },
   input: {
     width: '100%',
-    height: 40,
+    height: 50,
     borderWidth: 1,
-    borderColor: 'orange',
-    borderRadius: 12,
-    padding: 16,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
     fontSize: 16,
-    marginBottom: 15,
+    color: colors.text,
+    backgroundColor: colors.inputBg,
+    marginBottom: spacing.md,
   },
   button: {
     width: '100%',
-    height: 40,
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'orange',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-  },
-  linkButton: {
-    width: '100%',
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 32, 
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  form: {
-    width: "100%",
-    padding: 24,
-    alignItems: 'center',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24
-    
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.sm,
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  linkButton: {
+    alignSelf: 'center',
+    paddingVertical: spacing.lg,
+    marginTop: spacing.md,
   },
   linkButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'orange',
+    fontSize: 15,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   linkButtonTextBold: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'black',
-    
+    color: colors.primary,
+    fontWeight: '700',
   },
 });
