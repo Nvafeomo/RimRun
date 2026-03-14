@@ -8,7 +8,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    Image,
+
   } from 'react-native';
   import { SafeAreaView } from 'react-native-safe-area-context';
   import { useRouter } from 'expo-router';
@@ -17,11 +17,31 @@ import {
   import { colors, spacing, borderRadius } from '../../constants/theme';
   import { useEffect } from 'react';
   import { router } from 'expo-router';
+  import { Image } from 'expo-image';
+  import DateTimePicker from '@react-native-community/datetimepicker';
   import * as ImagePicker from 'expo-image-picker';
+  import { decode } from 'base64-arraybuffer';
+  import { supabase } from '../../lib/supabase';
+
+  const formatDateForDisplay = (isoDate: string) => {
+    const [y, m, d] = isoDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
   export default function OnboardingScreen() {
+    const { user } = useAuth();
     const [profilePicture, setProfilePicture] = useState<string | null>(null);
+    const [profilePictureBase64, setProfilePictureBase64] = useState<string | null>(null);
     const [dateOfBirth, setDateOfBirth] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
@@ -33,11 +53,63 @@ import {
             allowsEditing: true,
             aspect: [1, 1],
             quality: 1,
+            base64: true,
         });
         if (!result.canceled && result.assets[0]) {
-            setProfilePicture(result.assets[0].uri);
+            const asset = result.assets[0];
+            setProfilePicture(asset.uri);
+            setProfilePictureBase64(asset.base64 ?? null);
         }
         setIsLoading(false);
+    };
+
+    const handleCompleteProfile = async () => {
+        if (!user?.id) {
+            setError('You must be signed in to complete your profile.');
+            return;
+        }
+        setError('');
+        setSubmitting(true);
+        try {
+            let avatarUrl: string | null = null;
+            if (profilePictureBase64) {
+                try {
+                    const filePath = `${user.id}/avatar.jpg`;
+                    const { data, error: uploadError } = await supabase.storage
+                        .from('avatars')
+                        .upload(filePath, decode(profilePictureBase64), {
+                            contentType: 'image/jpeg',
+                            upsert: true,
+                        });
+                    if (uploadError) throw uploadError;
+                    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path);
+                    avatarUrl = urlData.publicUrl;
+                } catch (uploadErr) {
+                    const msg = uploadErr instanceof Error ? uploadErr.message : 'Upload failed';
+                    if (msg.includes('Bucket') || msg.includes('bucket')) {
+                        setError('Storage bucket "avatars" not found. Create it in Supabase Dashboard → Storage.');
+                        setSubmitting(false);
+                        return;
+                    }
+                    throw uploadErr;
+                }
+            }
+            const updates: Record<string, string | null> = {};
+            if (avatarUrl !== null) updates.profile_image_url = avatarUrl;
+            if (dateOfBirth) updates.date_of_birth = dateOfBirth;
+            if (Object.keys(updates).length > 0) {
+                const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update(updates)
+                    .eq('id', user.id);
+                if (updateError) throw updateError;
+            }
+            router.replace('/(app)');
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : 'Failed to save profile');
+        } finally {
+            setSubmitting(false);
+        }
     };
     if (isLoading) {
         return (
@@ -53,6 +125,13 @@ import {
           style={styles.keyboardView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+            <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+                activeOpacity={0.7}
+                >
+                <Text style={styles.backButtonText}>← Back</Text>
+            </TouchableOpacity>
             <ScrollView style={styles.container}>
                 <View style={styles.header}>
                     <Image source={require('../../assets/rimrun-logo.png')} style={styles.logo} resizeMode="contain" />
@@ -61,22 +140,57 @@ import {
                 </View>
                 <View style={styles.card}>
                     <TouchableOpacity style={styles.imageContainer} onPress={pickImage}>
+                        {profilePicture ? <Image source={{ uri: profilePicture }} style={styles.profilePicture} resizeMode="cover" /> : (
                         <View style={styles.placeholderImage}>
                             <Text style={styles.placeholderText}>+</Text>
                         </View>
+                        )}
                         <View style={styles.editBadge}>
                             <Text style={styles.editText}>Edit</Text>
                         </View>
                     </TouchableOpacity>
-                    <TextInput placeholder="Date of Birth" style={styles.input} placeholderTextColor={colors.textMuted}/>
-                    <TouchableOpacity style={styles.button} onPress={() => router.push('/(app)')}>
+
+                    <TouchableOpacity
+                        style={[styles.input, { width: '80%', alignSelf: 'center', justifyContent: 'center', alignItems: 'center' }]}
+                        onPress={() => setShowDatePicker(true)}
+                    >
+                        <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 16, fontWeight: '500', alignSelf: 'center' }}>
+                            {dateOfBirth ? formatDateForDisplay(dateOfBirth) : "Select Date of Birth"}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {showDatePicker && (
+                        <DateTimePicker
+                            value={dateOfBirth ? new Date(dateOfBirth) : new Date(2000, 0, 1)}
+                            mode="date"
+                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                            textColor={colors.textSecondary}
+                            onChange={(event, selectedDate) => {
+                                setShowDatePicker(false);
+                                if (event.type === 'set' && selectedDate) {
+                                    setDateOfBirth(selectedDate.toISOString().split("T")[0]);
+                                }
+                            }}
+                        />
+                    )}
+                    {error ? <Text style={styles.error}>{error}</Text> : null}
+                    <TouchableOpacity
+                        style={styles.button}
+                        onPress={handleCompleteProfile}
+                        disabled={submitting}
+                        activeOpacity={0.8}
+                    >
+                        {submitting ? (
+                        <ActivityIndicator color={colors.text} />
+                        ) : (
                         <Text style={styles.buttonText}>Complete Profile</Text>
+                        )}
                     </TouchableOpacity>
                 </View>
             </ScrollView>
             <TouchableOpacity
                 style={[styles.button, styles.skipButton]}
-                onPress={() => router.replace('/(auth)/signup')}
+                onPress={() => router.replace('/(app)')}
                 activeOpacity={0.7}
                 >
                     
@@ -90,6 +204,24 @@ import {
   }
   
   const styles = StyleSheet.create({
+    backButton: {
+        position: 'absolute',
+        top: spacing.md,
+        left: spacing.lg,
+        zIndex: 10,
+      },
+      backButtonText: {
+        fontSize: 16,
+        color: colors.primaryLight,
+        fontWeight: '600',
+      },
+    profilePicture: {
+      width: '100%',
+      height: '100%',
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
     imageContainer: {
       width: 100,
       height: 100,
@@ -180,6 +312,7 @@ import {
       textAlign: 'center',
     },
     card: {
+      marginTop: -50,
       backgroundColor: colors.surface,
       borderRadius: borderRadius.lg,
       padding: spacing.lg,

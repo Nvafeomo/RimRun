@@ -50,9 +50,7 @@ export default function SignupScreen() {
     return null;
   }
 
-  useEffect(() => {
-    router.push('/(auth)/onboarding');
-  }, []);
+  
   async function handleSignUp() {
     setError('');
     const usernameError = validateUsername(username);
@@ -69,13 +67,14 @@ export default function SignupScreen() {
 
     try {
       await signUp(email.trim(), password, username.trim().toLowerCase());
-      router.replace('/(app)');
+      router.replace('/(auth)/onboarding');
     } catch (e: any) {
       setError(e?.message ?? 'Sign up failed');
     } finally {
       setSubmitting(false);
     }
   }
+
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -179,7 +178,9 @@ export default function SignupScreen() {
     </SafeAreaView>
   );
 }
-
+useEffect(() => {
+  
+}, []);
 const styles = StyleSheet.create({
   container: {
     flex: 1,

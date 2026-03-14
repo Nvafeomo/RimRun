@@ -1,5 +1,14 @@
 {
   "expo": {
+    "plugins": [
+      ["@react-native-community/datetimepicker", {
+        "android": {
+          "datePicker": {
+            "textColorSecondary": { "light": "#94A3B8", "dark": "#94A3B8" }
+          }
+        }
+      }]
+    ],
     "scheme": "rimrun",
     "name": "RimRun",
     "slug": "RimRun",
@@ -27,8 +36,18 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
-      , "permissions": ["CAMERA","READ_MEDIA_IMAGES", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "package": "com.nvafeomo.RimRun"
     },
     "web": {
       "favicon": "./assets/favicon.png"
