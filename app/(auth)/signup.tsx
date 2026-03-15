@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -66,7 +67,20 @@ export default function SignupScreen() {
     setSubmitting(true);
 
     try {
-      await signUp(email.trim(), password, username.trim().toLowerCase());
+      const normalizedUsername = username.trim().toLowerCase();
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', normalizedUsername)
+        .maybeSingle();
+
+      if (existingUser) {
+        setError('Username is already taken');
+        setSubmitting(false);
+        return;
+      }
+
+      await signUp(email.trim(), password, normalizedUsername);
       router.replace('/(auth)/onboarding');
     } catch (e: any) {
       setError(e?.message ?? 'Sign up failed');

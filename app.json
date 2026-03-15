@@ -27,7 +27,8 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "RimRun uses your location to show nearby basketball courts on the map.",
         "NSPhotoLibraryUsageDescription": "RimRun needs access to your photos to set your profile picture.",
-        "NSPhotoLibraryAddUsageDescription": "RimRun needs access to your photos to set your profile picture."
+        "NSPhotoLibraryAddUsageDescription": "RimRun needs access to your photos to set your profile picture.",
+        "NSCameraUsageDescription": "RimRun needs camera access to take your profile picture."
       }
     },
     "android": {

@@ -55,6 +55,8 @@ type AuthContextValue = {
           if (!isMounted) return;
           if (error) {
             console.error('Error getting session', error);
+            // Invalid refresh token: clear bad session from storage
+            await supabase.auth.signOut({ scope: 'local' });
             setSession(null);
             setUser(null);
           } else {
@@ -99,7 +101,8 @@ type AuthContextValue = {
         email = data.email;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ 
+        email, password });
       if (error) {
         throw error;
       }
@@ -107,17 +110,24 @@ type AuthContextValue = {
     }
   
     async function signUp(email: string, password: string, username: string) {
-      const { error } = await supabase.auth.signUp({ email, password, options: { data: { username } } });
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password, 
+        options: { data: { username } },
+      });
       if (error) {
         throw error;
       }
-      // Depending on your email confirmation settings, you may or may not get a session immediately.
     }
   
     async function signOut() {
       const { error } = await supabase.auth.signOut();
       if (error) {
-        throw error;
+        // Invalid token etc: clear local session anyway
+        await supabase.auth.signOut({ scope: 'local' });
+        setSession(null);
+        setUser(null);
+        return;
       }
       // Listener will clear user/session.
     }

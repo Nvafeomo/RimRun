@@ -8,7 +8,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-
+    Alert,
   } from 'react-native';
   import { SafeAreaView } from 'react-native-safe-area-context';
   import { useRouter } from 'expo-router';
@@ -42,25 +42,54 @@ import {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
+    const imagePickerOptions = {
+        mediaTypes: ['images' as const],
+        allowsEditing: true,
+        aspect: [1, 1] as [number, number],
+        quality: 1,
+        base64: true,
+    };
+
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            alert('We need permission to access your photos to set your profile picture.');
+            Alert.alert(
+              'Permission needed',
+              'We need permission to access your photos to set your profile picture.',
+            );
             return;
         }
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 1,
-            base64: true,
-        });
+        const result = await ImagePicker.launchImageLibraryAsync(imagePickerOptions);
         if (!result.canceled && result.assets[0]) {
             const asset = result.assets[0];
             setProfilePicture(asset.uri);
             setProfilePictureBase64(asset.base64 ?? null);
         }
-        setIsLoading(false);
+    };
+
+    const takePhoto = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert(
+              'Permission needed',
+              'We need permission to access your camera to take a profile picture.',
+            );
+            return;
+        }
+        const result = await ImagePicker.launchCameraAsync(imagePickerOptions);
+        if (!result.canceled && result.assets[0]) {
+            const asset = result.assets[0];
+            setProfilePicture(asset.uri);
+            setProfilePictureBase64(asset.base64 ?? null);
+        }
+    };
+
+    const showImagePicker = () => {
+        Alert.alert('Select Profile Image', 'Choose an option', [
+            { text: 'Camera', onPress: takePhoto },
+            { text: 'Photo Library', onPress: pickImage },
+            { text: 'Cancel', style: 'cancel' },
+        ]);
     };
 
     const handleCompleteProfile = async () => {
@@ -76,18 +105,18 @@ import {
                 try {
                     const filePath = `${user.id}/avatar.jpg`;
                     const { data, error: uploadError } = await supabase.storage
-                        .from('avatars')
+                        .from('Avatars')
                         .upload(filePath, decode(profilePictureBase64), {
                             contentType: 'image/jpeg',
                             upsert: true,
                         });
                     if (uploadError) throw uploadError;
-                    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path);
+                    const { data: urlData } = supabase.storage.from('Avatars').getPublicUrl(data.path);
                     avatarUrl = urlData.publicUrl;
                 } catch (uploadErr) {
                     const msg = uploadErr instanceof Error ? uploadErr.message : 'Upload failed';
                     if (msg.includes('Bucket') || msg.includes('bucket')) {
-                        setError('Storage bucket "avatars" not found. Create it in Supabase Dashboard → Storage.');
+                        setError('Storage bucket "Avatars" not found. Create it in Supabase Dashboard → Storage.');
                         setSubmitting(false);
                         return;
                     }
@@ -139,7 +168,7 @@ import {
                     <Text style={styles.subtitle}>Add your profile picture and date of birth.</Text>
                 </View>
                 <View style={styles.card}>
-                    <TouchableOpacity style={styles.imageContainer} onPress={pickImage}>
+                    <TouchableOpacity style={styles.imageContainer} onPress={showImagePicker}>
                         {profilePicture ? <Image source={{ uri: profilePicture }} style={styles.profilePicture} resizeMode="cover" /> : (
                         <View style={styles.placeholderImage}>
                             <Text style={styles.placeholderText}>+</Text>
