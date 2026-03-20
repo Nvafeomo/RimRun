@@ -1,0 +1,58 @@
+{
+  "type": "FeatureCollection",
+  "generator": "overpass-turbo",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "way/1159590715",
+        "amenity": "shelter",
+        "bench": "no",
+        "building": "yes",
+        "hoops": "2",
+        "sport": "basketball",
+        "@geometry": "center"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.367645, 47.7582801]
+      },
+      "id": "way/1159590715"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "way/12345678",
+        "leisure": "pitch",
+        "sport": "basketball",
+        "hoops": "1",
+        "access": "public",
+        "name": "Riverside Park Court",
+        "addr:street": "Main St",
+        "addr:city": "Seattle",
+        "addr:state": "WA"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.35, 47.65]
+      },
+      "id": "way/12345678"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "way/87654321",
+        "leisure": "pitch",
+        "sport": "basketball",
+        "hoops": "4",
+        "access": "private",
+        "name": "Community Center Courts"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.38, 47.72]
+      },
+      "id": "way/87654321"
+    }
+  ]
+}

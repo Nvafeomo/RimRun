@@ -1,22 +1,28 @@
 // app/_layout.tsx
 import '../global.css';
 import { Stack } from 'expo-router';
+import { View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../context/AuthContext';
 import { ProfileProvider } from '../context/ProfileContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { colors } from '../constants/theme';
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <ProfileProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(app)" />
-        </Stack>
-        </ProfileProvider>
-      </AuthProvider>
+      <StatusBar style="light" />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <AuthProvider>
+          <ProfileProvider>
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(app)" />
+            </Stack>
+          </ProfileProvider>
+        </AuthProvider>
+      </View>
     </SafeAreaProvider>
   );
 }

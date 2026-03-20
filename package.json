@@ -6,7 +6,10 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "import-courts": "node scripts/import-courts.js",
+    "import-courts:upsert": "node scripts/import-courts.js --upsert",
+    "geocode-courts": "node scripts/geocode-courts.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -36,6 +39,7 @@
   "devDependencies": {
     "@types/react": "^18.2.79",
     "@types/react-dom": "^18.2.25",
+    "dotenv": "^16.6.1",
     "sharp": "^0.34.5",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.2"

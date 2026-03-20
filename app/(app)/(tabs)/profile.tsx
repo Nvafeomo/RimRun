@@ -6,12 +6,14 @@ import {
   ActivityIndicator,
   StyleSheet,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useAuth } from '../../../context/AuthContext';
 import { useProfile } from '../../../context/ProfileContext';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
+import { supabase } from '../../../lib/supabase';
 
 const formatDateForDisplay = (isoDate: string) => {
   const [y, m, d] = isoDate.split('-').map(Number);
@@ -26,6 +28,34 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { profile, loading, updateProfilePicture } = useProfile();
   const [signingOut, setSigningOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  function handleDeleteAccountPress() {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure? This will permanently delete your account and all your data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: handleDeleteAccount,
+        },
+      ]
+    );
+  }
+
+  async function handleDeleteAccount() {
+    setDeletingAccount(true);
+    try {
+      await supabase.auth.admin.deleteUser(user?.id ?? '');
+      await supabase.from('profiles').delete().eq('id', user?.id ?? '');
+    } catch (e) {
+      console.error('Delete account error', e);
+    } finally {
+      setDeletingAccount(false);
+    }
+  }
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -124,6 +154,20 @@ export default function ProfileScreen() {
             <ActivityIndicator color={colors.text} size="small" />
           ) : (
             <Text style={styles.signOutText}>Sign Out</Text>
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.spacer} />
+
+        <TouchableOpacity
+          onPress={handleDeleteAccountPress}
+          disabled={deletingAccount}
+          style={styles.deleteAccountButton}
+        >
+          {deletingAccount ? (
+            <ActivityIndicator color={colors.text} size="small" />
+          ) : (
+            <Text style={styles.deleteAccountText}>Delete Account</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -278,5 +322,20 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
+  },
+  deleteAccountButton: {
+    backgroundColor: colors.error,
+    borderWidth: 1.5,
+    borderColor: colors.text,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  deleteAccountText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
