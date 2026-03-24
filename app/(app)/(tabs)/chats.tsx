@@ -23,12 +23,21 @@ type CourtChatItem = {
   lastMessageAt?: string;
 };
 
+type DmChatItem = {
+  conversationId: string;
+  otherUserId: string;
+  otherUsername: string;
+  lastMessage?: string;
+  lastMessageAt?: string;
+};
+
 export default function ChatsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { getDisplayName } = useCourtAliases();
   const [activeTab, setActiveTab] = useState<"courts" | "messages">("messages");
   const [courtChats, setCourtChats] = useState<CourtChatItem[]>([]);
+  const [dmChats, setDmChats] = useState<DmChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -110,15 +119,110 @@ export default function ChatsScreen() {
     }
   }, [user?.id]);
 
+  const fetchDmChats = useCallback(async () => {
+    if (!user?.id) {
+      setDmChats([]);
+      return;
+    }
+    try {
+      const { data: friendIds } = await supabase
+        .from("friendships")
+        .select("friend_id")
+        .eq("user_id", user.id);
+      if (!friendIds?.length) {
+        setDmChats([]);
+        return;
+      }
+      const ids = friendIds.map((r) => r.friend_id);
+      const { data: convs } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("type", "dm");
+      if (!convs?.length) {
+        setDmChats([]);
+        return;
+      }
+      const convIds = convs.map((c) => c.id);
+      const { data: parts } = await supabase
+        .from("conversation_participants")
+        .select("conversation_id, user_id")
+        .in("conversation_id", convIds)
+        .in("user_id", [user.id, ...ids]);
+      const myConvs = new Set(
+        (parts ?? [])
+          .filter((p) => p.user_id === user.id)
+          .map((p) => p.conversation_id)
+      );
+      const dmPairs: { convId: string; otherId: string }[] = [];
+      for (const cid of myConvs) {
+        const convParts = (parts ?? []).filter((p) => p.conversation_id === cid);
+        const other = convParts.find((p) => p.user_id !== user.id);
+        if (other && ids.includes(other.user_id))
+          dmPairs.push({ convId: cid, otherId: other.user_id });
+      }
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .in("id", dmPairs.map((p) => p.otherId));
+      const nameMap = Object.fromEntries(
+        (profiles ?? []).map((p) => [p.id, p.username ?? "Unknown"])
+      );
+      const items: DmChatItem[] = [];
+      for (const { convId, otherId } of dmPairs) {
+        const { data: lastMsg } = await supabase
+          .from("messages")
+          .select("content, created_at")
+          .eq("conversation_id", convId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        items.push({
+          conversationId: convId,
+          otherUserId: otherId,
+          otherUsername: nameMap[otherId] ?? "Unknown",
+          lastMessage: lastMsg?.content,
+          lastMessageAt: lastMsg?.created_at,
+        });
+      }
+      items.sort(
+        (a, b) =>
+          new Date(b.lastMessageAt ?? 0).getTime() -
+          new Date(a.lastMessageAt ?? 0).getTime()
+      );
+      setDmChats(items);
+    } catch (err) {
+      console.error("Error fetching DM chats:", err);
+      setDmChats([]);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     setLoading(true);
     fetchCourtChats().finally(() => setLoading(false));
   }, [fetchCourtChats]);
 
+  useEffect(() => {
+    if (activeTab === "messages") fetchDmChats();
+  }, [activeTab, fetchDmChats]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchCourtChats();
     setRefreshing(false);
+  };
+
+  const openDmChat = (item: DmChatItem) => {
+    router.push({
+      pathname: "/(app)/chat/[conversationId]",
+      params: {
+        conversationId: item.conversationId,
+        title: item.otherUsername,
+      },
+    });
+  };
+
+  const openFriends = () => {
+    router.push("/(app)/friends");
   };
 
   const openCourtChat = (item: CourtChatItem) => {
@@ -155,21 +259,56 @@ export default function ChatsScreen() {
     </Pressable>
   );
 
+  const renderDmChatItem = ({ item }: { item: DmChatItem }) => (
+    <Pressable
+      style={styles.chatItem}
+      onPress={() => openDmChat(item)}
+      android_ripple={{ color: colors.border }}
+    >
+      <View style={styles.chatItemIcon}>
+        <Ionicons name="person" size={24} color={colors.primary} />
+      </View>
+      <View style={styles.chatItemContent}>
+        <Text style={styles.chatItemTitle} numberOfLines={1}>
+          {item.otherUsername}
+        </Text>
+        <Text style={styles.chatItemPreview} numberOfLines={1}>
+          {item.lastMessage ?? "No messages yet"}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+    </Pressable>
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Chats</Text>
-        <Text style={styles.subtitle}>
+        <View>
+          <Text style={styles.title}>Chats</Text>
+          <Text style={styles.subtitle}>
           {activeTab === "courts"
             ? "Court chats for your subscribed courts"
             : "Direct and group messages"}
-        </Text>
+          </Text>
+        </View>
+        {activeTab === "messages" && (
+          <Pressable
+            style={styles.plusButton}
+            onPress={openFriends}
+            hitSlop={12}
+          >
+            <Ionicons name="add-circle" size={32} color={colors.primary} />
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.tabBar}>
         <Pressable
           style={[styles.tab, activeTab === "messages" && styles.tabActive]}
-          onPress={() => setActiveTab("messages")}
+          onPress={() => {
+            setActiveTab("messages");
+            fetchDmChats();
+          }}
         >
           <Ionicons
             name="chatbubbles"
@@ -209,13 +348,37 @@ export default function ChatsScreen() {
       </View>
 
       {activeTab === "messages" ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>No messages yet</Text>
-          <Text style={styles.emptyText}>
-            Direct messages and group chats will appear here.
-          </Text>
-        </View>
+        dmChats.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
+            <Text style={styles.emptyTitle}>No messages yet</Text>
+            <Text style={styles.emptyText}>
+              Tap + to add friends and start a conversation.
+            </Text>
+            <Pressable style={styles.addFriendsButton} onPress={openFriends}>
+              <Ionicons name="person-add" size={20} color="#fff" />
+              <Text style={styles.addFriendsButtonText}>Add Friends</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <FlatList
+            data={dmChats}
+            renderItem={renderDmChatItem}
+            keyExtractor={(item) => item.conversationId}
+            contentContainerStyle={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={async () => {
+                  setRefreshing(true);
+                  await fetchDmChats();
+                  setRefreshing(false);
+                }}
+                tintColor={colors.primary}
+              />
+            }
+          />
+        )
       ) : activeTab === "courts" ? (
         loading ? (
           <View style={styles.loadingContainer}>
@@ -262,9 +425,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
+  },
+  plusButton: {
+    padding: spacing.xs,
   },
   title: {
     color: colors.text,
@@ -365,5 +534,20 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.sm,
     textAlign: "center",
+  },
+  addFriendsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+  },
+  addFriendsButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
   },
 });

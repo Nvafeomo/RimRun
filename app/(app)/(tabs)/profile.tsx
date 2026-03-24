@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -25,10 +26,44 @@ const formatDateForDisplay = (isoDate: string) => {
 };
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const { user, signOut } = useAuth();
   const { profile, loading, updateProfilePicture } = useProfile();
   const [signingOut, setSigningOut] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [friendsCount, setFriendsCount] = useState<number | null>(null);
+  const [courtsCount, setCourtsCount] = useState<number | null>(null);
+
+  // Fetch friends and courts counts
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadCounts = async () => {
+      const courtsRes = await supabase
+        .from('court_subscriptions')
+        .select('court_id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      setCourtsCount(courtsRes.error ? 0 : (courtsRes.count ?? 0));
+
+      const friendsRes = await supabase
+        .from('friendships')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      setFriendsCount(friendsRes.error ? 0 : (friendsRes.count ?? 0));
+    };
+    loadCounts();
+  }, [user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+        supabase
+          .from('friendships')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .then((r) => setFriendsCount(r.error ? 0 : (r.count ?? 0)));
+      }
+    }, [user?.id])
+  );
 
   function handleDeleteAccountPress() {
     Alert.alert(
@@ -126,9 +161,24 @@ export default function ProfileScreen() {
           ) : null}
         </View>
 
-        {/* Future action buttons */}
+        {/* Settings */}
         <View style={styles.actionsSection}>
           <Text style={styles.sectionTitle}>Settings</Text>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/(app)/friends')}
+          >
+            <Text style={styles.actionButtonText}>
+              Friends: {friendsCount !== null ? friendsCount : '...'}
+            </Text>
+            <Text style={styles.actionChevron}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => {}}>
+            <Text style={styles.actionButtonText}>
+              Courts: {courtsCount !== null ? courtsCount : '...'}
+            </Text>
+            <Text style={styles.actionChevron}>›</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={() => {}}>
             <Text style={styles.actionButtonText}>Account</Text>
             <Text style={styles.actionChevron}>›</Text>
