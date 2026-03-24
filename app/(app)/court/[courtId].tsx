@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../../lib/supabase";
+import { useAuth } from "../../../context/AuthContext";
+import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
 
 type Court = {
@@ -27,38 +29,106 @@ type Court = {
 
 export default function CourtDetailScreen() {
   const { courtId } = useLocalSearchParams<{ courtId: string }>();
+  const { user } = useAuth();
+  const { getDisplayName } = useCourtAliases();
   const [court, setCourt] = useState<Court | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscribed, setSubscribed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [joiningChat, setJoiningChat] = useState(false);
+
+  const fetchSubscription = useCallback(async () => {
+    if (!courtId || !user?.id) return false;
+    const { data } = await supabase
+      .from("court_subscriptions")
+      .select("court_id")
+      .eq("user_id", user.id)
+      .eq("court_id", courtId)
+      .maybeSingle();
+    return !!data;
+  }, [courtId, user?.id]);
 
   useEffect(() => {
     if (!courtId) return;
-    const fetchCourt = async () => {
-      const { data, error } = await supabase
-        .from("courts")
-        .select("id, name, address, latitude, longitude, hoops, is_private")
-        .eq("id", courtId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching court:", error);
+    const load = async () => {
+      const [courtRes, subRes] = await Promise.all([
+        supabase
+          .from("courts")
+          .select("id, name, address, latitude, longitude, hoops, is_private")
+          .eq("id", courtId)
+          .single(),
+        fetchSubscription(),
+      ]);
+      if (courtRes.error) {
+        console.error("Error fetching court:", courtRes.error);
         setCourt(null);
       } else {
-        setCourt(data);
+        setCourt(courtRes.data);
       }
+      setSubscribed(subRes);
       setLoading(false);
     };
-    fetchCourt();
-  }, [courtId]);
+    load();
+  }, [courtId, fetchSubscription]);
 
-  const handleSubscribe = () => {
-    // TODO: Wire up to court_subscriptions table when available
-    setSubscribed(!subscribed);
+  const handleSubscribe = async () => {
+    if (!courtId || !user?.id || subscribing) return;
+    setSubscribing(true);
+    try {
+      if (subscribed) {
+        await supabase
+          .from("court_subscriptions")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("court_id", courtId);
+        setSubscribed(false);
+      } else {
+        await supabase.from("court_subscriptions").insert({
+          user_id: user.id,
+          court_id: courtId,
+        });
+        setSubscribed(true);
+      }
+    } catch (err) {
+      console.error("Error toggling subscription:", err);
+    } finally {
+      setSubscribing(false);
+    }
   };
 
-  const handleJoinChat = () => {
-    // TODO: Navigate to court-specific chat when implemented
-    router.push("/(app)/(tabs)/chats");
+  const handleJoinChat = async () => {
+    if (!courtId || joiningChat) return;
+    if (!user?.id) return;
+    setJoiningChat(true);
+    try {
+      if (!subscribed) {
+        await supabase.from("court_subscriptions").insert({
+          user_id: user.id,
+          court_id: courtId,
+        });
+        setSubscribed(true);
+      }
+      const { data: conversationId, error } = await supabase.rpc(
+        "get_or_create_court_conversation",
+        { p_court_id: courtId }
+      );
+      if (error) throw error;
+      if (conversationId) {
+        router.push({
+          pathname: "/(app)/chat/[conversationId]",
+          params: {
+            conversationId,
+            title: court ? getDisplayName(court.id, court.name ?? "Court Chat") : "Court Chat",
+            courtId: court?.id ?? courtId,
+            courtName: court?.name ?? "Court",
+          },
+        });
+      }
+    } catch (err) {
+      console.error("Error joining court chat:", err);
+    } finally {
+      setJoiningChat(false);
+    }
   };
 
   const handleOpenInMaps = () => {
@@ -140,6 +210,7 @@ export default function CourtDetailScreen() {
         <Pressable
           onPress={handleSubscribe}
           style={[styles.button, subscribed && styles.buttonSubscribed]}
+          disabled={subscribing}
         >
           <Ionicons
             name={subscribed ? "heart" : "heart-outline"}
@@ -152,13 +223,27 @@ export default function CourtDetailScreen() {
               subscribed && styles.buttonTextSubscribed,
             ]}
           >
-            {subscribed ? "Subscribed" : "Subscribe to Court"}
+            {subscribing
+              ? "Updating..."
+              : subscribed
+                ? "Subscribed"
+                : "Subscribe to Court"}
           </Text>
         </Pressable>
 
-        <Pressable onPress={handleJoinChat} style={styles.buttonPrimary}>
-          <Ionicons name="chatbubbles" size={22} color={colors.text} />
-          <Text style={styles.buttonPrimaryText}>Join Court Chat</Text>
+        <Pressable
+          onPress={handleJoinChat}
+          style={styles.buttonPrimary}
+          disabled={joiningChat}
+        >
+          {joiningChat ? (
+            <ActivityIndicator size="small" color={colors.text} />
+          ) : (
+            <Ionicons name="chatbubbles" size={22} color={colors.text} />
+          )}
+          <Text style={styles.buttonPrimaryText}>
+            {joiningChat ? "Joining..." : "Enter Chat"}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

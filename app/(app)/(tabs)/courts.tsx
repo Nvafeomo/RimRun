@@ -12,6 +12,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { supabase } from "../../../lib/supabase";
+import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, borderRadius, spacing } from "../../../constants/theme";
 
 const DEFAULT_REGION: Region = {
@@ -190,6 +191,7 @@ const styles = StyleSheet.create({
 });
 
 export default function CourtsScreen() {
+  const { getDisplayName } = useCourtAliases();
   const [region, setRegion] = useState<Region | null>(null);
   const [courts, setCourts] = useState<Court[]>([]);
   const [userLocation, setUserLocation] = useState<{
@@ -320,7 +322,7 @@ export default function CourtsScreen() {
             <Callout tooltip>
               <View style={styles.callout}>
                 <Text style={styles.calloutTitle}>
-                  {court.name ?? "Basketball Court"}
+                  {getDisplayName(court.id, court.name ?? "Basketball Court")}
                 </Text>
                 {court.hoops != null && (
                   <Text style={styles.calloutText}>

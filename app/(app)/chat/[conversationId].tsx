@@ -1,0 +1,246 @@
+import { useState } from "react";
+import { useLocalSearchParams, router } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  View,
+  Pressable,
+  Text,
+  TextInput,
+  Modal,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { ChatScreen } from "../../../components/ChatScreen";
+import { supabase } from "../../../lib/supabase";
+import { useAuth } from "../../../context/AuthContext";
+import { useCourtAliases } from "../../../hooks/useCourtAliases";
+import { colors, spacing, borderRadius } from "../../../constants/theme";
+
+export default function ChatRouteScreen() {
+  const { conversationId, title, courtId, courtName } = useLocalSearchParams<{
+    conversationId: string;
+    title?: string;
+    courtId?: string;
+    courtName?: string;
+  }>();
+  const { user } = useAuth();
+  const { getDisplayName, refresh } = useCourtAliases();
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const displayTitle = title ?? "Chat";
+  const resolvedCourtId = courtId ?? "";
+  const resolvedCourtName = courtName ?? "Court";
+  const canRename = !!resolvedCourtId && !!user?.id;
+
+  const openRename = () => {
+    setEditName(getDisplayName(resolvedCourtId, resolvedCourtName));
+    setEditing(true);
+  };
+
+  const saveAlias = async () => {
+    if (!resolvedCourtId || !user?.id) return;
+    const trimmed = editName.trim();
+    if (!trimmed) return;
+    try {
+      if (trimmed === resolvedCourtName) {
+        await supabase
+          .from("user_court_aliases")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("court_id", resolvedCourtId);
+      } else {
+        await supabase.from("user_court_aliases").upsert(
+          {
+            user_id: user.id,
+            court_id: resolvedCourtId,
+            custom_name: trimmed,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,court_id" }
+        );
+      }
+      setEditing(false);
+      await refresh();
+      router.setParams({ title: trimmed });
+    } catch (err) {
+      console.error("Error saving alias:", err);
+      Alert.alert("Error", "Could not save name.");
+    }
+  };
+
+  if (!conversationId) {
+    return null;
+  }
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </Pressable>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {displayTitle}
+          </Text>
+          {canRename && (
+            <Pressable
+              hitSlop={12}
+              onPress={openRename}
+              style={styles.headerEditButton}
+            >
+              <Ionicons name="pencil" size={18} color={colors.textMuted} />
+            </Pressable>
+          )}
+        </View>
+      </View>
+      <ChatScreen conversationId={conversationId} title={displayTitle} />
+
+      <Modal
+        visible={editing}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditing(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setEditing(false)}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.modalContent}
+          >
+            <Pressable onPress={() => {}} style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Rename court chat</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Court name"
+                placeholderTextColor={colors.textMuted}
+                autoFocus
+                autoCapitalize="words"
+              />
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={styles.modalCancel}
+                  onPress={() => setEditing(false)}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.modalSave,
+                    !editName.trim() && styles.modalSaveDisabled,
+                  ]}
+                  onPress={saveAlias}
+                  disabled={!editName.trim()}
+                >
+                  <Text style={styles.modalSaveText}>Save</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  backButton: {
+    padding: spacing.sm,
+    marginRight: spacing.sm,
+  },
+  headerTitleRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+    gap: spacing.xs,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  headerEditButton: {
+    padding: spacing.xs,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.lg,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 360,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  modalInput: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.lg,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    justifyContent: "flex-end",
+  },
+  modalCancel: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    color: colors.textMuted,
+  },
+  modalSave: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+  },
+  modalSaveDisabled: {
+    opacity: 0.5,
+  },
+  modalSaveText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+  },
+});

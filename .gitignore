@@ -40,3 +40,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+future_features.txt
+RimRun_Technical_Documentation.tex
+Chat_Implementation.tex
+rotate-secrets.md
+Router_Guard.md
