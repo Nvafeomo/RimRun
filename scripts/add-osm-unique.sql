@@ -1,10 +1,8 @@
--- Run this in Supabase SQL Editor before using upsert in import-courts.js
--- Adds unique constraint on osm_id so upsert can use onConflict: 'osm_id'
--- Note: UNIQUE allows multiple NULLs (for user-added courts without osm_id)
+-- Prepare courts.osm_id for PostgREST upsert (import-courts.js onConflict: 'osm_id'); multiple NULLs allowed for user courts.
 
--- Drop if exists (in case you need to re-run)
-DROP INDEX IF EXISTS courts_osm_id_unique;
+-- Drop the UNIQUE constraint if it already exists (re-runs). This drops the backing index too.
+-- Do NOT use DROP INDEX on courts_osm_id_unique first — Postgres blocks it while the constraint exists.
 ALTER TABLE public.courts DROP CONSTRAINT IF EXISTS courts_osm_id_unique;
 
--- Add unique constraint (required for ON CONFLICT; multiple NULLs allowed)
+-- One row per OSM id; UNIQUE allows many rows where osm_id IS NULL (user-added courts).
 ALTER TABLE public.courts ADD CONSTRAINT courts_osm_id_unique UNIQUE (osm_id);

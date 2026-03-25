@@ -36,6 +36,13 @@ const IMAGE_PICKER_OPTIONS = {
   base64: true,
 };
 
+/** Same Storage URL after upsert — expo-image caches by URI; bust so new bytes show after login. */
+function withImageCacheBust(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const base = url.split('?')[0];
+  return `${base}?v=${Date.now()}`;
+}
+
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile>(null);
@@ -56,7 +63,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (error) throw error;
-      setProfile(data ?? null);
+      if (data) {
+        setProfile({
+          ...data,
+          profile_image_url: withImageCacheBust(data.profile_image_url),
+        });
+      } else {
+        setProfile(null);
+      }
     } catch (err) {
       console.error('Error fetching profile:', err);
       setProfile(null);
@@ -74,24 +88,34 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (!user?.id) return;
       try {
         const filePath = `${user.id}/avatar.jpg`;
-        const { data, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('Avatars')
           .upload(filePath, decode(base64), {
             contentType: 'image/jpeg',
             upsert: true,
           });
         if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from('Avatars').getPublicUrl(data.path);
+
+        const { data: urlData } = supabase.storage.from('Avatars').getPublicUrl(filePath);
         const avatarUrl = urlData.publicUrl;
 
-        const { error: updateError } = await supabase
+        const { data: updated, error: updateError } = await supabase
           .from('profiles')
           .update({ profile_image_url: avatarUrl })
-          .eq('id', user.id);
+          .eq('id', user.id)
+          .select('profile_image_url, date_of_birth, username, email')
+          .maybeSingle();
         if (updateError) throw updateError;
+        if (!updated) {
+          throw new Error(
+            'Could not save profile photo (no row updated). Check RLS allows UPDATE on profiles for your user.'
+          );
+        }
 
-        const displayUrl = `${avatarUrl}${avatarUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
-        setProfile((prev) => (prev ? { ...prev, profile_image_url: displayUrl } : { profile_image_url: displayUrl, date_of_birth: null }));
+        setProfile({
+          ...updated,
+          profile_image_url: withImageCacheBust(updated.profile_image_url ?? avatarUrl),
+        });
       } catch (err: unknown) {
         const message =
           err instanceof Error

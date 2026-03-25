@@ -23,6 +23,18 @@ type ChatScreenProps = {
   title?: string;
 };
 
+/** First letter for avatar placeholder: username, else optional email local part, else "?". */
+function avatarPlaceholderLetter(
+  username: string | null | undefined,
+  emailLocalPart?: string | null
+): string {
+  const u = username?.trim();
+  if (u) return u.charAt(0).toUpperCase();
+  const e = emailLocalPart?.trim();
+  if (e) return e.charAt(0).toUpperCase();
+  return "?";
+}
+
 export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) {
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -54,15 +66,7 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
     .map(([, name]) => name)
     .join(", ");
 
-  const renderAvatar = (message: Message) => {
-    const isOwn = message.sender_id === user?.id;
-    const avatarUrl = isOwn
-      ? profile?.profile_image_url
-      : message.sender?.profile_image_url;
-    const displayName = isOwn
-      ? (profile?.username ?? "You")
-      : (message.sender?.username ?? "Unknown");
-
+  const renderAvatar = (avatarUrl: string | null, placeholderLetter: string) => {
     if (avatarUrl) {
       return (
         <Image
@@ -74,9 +78,7 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
     }
     return (
       <View style={styles.avatarPlaceholder}>
-        <Text style={styles.avatarPlaceholderText}>
-          {displayName.charAt(0).toUpperCase()}
-        </Text>
+        <Text style={styles.avatarPlaceholderText}>{placeholderLetter}</Text>
       </View>
     );
   };
@@ -86,46 +88,58 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
     const displayName = isOwn
       ? (profile?.username ?? "You")
       : (item.sender?.username ?? "Unknown");
+    const avatarUrl = isOwn
+      ? profile?.profile_image_url
+      : item.sender?.profile_image_url;
+    const avatarLetter = isOwn
+      ? avatarPlaceholderLetter(
+          profile?.username,
+          user?.email?.split("@")[0] ?? null
+        )
+      : avatarPlaceholderLetter(item.sender?.username);
+
+    if (isOwn) {
+      return (
+        <View style={[styles.messageRow, styles.messageRowOwn]}>
+          <View style={[styles.messageContent, styles.messageContentOwn]}>
+            <Text style={[styles.senderName, styles.senderNameOwn]}>
+              {displayName}
+            </Text>
+            <View style={[styles.bubble, styles.bubbleOwn]}>
+              <Text style={[styles.messageText, styles.messageTextOwn]}>
+                {item.content}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.avatarColumn}>
+            {renderAvatar(avatarUrl ?? null, avatarLetter)}
+          </View>
+        </View>
+      );
+    }
 
     return (
-      <View
-        style={[
-          styles.messageRow,
-          isOwn ? styles.messageRowOwn : styles.messageRowOther,
-        ]}
-      >
-        {!isOwn && renderAvatar(item)}
-        <View
-          style={[
-            styles.messageContent,
-            isOwn ? styles.messageContentOwn : styles.messageContentOther,
-          ]}
-        >
+      <View style={[styles.messageRow, styles.messageRowOther]}>
+        <View style={styles.avatarColumn}>
           <Text
             style={[
               styles.senderName,
-              isOwn ? styles.senderNameOwn : styles.senderNameOther,
+              styles.senderNameOther,
+              styles.senderNameInColumn,
             ]}
+            numberOfLines={1}
           >
             {displayName}
           </Text>
-          <View
-            style={[
-              styles.bubble,
-              isOwn ? styles.bubbleOwn : styles.bubbleOther,
-            ]}
-          >
-            <Text
-              style={[
-                styles.messageText,
-                isOwn ? styles.messageTextOwn : styles.messageTextOther,
-              ]}
-            >
+          {renderAvatar(avatarUrl ?? null, avatarLetter)}
+        </View>
+        <View style={[styles.messageContent, styles.messageContentOther]}>
+          <View style={[styles.bubble, styles.bubbleOther]}>
+            <Text style={[styles.messageText, styles.messageTextOther]}>
               {item.content}
             </Text>
           </View>
         </View>
-        {isOwn && renderAvatar(item)}
       </View>
     );
   };
@@ -234,13 +248,17 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   messageRowOther: {
-    justifyContent: "flex-start",
+    alignItems: "flex-start",
+  },
+  avatarColumn: {
+    width: 44,
+    alignItems: "center",
+    marginHorizontal: spacing.xs,
   },
   avatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    marginHorizontal: spacing.xs,
   },
   avatarPlaceholder: {
     width: 36,
@@ -249,7 +267,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: spacing.xs,
   },
   avatarPlaceholderText: {
     fontSize: 16,
@@ -270,6 +287,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     marginBottom: spacing.xs,
+  },
+  senderNameInColumn: {
+    marginBottom: 2,
+    textAlign: "center",
+    width: "100%",
   },
   senderNameOwn: {
     color: colors.primaryLight,

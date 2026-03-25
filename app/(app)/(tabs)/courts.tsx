@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   ActivityIndicator,
@@ -8,7 +8,7 @@ import {
   Text,
 } from "react-native";
 import MapView, { Region, Marker, Callout } from "react-native-maps";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { supabase } from "../../../lib/supabase";
@@ -188,6 +188,19 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 999,
   },
+  addCourtButton: {
+    position: "absolute",
+    borderColor: colors.primary,
+    bottom: 80,
+    right: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    borderWidth: 2,
+  },
+  addCourtButtonIcon: {
+    color: colors.text,
+  },
 });
 
 export default function CourtsScreen() {
@@ -200,6 +213,25 @@ export default function CourtsScreen() {
   } | null>(null);
   const mapRef = useRef<MapView>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
+
+  const fetchCourts = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("courts")
+      .select("id, name, address, latitude, longitude, hoops, is_private")
+      .not("latitude", "is", null)
+      .not("longitude", "is", null);
+    if (error) {
+      console.error("Error fetching courts:", error);
+      return;
+    }
+    setCourts(data ?? []);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchCourts();
+    }, [fetchCourts])
+  );
 
   useEffect(() => {
     (async () => {
@@ -243,23 +275,9 @@ export default function CourtsScreen() {
     return () => locationSubRef.current?.remove();
   }, []);
 
-  useEffect(() => {
-    if (!region) return;
-    const fetchCourts = async () => {
-      const { data, error } = await supabase
-        .from("courts")
-        .select("id, name, address, latitude, longitude, hoops, is_private")
-        .not("latitude", "is", null)
-        .not("longitude", "is", null);
-      if (error) {
-        console.error("Error fetching courts:", error);
-        return;
-      }
-      setCourts(data ?? []);
-    };
-    fetchCourts();
-  }, [region]);
-
+  const handleAddCourt = () => {
+    router.push("/(app)/court/add");
+  };
   const handleRecenter = async () => {
     try {
       const loc = await Location.getCurrentPositionAsync({
@@ -345,6 +363,9 @@ export default function CourtsScreen() {
       </MapView>
       <Pressable onPress={handleRecenter} style={styles.recenterButton}>
         <Ionicons name="locate" size={24} color={colors.text} />
+      </Pressable>
+      <Pressable onPress={handleAddCourt} style={styles.addCourtButton}>
+        <Ionicons name="add-outline" size={24} color={colors.text} />
       </Pressable>
     </View>
   );

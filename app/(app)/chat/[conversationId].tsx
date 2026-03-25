@@ -34,10 +34,20 @@ export default function ChatRouteScreen() {
   const resolvedCourtId = courtId ?? "";
   const resolvedCourtName = courtName ?? "Court";
   const canRename = !!resolvedCourtId && !!user?.id;
+  const isCourtChat = !!resolvedCourtId;
 
   const openRename = () => {
     setEditName(getDisplayName(resolvedCourtId, resolvedCourtName));
     setEditing(true);
+  };
+
+  const goToCourt = () => {
+    if (resolvedCourtId) {
+      router.push({
+        pathname: "/(app)/court/[courtId]",
+        params: { courtId: resolvedCourtId },
+      });
+    }
   };
 
   const saveAlias = async () => {
@@ -85,6 +95,15 @@ export default function ChatRouteScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>
             {displayTitle}
           </Text>
+          {isCourtChat && (
+            <Pressable
+              hitSlop={12}
+              onPress={goToCourt}
+              style={styles.headerIconButton}
+            >
+              <Ionicons name="location" size={20} color={colors.primary} />
+            </Pressable>
+          )}
           {canRename && (
             <Pressable
               hitSlop={12}
@@ -178,6 +197,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: colors.text,
+  },
+  headerIconButton: {
+    padding: spacing.xs,
   },
   headerEditButton: {
     padding: spacing.xs,

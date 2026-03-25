@@ -19,6 +19,8 @@ export default function AppLayout() {
       <Stack.Screen name="court/[courtId]" />
       <Stack.Screen name="chat/[conversationId]" />
       <Stack.Screen name="friends" />
+      <Stack.Screen name="court/add" />
+      <Stack.Screen name="account" />
     </Stack>
   );
 }

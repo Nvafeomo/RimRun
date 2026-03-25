@@ -1,7 +1,6 @@
--- RimRun Chat Schema
--- Run this in Supabase SQL Editor before using the chat feature
+-- RimRun: conversations, messages, court chat RPC, and RLS (requires public.courts).
 
--- 0. Court subscriptions (user subscribes to court to access its chat)
+-- Join table: user must subscribe to a court before using that court's chat.
 create table if not exists public.court_subscriptions (
   user_id uuid references auth.users(id) on delete cascade,
   court_id uuid references public.courts(id) on delete cascade,
@@ -14,19 +13,20 @@ create index if not exists idx_court_subscriptions_user on public.court_subscrip
 alter table public.court_subscriptions enable row level security;
 
 drop policy if exists "Users can manage own subscriptions" on public.court_subscriptions;
+-- Users subscribe/unsubscribe only for themselves.
 create policy "Users can manage own subscriptions"
   on public.court_subscriptions for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
--- 1. Conversation type enum (idempotent: skip if already exists)
+-- Create conversation_type once; ignore if enum already exists from a prior run.
 do $$ begin
   create type conversation_type as enum ('court', 'dm', 'group');
 exception
   when duplicate_object then null;
 end $$;
 
--- 2. Conversations table
+-- One row per conversation; court rows reference a single court_id.
 create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
   type conversation_type not null,
@@ -39,10 +39,12 @@ create table if not exists public.conversations (
   )
 );
 
+-- Fast lookup of court by conversation.
 create index if not exists idx_conversations_court on public.conversations(court_id) where court_id is not null;
+-- At most one court-type conversation per court.
 create unique index if not exists idx_conversations_court_unique on public.conversations(court_id) where type = 'court';
 
--- 3. Conversation participants
+-- Membership for DM/group; court chats omit rows here and use court_subscriptions instead.
 create table if not exists public.conversation_participants (
   conversation_id uuid references public.conversations(id) on delete cascade,
   user_id uuid references auth.users(id) on delete cascade,
@@ -52,7 +54,7 @@ create table if not exists public.conversation_participants (
 
 create index if not exists idx_participants_user on public.conversation_participants(user_id);
 
--- 4. Messages table
+-- Chat messages tied to a conversation and sender.
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid references public.conversations(id) on delete cascade not null,
@@ -61,17 +63,20 @@ create table if not exists public.messages (
   created_at timestamptz default now()
 );
 
+-- Paginate/load history by conversation, newest first.
 create index if not exists idx_messages_conversation_created on public.messages(conversation_id, created_at desc);
 
--- 5. Enable Realtime
+-- Stream new message rows to Realtime subscribers.
 alter publication supabase_realtime add table public.messages;
 
--- 6. RLS
+-- Gate conversation list/detail by RLS policies.
 alter table public.conversations enable row level security;
+-- Gate who appears in each conversation.
 alter table public.conversation_participants enable row level security;
+-- Gate read/send of message content.
 alter table public.messages enable row level security;
 
--- Helper to check participation without RLS recursion (SECURITY DEFINER bypasses RLS)
+-- Avoid infinite RLS recursion when policies on messages check participants.
 create or replace function public.user_is_conversation_participant(conv_id uuid)
 returns boolean
 language sql
@@ -86,6 +91,7 @@ as $$
 $$;
 
 drop policy if exists "Users can read conversations they participate in" on public.conversations;
+-- See DM/group via membership; see court chat only if subscribed to that court.
 create policy "Users can read conversations they participate in"
   on public.conversations for select to authenticated
   using (
@@ -100,16 +106,19 @@ create policy "Users can read conversations they participate in"
   );
 
 drop policy if exists "Participants can read participants" on public.conversation_participants;
+-- See participant list only if you are in that conversation.
 create policy "Participants can read participants"
   on public.conversation_participants for select to authenticated
   using (public.user_is_conversation_participant(conversation_id));
 
 drop policy if exists "Users can add themselves to conversations" on public.conversation_participants;
+-- Lets users join participant sets (e.g. DM creation) as themselves only.
 create policy "Users can add themselves to conversations"
   on public.conversation_participants for insert to authenticated
   with check (user_id = auth.uid());
 
 drop policy if exists "Read messages if in conversation" on public.messages;
+-- Same access rule as conversations: participants or court subscribers.
 create policy "Read messages if in conversation"
   on public.messages for select to authenticated
   using (
@@ -125,6 +134,7 @@ create policy "Read messages if in conversation"
   );
 
 drop policy if exists "Send message if in conversation" on public.messages;
+-- Must be the sender and pass participant or court-subscription checks.
 create policy "Send message if in conversation"
   on public.messages for insert to authenticated
   with check (
@@ -142,7 +152,7 @@ create policy "Send message if in conversation"
     )
   );
 
--- 7. RPC: Get or create court conversation
+-- Idempotent court chat thread: return existing conversation id or create type=court row.
 create or replace function public.get_or_create_court_conversation(p_court_id uuid)
 returns uuid
 language plpgsql

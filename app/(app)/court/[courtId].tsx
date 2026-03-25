@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,6 +26,7 @@ type Court = {
   longitude: number;
   hoops: number | null;
   is_private: boolean | null;
+  created_by: string | null;
 };
 
 export default function CourtDetailScreen() {
@@ -36,6 +38,7 @@ export default function CourtDetailScreen() {
   const [subscribed, setSubscribed] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const [joiningChat, setJoiningChat] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchSubscription = useCallback(async () => {
     if (!courtId || !user?.id) return false;
@@ -54,7 +57,7 @@ export default function CourtDetailScreen() {
       const [courtRes, subRes] = await Promise.all([
         supabase
           .from("courts")
-          .select("id, name, address, latitude, longitude, hoops, is_private")
+          .select("id, name, address, latitude, longitude, hoops, is_private, created_by")
           .eq("id", courtId)
           .single(),
         fetchSubscription(),
@@ -131,6 +134,46 @@ export default function CourtDetailScreen() {
     }
   };
 
+  const isCreator =
+    !!user?.id && !!court?.created_by && court.created_by === user.id;
+
+  const handleDeleteCourt = () => {
+    if (!courtId || !user?.id || deleting) return;
+    Alert.alert(
+      "Remove court",
+      "This permanently deletes this court for everyone (map, chat, subscriptions). This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              const { error } = await supabase.from("courts").delete().eq("id", courtId);
+              if (error) {
+                console.error("Delete court error:", error);
+                Alert.alert(
+                  "Could not remove court",
+                  error.code === "42501" || error.message.includes("row-level security")
+                    ? "Permission denied. Run the latest user-courts-migration.sql (delete policy) in Supabase."
+                    : error.message
+                );
+                return;
+              }
+              router.replace("/(app)/(tabs)/courts");
+            } catch (e) {
+              console.error(e);
+              Alert.alert("Error", e instanceof Error ? e.message : "Something went wrong.");
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleOpenInMaps = () => {
     const { latitude, longitude } = court!;
     const label = encodeURIComponent(court!.name ?? "Basketball Court");
@@ -138,7 +181,10 @@ export default function CourtDetailScreen() {
       Platform.OS === "ios"
         ? `https://maps.apple.com/?ll=${latitude},${longitude}&q=${label}`
         : `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-    Linking.openURL(url);
+    // openURL returns a Promise; it can reject even after Maps opens — must catch or Metro reports uncaught promise.
+    void Linking.openURL(url).catch((err) => {
+      console.warn("Open in Maps:", err);
+    });
   };
 
   if (loading) {
@@ -245,6 +291,23 @@ export default function CourtDetailScreen() {
             {joiningChat ? "Joining..." : "Enter Chat"}
           </Text>
         </Pressable>
+
+        {isCreator ? (
+          <Pressable
+            onPress={handleDeleteCourt}
+            style={styles.deleteButton}
+            disabled={deleting}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <Ionicons name="trash-outline" size={22} color={colors.text} />
+            )}
+            <Text style={styles.deleteButtonText}>
+              {deleting ? "Removing..." : "Remove court"}
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -352,6 +415,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   buttonPrimaryText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  deleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.error,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  deleteButtonText: {
     fontSize: 16,
     fontWeight: "600",
     color: colors.text,

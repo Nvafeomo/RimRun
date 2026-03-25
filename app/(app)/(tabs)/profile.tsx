@@ -32,37 +32,39 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [friendsCount, setFriendsCount] = useState<number | null>(null);
-  const [courtsCount, setCourtsCount] = useState<number | null>(null);
+  const [courtsJoinedCount, setCourtsJoinedCount] = useState<number | null>(null);
+  const [courtsAddedCount, setCourtsAddedCount] = useState<number | null>(null);
 
-  // Fetch friends and courts counts
-  useEffect(() => {
+  const loadProfileCounts = useCallback(async () => {
     if (!user?.id) return;
-    const loadCounts = async () => {
-      const courtsRes = await supabase
-        .from('court_subscriptions')
-        .select('court_id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      setCourtsCount(courtsRes.error ? 0 : (courtsRes.count ?? 0));
-
-      const friendsRes = await supabase
+    const [friendsRes, joinedRes, addedRes] = await Promise.all([
+      supabase
         .from('friendships')
         .select('user_id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      setFriendsCount(friendsRes.error ? 0 : (friendsRes.count ?? 0));
-    };
-    loadCounts();
+        .eq('user_id', user.id),
+      supabase
+        .from('court_subscriptions')
+        .select('court_id', { count: 'exact', head: true })
+        .eq('user_id', user.id),
+      supabase
+        .from('courts')
+        .select('id', { count: 'exact', head: true })
+        .eq('created_by', user.id),
+    ]);
+    setFriendsCount(friendsRes.error ? 0 : (friendsRes.count ?? 0));
+    setCourtsJoinedCount(joinedRes.error ? 0 : (joinedRes.count ?? 0));
+    // Until user-courts-migration.sql (created_by column + RLS), this may error — show 0.
+    setCourtsAddedCount(addedRes.error ? 0 : (addedRes.count ?? 0));
   }, [user?.id]);
+
+  useEffect(() => {
+    loadProfileCounts();
+  }, [loadProfileCounts]);
 
   useFocusEffect(
     useCallback(() => {
-      if (user?.id) {
-        supabase
-          .from('friendships')
-          .select('user_id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .then((r) => setFriendsCount(r.error ? 0 : (r.count ?? 0)));
-      }
-    }, [user?.id])
+      loadProfileCounts();
+    }, [loadProfileCounts])
   );
 
   function handleDeleteAccountPress() {
@@ -81,12 +83,27 @@ export default function ProfileScreen() {
   }
 
   async function handleDeleteAccount() {
+    if (!user?.id) return;
     setDeletingAccount(true);
     try {
-      await supabase.auth.admin.deleteUser(user?.id ?? '');
-      await supabase.from('profiles').delete().eq('id', user?.id ?? '');
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Your session expired. Sign in again and try deleting your account.');
+      }
+      const { data, error } = await supabase.functions.invoke('delete-account', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await signOut();
+      router.replace('/(auth)/login');
     } catch (e) {
       console.error('Delete account error', e);
+      Alert.alert(
+        'Could not delete account',
+        e instanceof Error ? e.message : 'An error occurred. Make sure the delete-account Edge Function is deployed.'
+      );
     } finally {
       setDeletingAccount(false);
     }
@@ -159,6 +176,41 @@ export default function ProfileScreen() {
               Born {formatDateForDisplay(profile.date_of_birth)}
             </Text>
           ) : null}
+
+          <View style={styles.statsRow}>
+            <TouchableOpacity
+              style={styles.statItem}
+              onPress={() => router.push('/(app)/friends')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.statValue}>
+                {friendsCount !== null ? friendsCount : '...'}
+              </Text>
+              <Text style={styles.statLabel}>Friends</Text>
+            </TouchableOpacity>
+            <View style={styles.statDivider} />
+            <TouchableOpacity
+              style={styles.statItem}
+              onPress={() => router.push('/(app)/(tabs)/courts')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.statValue}>
+                {courtsJoinedCount !== null ? courtsJoinedCount : '...'}
+              </Text>
+              <Text style={styles.statLabel} numberOfLines={2}>
+                Courts joined
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {courtsAddedCount !== null ? courtsAddedCount : '...'}
+              </Text>
+              <Text style={styles.statLabel} numberOfLines={2}>
+                Courts added
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Settings */}
@@ -166,20 +218,8 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Settings</Text>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => router.push('/(app)/friends')}
+            onPress={() => router.push('/(app)/account')}
           >
-            <Text style={styles.actionButtonText}>
-              Friends: {friendsCount !== null ? friendsCount : '...'}
-            </Text>
-            <Text style={styles.actionChevron}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => {}}>
-            <Text style={styles.actionButtonText}>
-              Courts: {courtsCount !== null ? courtsCount : '...'}
-            </Text>
-            <Text style={styles.actionChevron}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => {}}>
             <Text style={styles.actionButtonText}>Account</Text>
             <Text style={styles.actionChevron}>›</Text>
           </TouchableOpacity>
@@ -317,6 +357,37 @@ const styles = StyleSheet.create({
   dateOfBirth: {
     color: colors.textMuted,
     fontSize: 14,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    width: '100%',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+  },
+  statLabel: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingHorizontal: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: colors.border,
   },
   actionsSection: {
     backgroundColor: colors.surface,

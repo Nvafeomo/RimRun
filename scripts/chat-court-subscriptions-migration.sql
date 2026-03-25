@@ -1,8 +1,6 @@
--- RimRun: Court Subscriptions Migration
--- Run this ONLY if you already have the main chat schema (conversations, messages, etc.)
--- Adds court_subscriptions and updates RLS to require subscription for court chat access
+-- RimRun: court_subscriptions + stricter RLS for court chat (run after main chat schema exists).
 
--- 1. Court subscriptions table
+-- Join table: user follows a court (required to read/send that court's chat).
 create table if not exists public.court_subscriptions (
   user_id uuid references auth.users(id) on delete cascade,
   court_id uuid references public.courts(id) on delete cascade,
@@ -10,18 +8,20 @@ create table if not exists public.court_subscriptions (
   primary key (user_id, court_id)
 );
 
+-- List subscriptions by user for the Chats tab and policies.
 create index if not exists idx_court_subscriptions_user on public.court_subscriptions(user_id);
 
 alter table public.court_subscriptions enable row level security;
 
 drop policy if exists "Users can manage own subscriptions" on public.court_subscriptions;
+-- Users insert/update/delete only their own subscription rows.
 create policy "Users can manage own subscriptions"
   on public.court_subscriptions for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
--- 2. Update conversations policy (require subscription for court chats)
 drop policy if exists "Users can read conversations they participate in" on public.conversations;
+-- DMs/groups via participants; court chats visible only if subscribed to that court.
 create policy "Users can read conversations they participate in"
   on public.conversations for select to authenticated
   using (
@@ -35,8 +35,8 @@ create policy "Users can read conversations they participate in"
     ))
   );
 
--- 3. Update messages policies (require subscription for court chat read/send)
 drop policy if exists "Read messages if in conversation" on public.messages;
+-- Read messages in DMs you're in, or in court threads where you're subscribed to the court.
 create policy "Read messages if in conversation"
   on public.messages for select to authenticated
   using (
@@ -52,6 +52,7 @@ create policy "Read messages if in conversation"
   );
 
 drop policy if exists "Send message if in conversation" on public.messages;
+-- Send only as yourself and only if the same participation/subscription rules pass.
 create policy "Send message if in conversation"
   on public.messages for insert to authenticated
   with check (

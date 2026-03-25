@@ -5,12 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="87a0e9ac-58cf-4d2d-8ac8-bbab96942908" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/deviceManager.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deviceManager.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app.json" beforeDir="false" afterPath="$PROJECT_DIR$/app.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(app)/(tabs)/courts.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(app)/(tabs)/courts.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(app)/(tabs)/profile.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(app)/(tabs)/profile.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(app)/_layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(app)/_layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(app)/chat/[conversationId].tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(app)/chat/[conversationId].tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ChatScreen.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ChatScreen.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/add-osm-unique.sql" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/add-osm-unique.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/chat-court-subscriptions-migration.sql" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/chat-court-subscriptions-migration.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/chat-schema.sql" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/chat-schema.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/court-aliases-migration.sql" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/court-aliases-migration.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/friend-requests-migration.sql" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/friend-requests-migration.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/friendships-migration.sql" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/friendships-migration.sql" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,7 +50,7 @@
     "git-widget-placeholder": "main",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Personal CS Work/Projects/RimRun",
-    "settings.editor.selected.configurable": "project.propVCSSupport.DirectoryMappings"
+    "settings.editor.selected.configurable": "device.mirroring"
   }
 }]]></component>
   <component name="TaskManager">
