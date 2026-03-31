@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   ActivityIndicator,
@@ -6,6 +6,11 @@ import {
   StyleSheet,
   Platform,
   Text,
+  TextInput,
+  Keyboard,
+  Alert,
+  Modal,
+  ScrollView,
 } from "react-native";
 import MapView, { Region, Marker } from "react-native-maps";
 import { router } from "expo-router";
@@ -19,32 +24,46 @@ import {
   boundingBoxForRadiusMiles,
   haversineMiles,
 } from "../../../lib/geo";
+import {
+  geocodeSearchQuery,
+  enrichPickOptions,
+  type LocationPickOption,
+} from "../../../lib/courtMapSearch";
 
 const DEFAULT_REGION: Region = {
   latitude: 37.78825,
   longitude: -122.4324,
-  /** ~30–35 mi span so ~20 mi radius is comfortably in view */
   latitudeDelta: 0.52,
   longitudeDelta: 0.52,
 };
 
-/** Map zoom when recentering on user (~20 mi context). */
 const MAP_DELTA_NEAR_USER = 0.52;
 
-/** Show courts within this radius of the anchor point (user or default map center). */
-const COURTS_RADIUS_MILES = 20;
+const DEFAULT_RADIUS_MILES = 15;
 
-/**
- * One Supabase request cap. No `.order()` — ordering would truncate to a lat/lng stripe
- * inside the bbox and hide courts elsewhere in the circle.
- */
+/** If the last load was centered on the user, refetch when GPS moves farther than this (miles). */
+const REFETCH_MOVE_MILES = 8;
+
 const FETCH_ROW_CAP = 50_000;
 
-/** How many markers to add per animation frame when revealing (near → far). */
 const REVEAL_MARKERS_PER_FRAME = 36;
 
 const PIN_WIDTH = 36;
 const PIN_HEIGHT = 44;
+
+function parseMilesInput(raw: string): number {
+  const n = parseFloat(raw.replace(/,/g, "").trim());
+  if (!Number.isFinite(n) || n <= 0) {
+    return DEFAULT_RADIUS_MILES;
+  }
+  return Math.min(150, Math.max(1, Math.round(n)));
+}
+
+/** Map span so the search radius fits comfortably in view. */
+function mapDeltaForRadiusMiles(radiusMiles: number): number {
+  const spanDeg = (2 * radiusMiles) / 69;
+  return Math.min(2.5, Math.max(0.08, spanDeg * 1.15));
+}
 
 const RIMRUN_MAP_THEME = [
   { elementType: "geometry", stylers: [{ color: colors.surface }] },
@@ -148,6 +167,113 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    paddingTop: spacing.xs,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    height: 40,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.inputBg,
+    color: colors.text,
+    fontSize: 15,
+  },
+  milesInput: {
+    width: 52,
+    height: 40,
+    paddingHorizontal: spacing.xs,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.inputBg,
+    color: colors.text,
+    fontSize: 15,
+    textAlign: "center",
+  },
+  searchButton: {
+    height: 40,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  searchButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.background,
+  },
+  searchButtonDisabled: {
+    opacity: 0.55,
+  },
+  pickModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.md,
+  },
+  pickModalCard: {
+    width: "100%",
+    maxWidth: 420,
+    maxHeight: "78%",
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
+  pickModalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: colors.text,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
+  pickModalSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
+  pickModalScroll: {
+    maxHeight: 360,
+  },
+  pickOptionRow: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  pickOptionText: {
+    fontSize: 15,
+    color: colors.text,
+    lineHeight: 20,
+  },
+  pickModalCancel: {
+    paddingVertical: spacing.md,
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  pickModalCancelText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
   map: {
     flex: 1,
   },
@@ -241,39 +367,49 @@ export default function CourtsScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
-  /** Courts within COURTS_RADIUS_MILES, sorted nearest → farthest from anchor. */
   const [sortedCourts, setSortedCourts] = useState<Court[]>([]);
-  /** Subset revealed progressively for smooth “spread” from user. */
   const [visibleCourts, setVisibleCourts] = useState<Court[]>([]);
   const [courtsLoading, setCourtsLoading] = useState(false);
+
+  const [locationQuery, setLocationQuery] = useState("");
+  const [milesInput, setMilesInput] = useState(String(DEFAULT_RADIUS_MILES));
+  const [geocodingSearch, setGeocodingSearch] = useState(false);
+  const [locationPickVisible, setLocationPickVisible] = useState(false);
+  const [locationPickOptions, setLocationPickOptions] = useState<
+    LocationPickOption[]
+  >([]);
 
   const mapRef = useRef<MapView | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const fetchRequestIdRef = useRef(0);
-  const courtsLoadStartedRef = useRef(false);
+  const initialCourtsLoadStartedRef = useRef(false);
 
-  /** Single load when `region` is ready (not on every GPS tick). Anchor = user if granted, else map center. */
-  useEffect(() => {
-    if (!region || courtsLoadStartedRef.current) {
-      return;
-    }
-    courtsLoadStartedRef.current = true;
+  const radiusMilesRef = useRef(DEFAULT_RADIUS_MILES);
+  const lastFetchAnchorRef = useRef<{ lat: number; lng: number } | null>(
+    null
+  );
+  const lastFetchWasUserAnchoredRef = useRef(false);
+  const moveRefetchInFlightRef = useRef(false);
 
-    const centerLat = userLocation?.latitude ?? region.latitude;
-    const centerLng = userLocation?.longitude ?? region.longitude;
-    const requestId = ++fetchRequestIdRef.current;
+  const loadCourtsAtAnchor = useCallback(
+    async (
+      centerLat: number,
+      centerLng: number,
+      radiusMiles: number,
+      requestId: number
+    ): Promise<boolean> => {
+      radiusMilesRef.current = radiusMiles;
 
-    setCourtsLoading(true);
-    setSortedCourts([]);
-    setVisibleCourts([]);
+      setCourtsLoading(true);
+      setSortedCourts([]);
+      setVisibleCourts([]);
 
-    const { minLat, maxLat, minLng, maxLng } = boundingBoxForRadiusMiles(
-      centerLat,
-      centerLng,
-      COURTS_RADIUS_MILES
-    );
+      const { minLat, maxLat, minLng, maxLng } = boundingBoxForRadiusMiles(
+        centerLat,
+        centerLng,
+        radiusMiles
+      );
 
-    void (async () => {
       const { data, error } = await supabase
         .from("courts")
         .select("id, name, address, latitude, longitude, hoops, is_private")
@@ -284,13 +420,13 @@ export default function CourtsScreen() {
         .limit(FETCH_ROW_CAP);
 
       if (requestId !== fetchRequestIdRef.current) {
-        return;
+        return false;
       }
 
       if (error) {
         console.error("Error fetching courts:", error);
         setCourtsLoading(false);
-        return;
+        return false;
       }
 
       const rows = data ?? [];
@@ -301,7 +437,7 @@ export default function CourtsScreen() {
           c.latitude,
           c.longitude
         );
-        return d <= COURTS_RADIUS_MILES;
+        return d <= radiusMiles;
       });
 
       inRadius.sort(
@@ -312,10 +448,79 @@ export default function CourtsScreen() {
 
       setSortedCourts(inRadius);
       setCourtsLoading(false);
-    })();
-  }, [region]);
+      return true;
+    },
+    []
+  );
 
-  /** Reveal markers from nearest to farthest in small batches each frame. */
+  const runCourtsSearch = useCallback(
+    async (opts: {
+      anchorLat: number;
+      anchorLng: number;
+      radiusMiles: number;
+      userAnchored: boolean;
+      animateMap: boolean;
+    }) => {
+      const requestId = ++fetchRequestIdRef.current;
+      const ok = await loadCourtsAtAnchor(
+        opts.anchorLat,
+        opts.anchorLng,
+        opts.radiusMiles,
+        requestId
+      );
+      if (!ok) {
+        return;
+      }
+      lastFetchAnchorRef.current = {
+        lat: opts.anchorLat,
+        lng: opts.anchorLng,
+      };
+      lastFetchWasUserAnchoredRef.current = opts.userAnchored;
+
+      if (opts.animateMap) {
+        const d = mapDeltaForRadiusMiles(opts.radiusMiles);
+        mapRef.current?.animateToRegion({
+          latitude: opts.anchorLat,
+          longitude: opts.anchorLng,
+          latitudeDelta: d,
+          longitudeDelta: d,
+        });
+        setRegion({
+          latitude: opts.anchorLat,
+          longitude: opts.anchorLng,
+          latitudeDelta: d,
+          longitudeDelta: d,
+        });
+      }
+    },
+    [loadCourtsAtAnchor]
+  );
+
+  const runCourtsSearchRef = useRef(runCourtsSearch);
+  runCourtsSearchRef.current = runCourtsSearch;
+
+  /** First paint: same as blank search — current location (or map default) + miles field. */
+  useEffect(() => {
+    if (!region || initialCourtsLoadStartedRef.current) {
+      return;
+    }
+    initialCourtsLoadStartedRef.current = true;
+
+    const centerLat = userLocation?.latitude ?? region.latitude;
+    const centerLng = userLocation?.longitude ?? region.longitude;
+    const radiusMiles = parseMilesInput(milesInput);
+
+    void runCourtsSearch({
+      anchorLat: centerLat,
+      anchorLng: centerLng,
+      radiusMiles,
+      userAnchored: true,
+      animateMap: false,
+    });
+    // Intentionally omit milesInput/userLocation: run once when map region is ready; GPS and region are set together when permission is granted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [region, runCourtsSearch]);
+
   useEffect(() => {
     if (sortedCourts.length === 0) {
       setVisibleCourts([]);
@@ -380,15 +585,121 @@ export default function CourtsScreen() {
           distanceInterval: 75,
         },
         (loc) => {
-          setUserLocation({
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-          });
+          const latitude = loc.coords.latitude;
+          const longitude = loc.coords.longitude;
+          setUserLocation({ latitude, longitude });
+
+          const anchor = lastFetchAnchorRef.current;
+          if (
+            !lastFetchWasUserAnchoredRef.current ||
+            !anchor ||
+            moveRefetchInFlightRef.current
+          ) {
+            return;
+          }
+          const dist = haversineMiles(
+            latitude,
+            longitude,
+            anchor.lat,
+            anchor.lng
+          );
+          if (dist < REFETCH_MOVE_MILES) {
+            return;
+          }
+          moveRefetchInFlightRef.current = true;
+          const r = radiusMilesRef.current;
+          void runCourtsSearchRef
+            .current({
+              anchorLat: latitude,
+              anchorLng: longitude,
+              radiusMiles: r,
+              userAnchored: true,
+              animateMap: false,
+            })
+            .finally(() => {
+              moveRefetchInFlightRef.current = false;
+            });
         }
       );
     })();
     return () => locationSubRef.current?.remove();
   }, []);
+
+  const handleCourtsSearch = useCallback(async () => {
+    Keyboard.dismiss();
+    if (!region) {
+      return;
+    }
+
+    const radiusMiles = parseMilesInput(milesInput);
+    const trimmed = locationQuery.trim();
+
+    if (trimmed === "") {
+      const lat = userLocation?.latitude ?? region.latitude;
+      const lng = userLocation?.longitude ?? region.longitude;
+      await runCourtsSearch({
+        anchorLat: lat,
+        anchorLng: lng,
+        radiusMiles,
+        userAnchored: true,
+        animateMap: true,
+      });
+      return;
+    }
+
+    setGeocodingSearch(true);
+    try {
+      const raw = await geocodeSearchQuery(trimmed, userLocation);
+      if (raw.length === 0) {
+        Alert.alert(
+          "Location not found",
+          "Try adding a state or country (e.g. Calgary, AB), or turn on location so we can narrow the search."
+        );
+        return;
+      }
+
+      const options = await enrichPickOptions(raw, userLocation);
+      if (options.length === 1) {
+        const only = options[0];
+        setLocationQuery(only.label);
+        await runCourtsSearch({
+          anchorLat: only.latitude,
+          anchorLng: only.longitude,
+          radiusMiles,
+          userAnchored: false,
+          animateMap: true,
+        });
+        return;
+      }
+
+      setLocationPickOptions(options);
+      setLocationPickVisible(true);
+    } catch (e) {
+      console.error("geocodeSearch", e);
+      Alert.alert(
+        "Search failed",
+        "Could not look up that location. Try a different spelling."
+      );
+    } finally {
+      setGeocodingSearch(false);
+    }
+  }, [locationQuery, milesInput, region, userLocation, runCourtsSearch]);
+
+  const handlePickSearchLocation = useCallback(
+    async (opt: LocationPickOption) => {
+      setLocationPickVisible(false);
+      setLocationQuery(opt.label);
+      const radiusMiles = parseMilesInput(milesInput);
+      await runCourtsSearch({
+        anchorLat: opt.latitude,
+        anchorLng: opt.longitude,
+        radiusMiles,
+        userAnchored: false,
+        animateMap: true,
+      });
+    },
+    [milesInput, runCourtsSearch]
+  );
 
   const handleAddCourt = () => {
     router.push("/(app)/court/add");
@@ -400,11 +711,12 @@ export default function CourtsScreen() {
         accuracy: Location.Accuracy.Balanced,
       });
       const { latitude, longitude } = loc.coords;
+      const d = mapDeltaForRadiusMiles(radiusMilesRef.current);
       mapRef.current?.animateToRegion({
         latitude,
         longitude,
-        latitudeDelta: MAP_DELTA_NEAR_USER,
-        longitudeDelta: MAP_DELTA_NEAR_USER,
+        latitudeDelta: d,
+        longitudeDelta: d,
       });
     } catch {
       // Location unavailable
@@ -421,6 +733,90 @@ export default function CourtsScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="City, neighborhood, or address"
+          placeholderTextColor={colors.textMuted}
+          value={locationQuery}
+          onChangeText={setLocationQuery}
+          returnKeyType="search"
+          onSubmitEditing={handleCourtsSearch}
+          editable={!geocodingSearch}
+          autoCorrect
+          autoCapitalize="words"
+        />
+        <TextInput
+          style={styles.milesInput}
+          placeholder="mi"
+          placeholderTextColor={colors.textMuted}
+          value={milesInput}
+          onChangeText={setMilesInput}
+          editable={!geocodingSearch}
+          keyboardType={
+            Platform.OS === "ios" ? "number-pad" : "numeric"
+          }
+          maxLength={4}
+        />
+        <Pressable
+          style={[
+            styles.searchButton,
+            geocodingSearch && styles.searchButtonDisabled,
+          ]}
+          onPress={handleCourtsSearch}
+          disabled={geocodingSearch}
+          accessibilityRole="button"
+          accessibilityLabel="Search courts"
+        >
+          {geocodingSearch ? (
+            <ActivityIndicator color={colors.background} size="small" />
+          ) : (
+            <Text style={styles.searchButtonText}>Search</Text>
+          )}
+        </Pressable>
+      </View>
+
+      <Modal
+        visible={locationPickVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLocationPickVisible(false)}
+      >
+        <View style={styles.pickModalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setLocationPickVisible(false)}
+            accessibilityLabel="Dismiss"
+          />
+          <View style={[styles.pickModalCard, { zIndex: 1 }]}>
+            <Text style={styles.pickModalTitle}>Which place?</Text>
+            <Text style={styles.pickModalSubtitle}>
+              Several locations matched. Choose one to search nearby courts.
+            </Text>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              style={styles.pickModalScroll}
+            >
+              {locationPickOptions.map((opt, index) => (
+                <Pressable
+                  key={`${opt.latitude.toFixed(4)},${opt.longitude.toFixed(4)}-${index}`}
+                  style={styles.pickOptionRow}
+                  onPress={() => void handlePickSearchLocation(opt)}
+                >
+                  <Text style={styles.pickOptionText}>{opt.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable
+              style={styles.pickModalCancel}
+              onPress={() => setLocationPickVisible(false)}
+            >
+              <Text style={styles.pickModalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <MapView
         ref={mapRef}
         style={styles.map}
