@@ -4,7 +4,7 @@
       ["@react-native-community/datetimepicker", {
         "android": {
           "datePicker": {
-            "textColorSecondary": { "light": "#94A3B8", "dark": "#94A3B8" }
+            "textColorSecondary": "#94A3B8"
           }
         }
       }]
@@ -45,13 +45,7 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "READ_MEDIA_IMAGES"
       ],
       "package": "com.nvafeomo.RimRun"
     },

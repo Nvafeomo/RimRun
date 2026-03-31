@@ -21,6 +21,15 @@ import { supabase } from "../../lib/supabase";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
 
+function formatDateOfBirthDisplay(isoDate: string) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function validateUsername(value: string): string | null {
   if (!value.trim()) return "Username is required";
   if (!USERNAME_REGEX.test(value))
@@ -176,6 +185,18 @@ export default function AccountScreen() {
           <View style={styles.card}>
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
+            <Text style={styles.label}>Date of birth</Text>
+            <View style={styles.readOnlyField}>
+              <Text style={styles.readOnlyValue}>
+                {profile?.date_of_birth
+                  ? formatDateOfBirthDisplay(profile.date_of_birth)
+                  : "—"}
+              </Text>
+            </View>
+            <Text style={styles.readOnlyHint}>
+              Set when you signed up. It can’t be changed in the app.
+            </Text>
+
             <Text style={styles.label}>Username</Text>
             <TextInput
               style={styles.input}
@@ -272,6 +293,24 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textSecondary,
     marginBottom: spacing.sm,
+  },
+  readOnlyField: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: Platform.OS === "ios" ? 14 : 12,
+    backgroundColor: colors.background,
+    marginBottom: spacing.xs,
+  },
+  readOnlyValue: {
+    fontSize: 16,
+    color: colors.textMuted,
+  },
+  readOnlyHint: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
   },
   input: {
     borderWidth: 1,

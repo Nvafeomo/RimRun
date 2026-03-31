@@ -14,6 +14,8 @@ import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
+import { FriendsPanel } from "../../../components/FriendsPanel";
+import { NewGroupChatModal } from "../../../components/NewGroupChatModal";
 
 type CourtChatItem = {
   courtId: string;
@@ -23,23 +25,37 @@ type CourtChatItem = {
   lastMessageAt?: string;
 };
 
-type DmChatItem = {
-  conversationId: string;
-  otherUserId: string;
-  otherUsername: string;
-  lastMessage?: string;
-  lastMessageAt?: string;
-};
+type MessageThreadItem =
+  | {
+      kind: "dm";
+      conversationId: string;
+      otherUserId: string;
+      otherUsername: string;
+      lastMessage?: string;
+      lastMessageAt?: string;
+    }
+  | {
+      kind: "group";
+      conversationId: string;
+      title: string;
+      lastMessage?: string;
+      lastMessageAt?: string;
+    };
 
 export default function ChatsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { getDisplayName } = useCourtAliases();
-  const [activeTab, setActiveTab] = useState<"courts" | "messages">("messages");
+  const [activeTab, setActiveTab] = useState<
+    "courts" | "messages" | "friends"
+  >("messages");
   const [courtChats, setCourtChats] = useState<CourtChatItem[]>([]);
-  const [dmChats, setDmChats] = useState<DmChatItem[]>([]);
+  const [messageThreads, setMessageThreads] = useState<MessageThreadItem[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
 
   const fetchCourtChats = useCallback(async () => {
     if (!user?.id) {
@@ -90,120 +106,183 @@ export default function ChatsScreen() {
         conversationId: convByCourt[court.id] ?? "",
       }));
 
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].conversationId) {
-          const { data: lastMsg } = await supabase
-            .from("messages")
-            .select("content, created_at")
-            .eq("conversation_id", items[i].conversationId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (lastMsg) {
-            items[i].lastMessage = lastMsg.content;
-            items[i].lastMessageAt = lastMsg.created_at;
+      await Promise.all(
+        items.map(async (row) => {
+          if (row.conversationId) {
+            const { data: lastMsg } = await supabase
+              .from("messages")
+              .select("content, created_at")
+              .eq("conversation_id", row.conversationId)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (lastMsg) {
+              row.lastMessage = lastMsg.content;
+              row.lastMessageAt = lastMsg.created_at;
+            }
+          } else {
+            const { data: newConvId } = await supabase.rpc(
+              "get_or_create_court_conversation",
+              { p_court_id: row.courtId }
+            );
+            if (newConvId) row.conversationId = newConvId;
           }
-        } else {
-          const { data: newConvId } = await supabase.rpc(
-            "get_or_create_court_conversation",
-            { p_court_id: items[i].courtId }
-          );
-          if (newConvId) items[i].conversationId = newConvId;
-        }
-      }
+        })
+      );
 
-      setCourtChats(items);
+      setCourtChats([...items]);
     } catch (err) {
       console.error("Error fetching court chats:", err);
       setCourtChats([]);
     }
   }, [user?.id]);
 
-  const fetchDmChats = useCallback(async () => {
+  const fetchMessageThreads = useCallback(async () => {
     if (!user?.id) {
-      setDmChats([]);
+      setMessageThreads([]);
       return;
     }
     try {
+      const { data: myParts } = await supabase
+        .from("conversation_participants")
+        .select("conversation_id")
+        .eq("user_id", user.id);
+      const myConvIds = [
+        ...new Set((myParts ?? []).map((p) => p.conversation_id)),
+      ];
+
+      let groupItems: MessageThreadItem[] = [];
+      if (myConvIds.length) {
+        const { data: groupConvs } = await supabase
+          .from("conversations")
+          .select("id, name")
+          .eq("type", "group")
+          .in("id", myConvIds);
+
+        groupItems = await Promise.all(
+          (groupConvs ?? []).map(async (c) => {
+            const { data: parts } = await supabase
+              .from("conversation_participants")
+              .select("user_id")
+              .eq("conversation_id", c.id);
+            const otherIds = (parts ?? [])
+              .map((p) => p.user_id)
+              .filter((id) => id !== user.id);
+            const { data: profs } = await supabase
+              .from("profiles")
+              .select("username")
+              .in("id", otherIds);
+            const names = (profs ?? [])
+              .map((p) => p.username ?? "?")
+              .sort()
+              .join(", ");
+            const title = c.name?.trim() || names || "Group chat";
+            const { data: lastMsg } = await supabase
+              .from("messages")
+              .select("content, created_at")
+              .eq("conversation_id", c.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            return {
+              kind: "group" as const,
+              conversationId: c.id,
+              title,
+              lastMessage: lastMsg?.content,
+              lastMessageAt: lastMsg?.created_at,
+            };
+          })
+        );
+      }
+
       const { data: friendIds } = await supabase
         .from("friendships")
         .select("friend_id")
         .eq("user_id", user.id);
-      if (!friendIds?.length) {
-        setDmChats([]);
-        return;
+      const dmItems: MessageThreadItem[] = [];
+      if (friendIds?.length) {
+        const ids = friendIds.map((r) => r.friend_id);
+        const { data: convs } = await supabase
+          .from("conversations")
+          .select("id")
+          .eq("type", "dm");
+        if (convs?.length) {
+          const convIds = convs.map((c) => c.id);
+          const { data: parts } = await supabase
+            .from("conversation_participants")
+            .select("conversation_id, user_id")
+            .in("conversation_id", convIds)
+            .in("user_id", [user.id, ...ids]);
+          const myDmConvs = new Set(
+            (parts ?? [])
+              .filter((p) => p.user_id === user.id)
+              .map((p) => p.conversation_id)
+          );
+          const dmPairs: { convId: string; otherId: string }[] = [];
+          for (const cid of myDmConvs) {
+            const convParts = (parts ?? []).filter(
+              (p) => p.conversation_id === cid
+            );
+            const other = convParts.find((p) => p.user_id !== user.id);
+            if (other && ids.includes(other.user_id))
+              dmPairs.push({ convId: cid, otherId: other.user_id });
+          }
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, username")
+            .in("id", dmPairs.map((p) => p.otherId));
+          const nameMap = Object.fromEntries(
+            (profiles ?? []).map((p) => [p.id, p.username ?? "Unknown"])
+          );
+          for (const { convId, otherId } of dmPairs) {
+            const { data: lastMsg } = await supabase
+              .from("messages")
+              .select("content, created_at")
+              .eq("conversation_id", convId)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            dmItems.push({
+              kind: "dm",
+              conversationId: convId,
+              otherUserId: otherId,
+              otherUsername: nameMap[otherId] ?? "Unknown",
+              lastMessage: lastMsg?.content,
+              lastMessageAt: lastMsg?.created_at,
+            });
+          }
+        }
       }
-      const ids = friendIds.map((r) => r.friend_id);
-      const { data: convs } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("type", "dm");
-      if (!convs?.length) {
-        setDmChats([]);
-        return;
-      }
-      const convIds = convs.map((c) => c.id);
-      const { data: parts } = await supabase
-        .from("conversation_participants")
-        .select("conversation_id, user_id")
-        .in("conversation_id", convIds)
-        .in("user_id", [user.id, ...ids]);
-      const myConvs = new Set(
-        (parts ?? [])
-          .filter((p) => p.user_id === user.id)
-          .map((p) => p.conversation_id)
-      );
-      const dmPairs: { convId: string; otherId: string }[] = [];
-      for (const cid of myConvs) {
-        const convParts = (parts ?? []).filter((p) => p.conversation_id === cid);
-        const other = convParts.find((p) => p.user_id !== user.id);
-        if (other && ids.includes(other.user_id))
-          dmPairs.push({ convId: cid, otherId: other.user_id });
-      }
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, username")
-        .in("id", dmPairs.map((p) => p.otherId));
-      const nameMap = Object.fromEntries(
-        (profiles ?? []).map((p) => [p.id, p.username ?? "Unknown"])
-      );
-      const items: DmChatItem[] = [];
-      for (const { convId, otherId } of dmPairs) {
-        const { data: lastMsg } = await supabase
-          .from("messages")
-          .select("content, created_at")
-          .eq("conversation_id", convId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        items.push({
-          conversationId: convId,
-          otherUserId: otherId,
-          otherUsername: nameMap[otherId] ?? "Unknown",
-          lastMessage: lastMsg?.content,
-          lastMessageAt: lastMsg?.created_at,
-        });
-      }
-      items.sort(
+
+      const merged = [...dmItems, ...groupItems].sort(
         (a, b) =>
           new Date(b.lastMessageAt ?? 0).getTime() -
           new Date(a.lastMessageAt ?? 0).getTime()
       );
-      setDmChats(items);
+      setMessageThreads(merged);
     } catch (err) {
-      console.error("Error fetching DM chats:", err);
-      setDmChats([]);
+      console.error("Error fetching message threads:", err);
+      setMessageThreads([]);
     }
   }, [user?.id]);
 
+  // Defer court-chat work until the Court Chats sub-tab is open so switching
+  // from the map (Courts tab) to Chats is not blocked by N+1 queries.
   useEffect(() => {
+    if (activeTab !== "courts") return;
+    let cancelled = false;
     setLoading(true);
-    fetchCourtChats().finally(() => setLoading(false));
-  }, [fetchCourtChats]);
+    fetchCourtChats().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, fetchCourtChats]);
 
   useEffect(() => {
-    if (activeTab === "messages") fetchDmChats();
-  }, [activeTab, fetchDmChats]);
+    if (activeTab === "messages") fetchMessageThreads();
+  }, [activeTab, fetchMessageThreads]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -211,18 +290,14 @@ export default function ChatsScreen() {
     setRefreshing(false);
   };
 
-  const openDmChat = (item: DmChatItem) => {
+  const openMessageThread = (item: MessageThreadItem) => {
     router.push({
       pathname: "/(app)/chat/[conversationId]",
       params: {
         conversationId: item.conversationId,
-        title: item.otherUsername,
+        title: item.kind === "dm" ? item.otherUsername : item.title,
       },
     });
-  };
-
-  const openFriends = () => {
-    router.push("/(app)/friends");
   };
 
   const openCourtChat = (item: CourtChatItem) => {
@@ -259,18 +334,22 @@ export default function ChatsScreen() {
     </Pressable>
   );
 
-  const renderDmChatItem = ({ item }: { item: DmChatItem }) => (
+  const renderMessageThreadItem = ({ item }: { item: MessageThreadItem }) => (
     <Pressable
       style={styles.chatItem}
-      onPress={() => openDmChat(item)}
+      onPress={() => openMessageThread(item)}
       android_ripple={{ color: colors.border }}
     >
       <View style={styles.chatItemIcon}>
-        <Ionicons name="person" size={24} color={colors.primary} />
+        <Ionicons
+          name={item.kind === "group" ? "people" : "person"}
+          size={24}
+          color={colors.primary}
+        />
       </View>
       <View style={styles.chatItemContent}>
         <Text style={styles.chatItemTitle} numberOfLines={1}>
-          {item.otherUsername}
+          {item.kind === "dm" ? item.otherUsername : item.title}
         </Text>
         <Text style={styles.chatItemPreview} numberOfLines={1}>
           {item.lastMessage ?? "No messages yet"}
@@ -283,19 +362,21 @@ export default function ChatsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerTextBlock}>
           <Text style={styles.title}>Chats</Text>
           <Text style={styles.subtitle}>
-          {activeTab === "courts"
-            ? "Court chats for your subscribed courts"
-            : "Direct and group messages"}
+            {activeTab === "courts"
+              ? "Court chats for your subscribed courts"
+              : activeTab === "friends"
+                ? "Friends, requests, and add people"
+                : "Direct messages and groups"}
           </Text>
         </View>
         {activeTab === "messages" && (
           <Pressable
-            style={styles.plusButton}
-            onPress={openFriends}
+            onPress={() => setNewGroupOpen(true)}
             hitSlop={12}
+            style={styles.headerPlus}
           >
             <Ionicons name="add-circle" size={32} color={colors.primary} />
           </Pressable>
@@ -305,14 +386,11 @@ export default function ChatsScreen() {
       <View style={styles.tabBar}>
         <Pressable
           style={[styles.tab, activeTab === "messages" && styles.tabActive]}
-          onPress={() => {
-            setActiveTab("messages");
-            fetchDmChats();
-          }}
+          onPress={() => setActiveTab("messages")}
         >
           <Ionicons
             name="chatbubbles"
-            size={20}
+            size={18}
             color={activeTab === "messages" ? colors.primary : colors.textMuted}
           />
           <Text
@@ -320,20 +398,18 @@ export default function ChatsScreen() {
               styles.tabText,
               activeTab === "messages" && styles.tabTextActive,
             ]}
+            numberOfLines={1}
           >
             Messages
           </Text>
         </Pressable>
         <Pressable
           style={[styles.tab, activeTab === "courts" && styles.tabActive]}
-          onPress={() => {
-            setActiveTab("courts");
-            fetchCourtChats();
-          }}
+          onPress={() => setActiveTab("courts")}
         >
           <Ionicons
             name="basketball"
-            size={20}
+            size={18}
             color={activeTab === "courts" ? colors.primary : colors.textMuted}
           />
           <Text
@@ -341,29 +417,53 @@ export default function ChatsScreen() {
               styles.tabText,
               activeTab === "courts" && styles.tabTextActive,
             ]}
+            numberOfLines={1}
           >
-            Court Chats
+            Court
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tab, activeTab === "friends" && styles.tabActive]}
+          onPress={() => setActiveTab("friends")}
+        >
+          <Ionicons
+            name="people"
+            size={18}
+            color={activeTab === "friends" ? colors.primary : colors.textMuted}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "friends" && styles.tabTextActive,
+            ]}
+            numberOfLines={1}
+          >
+            Friends
           </Text>
         </Pressable>
       </View>
 
+      <View style={styles.body}>
       {activeTab === "messages" ? (
-        dmChats.length === 0 ? (
+        messageThreads.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>No messages yet</Text>
             <Text style={styles.emptyText}>
-              Tap + to add friends and start a conversation.
+              Tap + to start a group, or open Friends to message someone directly.
             </Text>
-            <Pressable style={styles.addFriendsButton} onPress={openFriends}>
-              <Ionicons name="person-add" size={20} color="#fff" />
-              <Text style={styles.addFriendsButtonText}>Add Friends</Text>
+            <Pressable
+              style={styles.addFriendsButton}
+              onPress={() => setActiveTab("friends")}
+            >
+              <Ionicons name="people" size={20} color="#fff" />
+              <Text style={styles.addFriendsButtonText}>Go to Friends</Text>
             </Pressable>
           </View>
         ) : (
           <FlatList
-            data={dmChats}
-            renderItem={renderDmChatItem}
+            data={messageThreads}
+            renderItem={renderMessageThreadItem}
             keyExtractor={(item) => item.conversationId}
             contentContainerStyle={styles.list}
             refreshControl={
@@ -371,7 +471,7 @@ export default function ChatsScreen() {
                 refreshing={refreshing}
                 onRefresh={async () => {
                   setRefreshing(true);
-                  await fetchDmChats();
+                  await fetchMessageThreads();
                   setRefreshing(false);
                 }}
                 tintColor={colors.primary}
@@ -414,7 +514,23 @@ export default function ChatsScreen() {
             }
           />
         )
-      ) : null}
+      ) : (
+        <FriendsPanel embedded />
+      )}
+      </View>
+
+      <NewGroupChatModal
+        visible={newGroupOpen}
+        onClose={() => setNewGroupOpen(false)}
+        onCreated={(conversationId, title) => {
+          setNewGroupOpen(false);
+          fetchMessageThreads();
+          router.push({
+            pathname: "/(app)/chat/[conversationId]",
+            params: { conversationId, title },
+          });
+        }}
+      />
     </View>
   );
 }
@@ -426,14 +542,24 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
+    gap: spacing.md,
   },
-  plusButton: {
+  headerTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerPlus: {
     padding: spacing.xs,
+    marginTop: 2,
+  },
+  body: {
+    flex: 1,
+    minHeight: 0,
   },
   title: {
     color: colors.text,

@@ -8,15 +8,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
-import { useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import {
+  formatLocalIsoDate,
+  maxBirthDateForMinAge,
+  validateDateOfBirthForSignup,
+} from '../../lib/agePolicy';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -24,6 +29,8 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { signUp } = useAuth();
@@ -51,16 +58,37 @@ export default function SignupScreen() {
     return null;
   }
 
-  
+  const formatDateForDisplay = (isoDate: string) => {
+    const [y, m, d] = isoDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
   async function handleSignUp() {
     setError('');
     const usernameError = validateUsername(username);
     const emailError = validateEmail(email);
     const passwordError = validatePassword(password);
     const confirmPasswordError = validateConfirmPassword(confirmPassword);
+    const dobCheck = validateDateOfBirthForSignup(dateOfBirth);
+    if (!dobCheck.ok) {
+      const dobMsg =
+        dobCheck.error === 'required'
+          ? 'Date of birth is required. RimRun is 13+ only.'
+          : dobCheck.error === 'invalid_format'
+            ? 'Enter a valid date of birth.'
+            : dobCheck.error === 'future'
+              ? 'Date of birth cannot be in the future.'
+              : 'You must be at least 13 years old to use RimRun.';
+      setError(dobMsg);
+      return;
+    }
     if (usernameError || emailError || passwordError || confirmPasswordError) {
       setError(
-        usernameError || emailError || passwordError || confirmPasswordError || 'Invalid credentials'
+        usernameError || emailError || passwordError || confirmPasswordError || 'Invalid credentials',
       );
       return;
     }
@@ -80,15 +108,15 @@ export default function SignupScreen() {
         return;
       }
 
-      await signUp(email.trim(), password, normalizedUsername);
+      const dobIso = dateOfBirth.trim();
+      await signUp(email.trim(), password, normalizedUsername, dobIso);
       router.replace('/(auth)/onboarding');
-    } catch (e: any) {
-      setError(e?.message ?? 'Sign up failed');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Sign up failed');
     } finally {
       setSubmitting(false);
     }
   }
-
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -113,7 +141,6 @@ export default function SignupScreen() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Create Account</Text>
-            
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -139,6 +166,38 @@ export default function SignupScreen() {
               value={email}
               onChangeText={setEmail}
             />
+
+            <TouchableOpacity
+              style={[styles.input, styles.dobTouchable]}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={[styles.dobText, !dateOfBirth && styles.dobPlaceholder]}>
+                {dateOfBirth ? formatDateForDisplay(dateOfBirth) : 'Date of birth (13+ only)'}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker ? (
+              <DateTimePicker
+                value={
+                  dateOfBirth
+                    ? (() => {
+                        const [y, m, d] = dateOfBirth.split('-').map(Number);
+                        return new Date(y, m - 1, d);
+                      })()
+                    : maxBirthDateForMinAge()
+                }
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                textColor={colors.textSecondary}
+                maximumDate={maxBirthDateForMinAge()}
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (event.type === 'set' && selectedDate) {
+                    setDateOfBirth(formatLocalIsoDate(selectedDate));
+                  }
+                }}
+              />
+            ) : null}
+
             <TextInput
               placeholder="Password"
               placeholderTextColor={colors.textMuted}
@@ -192,9 +251,7 @@ export default function SignupScreen() {
     </SafeAreaView>
   );
 }
-useEffect(() => {
-  
-}, []);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -244,12 +301,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     textAlign: 'center',
   },
-  cardSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg,
-    textAlign: 'center',
-  },
   error: {
     color: colors.error,
     fontSize: 14,
@@ -267,6 +318,17 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.inputBg,
     marginBottom: spacing.md,
+  },
+  dobTouchable: {
+    justifyContent: 'center',
+  },
+  dobText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  dobPlaceholder: {
+    color: colors.textMuted,
   },
   button: {
     width: '100%',

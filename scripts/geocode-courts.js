@@ -3,11 +3,13 @@
  * Reverse geocode courts with null name or address using OpenStreetMap Nominatim.
  * Fills in address and optionally name from coordinates.
  *
- * Usage: node scripts/geocode-courts.js
+ * Usage:
+ *   node scripts/geocode-courts.js
+ *   node scripts/geocode-courts.js --limit 50
  *
  * Requires: EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env
  *
- * Rate limit: Nominatim allows 1 request/second. ~500 courts = ~8 minutes.
+ * Rate limit: Nominatim allows ~1 request/second. 5,000 courts ≈ 1.5 hours — run overnight for huge batches.
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -34,16 +36,16 @@ function buildAddress(result) {
   const addr = result?.address;
   if (!addr) return result?.display_name || null;
   const parts = [
-    addr.road,
+    addr.house_number && addr.road ? `${addr.house_number} ${addr.road}` : addr.road,
     addr.suburb || addr.neighbourhood || addr.village,
     addr.city || addr.town || addr.municipality,
     addr.state,
+    addr.postcode,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(', ') : result.display_name || null;
 }
 
 function buildName(result) {
-  // Prefer park, playground, or place name for court context
   const addr = result.address || {};
   const name =
     addr.park ||
@@ -52,9 +54,23 @@ function buildName(result) {
     addr.leisure ||
     result.name;
   if (name) {
-    return String(name).toLowerCase().includes('basketball')
-      ? name
-      : `${name} Basketball Court`;
+    const s = String(name);
+    return s.toLowerCase().includes('basketball') ? s : `${s} – Basketball`;
+  }
+  // Fallback: neighbourhood / city label so the map isn't full of blank titles
+  const area =
+    addr.neighbourhood ||
+    addr.suburb ||
+    addr.hamlet ||
+    addr.village ||
+    addr.town ||
+    addr.city;
+  if (area) {
+    return `Basketball court (${area})`;
+  }
+  if (result.display_name) {
+    const first = result.display_name.split(',').slice(0, 2).join(',').trim();
+    return first.length > 90 ? `${first.slice(0, 87)}…` : first;
   }
   return null;
 }
@@ -73,7 +89,16 @@ async function reverseGeocode(lat, lon) {
   return res.json();
 }
 
+function parseLimit() {
+  const i = process.argv.indexOf('--limit');
+  if (i === -1 || !process.argv[i + 1]) return null;
+  const n = parseInt(process.argv[i + 1], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 async function main() {
+  const maxRows = parseLimit();
+
   const { data: allCourts, error } = await supabase
     .from('courts')
     .select('id, name, address, latitude, longitude')
@@ -87,8 +112,11 @@ async function main() {
 
   const courts = (allCourts || []).filter((c) => c.name == null || c.address == null);
 
-  const toUpdate = courts;
-  console.log(`Found ${toUpdate.length} courts needing name or address`);
+  const toUpdate = maxRows != null ? courts.slice(0, maxRows) : courts;
+  console.log(
+    `Found ${courts.length} courts needing name or address` +
+      (maxRows != null ? ` (processing first ${toUpdate.length} only)` : '')
+  );
   if (toUpdate.length === 0) {
     console.log('Nothing to do.');
     return;

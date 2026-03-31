@@ -45,8 +45,37 @@ npm start
 
 Then press `a` (Android), `i` (iOS), or `w` (web), or scan the QR code with Expo Go.
 
+### Expo Go on Android: `java.io.IOException: Failed to download remote update`
+
+Expo Go is failing to download the JavaScript bundle from your dev machine (network path to Metro), not from your app source code. Try, in order:
+
+1. **`npm run start:tunnel`** — uses Expo’s tunnel so the phone does not need to reach your PC’s LAN IP (works across Wi‑Fi isolation, many corporate networks, and some VPNs).
+2. **Same Wi‑Fi** — phone and PC on the same network; turn off VPN on both if possible.
+3. **Windows Firewall** — allow **Node.js** (or inbound **TCP 8081**) on **Private** networks; set the Wi‑Fi profile to Private, not Public.
+4. **Expo Go vs SDK** — install the latest **Expo Go** from the Play Store so it matches **Expo SDK 54** (this project).
+
+After switching to tunnel or fixing the network, fully close Expo Go and scan the new QR code (or enter the URL manually).
+
 - **Android / iOS (native):** `npm run android` or `npm run ios` (requires local SDKs and configured devices/emulators)
 - **Web:** `npm run web`
+
+## Supabase: Phase 2 age policy
+
+Run `scripts/phase-2-age-policy.sql` in the **Supabase SQL Editor** after Phase 0/1 and chat/friend migrations are applied (or run the Phase 2 block inside `scripts/rimrun-consolidated-migrations.sql`). It enforces the same rules as `lib/agePolicy.ts` for DMs, accepting friend requests, and **sending** friend requests.
+
+**Sanity checks in SQL Editor** (no auth needed):
+
+```sql
+SELECT public.mutual_interaction_allowed(14, 14);  -- expect true
+SELECT public.mutual_interaction_allowed(14, 25);  -- expect false
+SELECT public.age_in_full_years('2010-06-15'::date, CURRENT_DATE);
+```
+
+`get_or_create_dm_conversation`, `accept_friend_request`, and inserts on `friend_requests` raise clear exceptions if ages are missing or the pair is not allowed. The app shows the server `message` in alerts.
+
+Testing those RPCs **as a real user** needs a JWT (`auth.uid()`): use the RimRun app, or Supabase tools that impersonate a user. You cannot fully exercise `auth.uid()`-based RPCs from the SQL Editor alone without extra setup.
+
+**Phase 2b** (court message pairwise visibility, lock DOB updates, minors’ court address): run `scripts/phase-2b-messages-visibility.sql` after Phase 2 age functions exist, or use the Phase 2b section inside `scripts/rimrun-consolidated-migrations.sql`. See `docs/IMPLEMENTATION_STATUS.md` for the full checklist.
 
 ## Optional scripts
 

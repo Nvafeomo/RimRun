@@ -16,15 +16,6 @@ import { useProfile } from '../../../context/ProfileContext';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
 
-const formatDateForDisplay = (isoDate: string) => {
-  const [y, m, d] = isoDate.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-};
-
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
@@ -153,7 +144,7 @@ export default function ProfileScreen() {
                 key={profile.profile_image_url}
                 source={{ uri: profile.profile_image_url }}
                 style={styles.avatar}
-                resizeMode="cover"
+                contentFit="cover"
               />
             ) : (
               <View style={styles.avatarPlaceholder}>
@@ -170,11 +161,6 @@ export default function ProfileScreen() {
           <Text style={styles.name}>{displayName}</Text>
           {displayEmail ? (
             <Text style={styles.email}>{displayEmail}</Text>
-          ) : null}
-          {profile?.date_of_birth ? (
-            <Text style={styles.dateOfBirth}>
-              Born {formatDateForDisplay(profile.date_of_birth)}
-            </Text>
           ) : null}
 
           <View style={styles.statsRow}>
@@ -353,10 +339,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 15,
     marginBottom: spacing.xs,
-  },
-  dateOfBirth: {
-    color: colors.textMuted,
-    fontSize: 14,
   },
   statsRow: {
     flexDirection: 'row',

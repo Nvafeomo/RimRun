@@ -8,9 +8,29 @@ import {
 } from 'react';
 import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
+import { reencodeJpegWithoutExif } from '../lib/stripImageForUpload';
+import { validateDateOfBirthForSignup } from '../lib/agePolicy';
 import { useAuth } from './AuthContext';
+
+function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error(`Profile fetch timed out after ${ms}ms`)),
+      ms,
+    );
+    Promise.resolve(promise).then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
 
 export type Profile = {
   profile_image_url: string | null;
@@ -33,7 +53,7 @@ const IMAGE_PICKER_OPTIONS = {
   allowsEditing: true,
   aspect: [1, 1] as [number, number],
   quality: 1,
-  base64: true,
+  base64: false,
 };
 
 /** Same Storage URL after upsert — expo-image caches by URI; bust so new bytes show after login. */
@@ -56,17 +76,37 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('profile_image_url, date_of_birth, username, email')
-        .eq('id', user.id)
-        .maybeSingle();
+      const { data, error } = await withTimeout(
+        supabase
+          .from('profiles')
+          .select('profile_image_url, date_of_birth, username, email')
+          .eq('id', user.id)
+          .maybeSingle(),
+        20_000,
+      );
 
       if (error) throw error;
-      if (data) {
+      let row = data;
+      // Email-confirm signup: DOB may only exist in auth metadata until first profile row sync.
+      if (row && !row.date_of_birth) {
+        const metaDob = user.user_metadata?.date_of_birth;
+        if (typeof metaDob === 'string' && metaDob.trim()) {
+          const check = validateDateOfBirthForSignup(metaDob.trim());
+          if (check.ok) {
+            const { error: syncErr } = await supabase
+              .from('profiles')
+              .update({ date_of_birth: metaDob.trim() })
+              .eq('id', user.id);
+            if (!syncErr) {
+              row = { ...row, date_of_birth: metaDob.trim() };
+            }
+          }
+        }
+      }
+      if (row) {
         setProfile({
-          ...data,
-          profile_image_url: withImageCacheBust(data.profile_image_url),
+          ...row,
+          profile_image_url: withImageCacheBust(row.profile_image_url),
         });
       } else {
         setProfile(null);
@@ -77,20 +117,21 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, user?.user_metadata?.date_of_birth]);
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
 
   const uploadAndUpdateProfile = useCallback(
-    async (base64: string) => {
+    async (localUri: string) => {
       if (!user?.id) return;
       try {
         const filePath = `${user.id}/avatar.jpg`;
+        const bytes = await reencodeJpegWithoutExif(localUri);
         const { error: uploadError } = await supabase.storage
           .from('Avatars')
-          .upload(filePath, decode(base64), {
+          .upload(filePath, bytes, {
             contentType: 'image/jpeg',
             upsert: true,
           });
@@ -143,8 +184,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync(IMAGE_PICKER_OPTIONS);
-      if (!result.canceled && result.assets[0]?.base64) {
-        await uploadAndUpdateProfile(result.assets[0].base64);
+      const uri = result.assets?.[0]?.uri;
+      if (!result.canceled && uri) {
+        await uploadAndUpdateProfile(uri);
       }
     };
 
@@ -158,8 +200,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         return;
       }
       const result = await ImagePicker.launchCameraAsync(IMAGE_PICKER_OPTIONS);
-      if (!result.canceled && result.assets[0]?.base64) {
-        await uploadAndUpdateProfile(result.assets[0].base64);
+      const uri = result.assets?.[0]?.uri;
+      if (!result.canceled && uri) {
+        await uploadAndUpdateProfile(uri);
       }
     };
 

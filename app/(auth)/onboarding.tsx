@@ -1,7 +1,6 @@
 import {
     View,
     Text,
-    TextInput,
     TouchableOpacity,
     StyleSheet,
     ActivityIndicator,
@@ -14,14 +13,19 @@ import {
   import { useRouter } from 'expo-router';
   import { useState } from 'react';
   import { useAuth } from '../../context/AuthContext';
+  import { useProfile } from '../../context/ProfileContext';
   import { colors, spacing, borderRadius } from '../../constants/theme';
-  import { useEffect } from 'react';
   import { router } from 'expo-router';
   import { Image } from 'expo-image';
   import DateTimePicker from '@react-native-community/datetimepicker';
   import * as ImagePicker from 'expo-image-picker';
-  import { decode } from 'base64-arraybuffer';
   import { supabase } from '../../lib/supabase';
+  import { reencodeJpegWithoutExif } from '../../lib/stripImageForUpload';
+  import {
+    formatLocalIsoDate,
+    maxBirthDateForMinAge,
+    validateDateOfBirthForSignup,
+  } from '../../lib/agePolicy';
 
   const formatDateForDisplay = (isoDate: string) => {
     const [y, m, d] = isoDate.split('-').map(Number);
@@ -34,10 +38,11 @@ import {
 
   export default function OnboardingScreen() {
     const { user } = useAuth();
+    const { profile, loading: profileLoading, refreshProfile } = useProfile();
     const [profilePicture, setProfilePicture] = useState<string | null>(null);
-    const [profilePictureBase64, setProfilePictureBase64] = useState<string | null>(null);
+    /** Local file URI for upload (strip EXIF via re-encode before storage). */
+    const [profilePictureUri, setProfilePictureUri] = useState<string | null>(null);
     const [dateOfBirth, setDateOfBirth] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
@@ -47,7 +52,7 @@ import {
         allowsEditing: true,
         aspect: [1, 1] as [number, number],
         quality: 1,
-        base64: true,
+        base64: false,
     };
 
     const pickImage = async () => {
@@ -63,7 +68,7 @@ import {
         if (!result.canceled && result.assets[0]) {
             const asset = result.assets[0];
             setProfilePicture(asset.uri);
-            setProfilePictureBase64(asset.base64 ?? null);
+            setProfilePictureUri(asset.uri);
         }
     };
 
@@ -80,7 +85,7 @@ import {
         if (!result.canceled && result.assets[0]) {
             const asset = result.assets[0];
             setProfilePicture(asset.uri);
-            setProfilePictureBase64(asset.base64 ?? null);
+            setProfilePictureUri(asset.uri);
         }
     };
 
@@ -92,26 +97,44 @@ import {
         ]);
     };
 
+    const needsLegacyDob = !profile?.date_of_birth;
+
     const handleCompleteProfile = async () => {
         if (!user?.id) {
             setError('You must be signed in to complete your profile.');
             return;
         }
+        if (needsLegacyDob) {
+            const dobCheck = validateDateOfBirthForSignup(dateOfBirth);
+            if (!dobCheck.ok) {
+                const msg =
+                    dobCheck.error === 'required'
+                        ? 'Please select your date of birth. RimRun is 13+ only.'
+                        : dobCheck.error === 'invalid_format'
+                          ? 'Date of birth must be a valid calendar date.'
+                          : dobCheck.error === 'future'
+                            ? 'Date of birth cannot be in the future.'
+                            : 'You must be at least 13 years old to use RimRun.';
+                setError(msg);
+                return;
+            }
+        }
         setError('');
         setSubmitting(true);
         try {
             let avatarUrl: string | null = null;
-            if (profilePictureBase64) {
+            if (profilePictureUri) {
                 try {
                     const filePath = `${user.id}/avatar.jpg`;
-                    const { data, error: uploadError } = await supabase.storage
+                    const bytes = await reencodeJpegWithoutExif(profilePictureUri);
+                    const { error: uploadError } = await supabase.storage
                         .from('Avatars')
-                        .upload(filePath, decode(profilePictureBase64), {
+                        .upload(filePath, bytes, {
                             contentType: 'image/jpeg',
                             upsert: true,
                         });
                     if (uploadError) throw uploadError;
-                    const { data: urlData } = supabase.storage.from('Avatars').getPublicUrl(data.path);
+                    const { data: urlData } = supabase.storage.from('Avatars').getPublicUrl(filePath);
                     avatarUrl = urlData.publicUrl;
                 } catch (uploadErr) {
                     const msg = uploadErr instanceof Error ? uploadErr.message : 'Upload failed';
@@ -124,8 +147,12 @@ import {
                 }
             }
             const updates: Record<string, string | null> = {};
-            if (avatarUrl !== null) updates.profile_image_url = avatarUrl;
-            if (dateOfBirth) updates.date_of_birth = dateOfBirth;
+            if (needsLegacyDob) {
+                updates.date_of_birth = dateOfBirth.trim();
+            }
+            if (avatarUrl !== null) {
+                updates.profile_image_url = avatarUrl;
+            }
             if (Object.keys(updates).length > 0) {
                 const { error: updateError } = await supabase
                     .from('profiles')
@@ -133,6 +160,7 @@ import {
                     .eq('id', user.id);
                 if (updateError) throw updateError;
             }
+            await refreshProfile();
             router.replace('/(app)');
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : 'Failed to save profile');
@@ -140,14 +168,13 @@ import {
             setSubmitting(false);
         }
     };
-    if (isLoading) {
+    if (profileLoading) {
         return (
-            <View style={styles.loadingContainer}>
+            <View style={styles.centered}>
                 <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
     }
-    
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
@@ -163,13 +190,17 @@ import {
             </TouchableOpacity>
             <ScrollView style={styles.container}>
                 <View style={styles.header}>
-                    <Image source={require('../../assets/rimrun-logo.png')} style={styles.logo} resizeMode="contain" />
+                    <Image source={require('../../assets/rimrun-logo.png')} style={styles.logo} contentFit="contain" />
                     <Text style={styles.title}>Complete Your Profile</Text>
-                    <Text style={styles.subtitle}>Add your profile picture and date of birth.</Text>
+                    <Text style={styles.subtitle}>
+                        {needsLegacyDob
+                            ? 'Your account needs a date of birth (13+). Add an optional profile photo below.'
+                            : 'Add a profile picture if you like. Date of birth was set when you signed up.'}
+                    </Text>
                 </View>
                 <View style={styles.card}>
                     <TouchableOpacity style={styles.imageContainer} onPress={showImagePicker}>
-                        {profilePicture ? <Image source={{ uri: profilePicture }} style={styles.profilePicture} resizeMode="cover" /> : (
+                        {profilePicture ? <Image source={{ uri: profilePicture }} style={styles.profilePicture} contentFit="cover" /> : (
                         <View style={styles.placeholderImage}>
                             <Text style={styles.placeholderText}>+</Text>
                         </View>
@@ -179,29 +210,41 @@ import {
                         </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[styles.input, { width: '80%', alignSelf: 'center', justifyContent: 'center', alignItems: 'center' }]}
-                        onPress={() => setShowDatePicker(true)}
-                    >
-                        <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 16, fontWeight: '500', alignSelf: 'center' }}>
-                            {dateOfBirth ? formatDateForDisplay(dateOfBirth) : "Select Date of Birth"}
-                        </Text>
-                    </TouchableOpacity>
+                    {needsLegacyDob ? (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.input, { width: '80%', alignSelf: 'center', justifyContent: 'center', alignItems: 'center' }]}
+                                onPress={() => setShowDatePicker(true)}
+                            >
+                                <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 16, fontWeight: '500', alignSelf: 'center' }}>
+                                    {dateOfBirth ? formatDateForDisplay(dateOfBirth) : 'Select Date of Birth'}
+                                </Text>
+                            </TouchableOpacity>
 
-                    {showDatePicker && (
-                        <DateTimePicker
-                            value={dateOfBirth ? new Date(dateOfBirth) : new Date(2000, 0, 1)}
-                            mode="date"
-                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                            textColor={colors.textSecondary}
-                            onChange={(event, selectedDate) => {
-                                setShowDatePicker(false);
-                                if (event.type === 'set' && selectedDate) {
-                                    setDateOfBirth(selectedDate.toISOString().split("T")[0]);
-                                }
-                            }}
-                        />
-                    )}
+                            {showDatePicker ? (
+                                <DateTimePicker
+                                    value={
+                                        dateOfBirth
+                                            ? (() => {
+                                                const [y, m, d] = dateOfBirth.split('-').map(Number);
+                                                return new Date(y, m - 1, d);
+                                              })()
+                                            : maxBirthDateForMinAge()
+                                    }
+                                    mode="date"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    textColor={colors.textSecondary}
+                                    maximumDate={maxBirthDateForMinAge()}
+                                    onChange={(event, selectedDate) => {
+                                        setShowDatePicker(false);
+                                        if (event.type === 'set' && selectedDate) {
+                                            setDateOfBirth(formatLocalIsoDate(selectedDate));
+                                        }
+                                    }}
+                                />
+                            ) : null}
+                        </>
+                    ) : null}
                     {error ? <Text style={styles.error}>{error}</Text> : null}
                     <TouchableOpacity
                         style={styles.button}
@@ -212,20 +255,11 @@ import {
                         {submitting ? (
                         <ActivityIndicator color={colors.text} />
                         ) : (
-                        <Text style={styles.buttonText}>Complete Profile</Text>
+                        <Text style={styles.buttonText}>{needsLegacyDob ? 'Complete Profile' : 'Continue'}</Text>
                         )}
                     </TouchableOpacity>
                 </View>
             </ScrollView>
-            <TouchableOpacity
-                style={[styles.button, styles.skipButton]}
-                onPress={() => router.replace('/(app)')}
-                activeOpacity={0.7}
-                >
-                    
-                <Text style={styles.buttonText}>Skip</Text>
-            </TouchableOpacity> 
-          
         </KeyboardAvoidingView>
       </SafeAreaView>
       
@@ -293,11 +327,11 @@ import {
       color: colors.text,
       textAlign: 'center',
     },
-    skipButton: {
-      width: '40%',
-      height: 40,
-      alignSelf: 'center',
-      marginTop: spacing.md,
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
     },
     container: {
       flex: 1,
@@ -408,11 +442,6 @@ import {
     linkButtonTextBold: {
       color: colors.primary,
       fontWeight: '700',
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
   });
   

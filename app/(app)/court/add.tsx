@@ -19,6 +19,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
+import { useProfile } from "../../../context/ProfileContext";
+import { ageInFullYears, getAgeBracket } from "../../../lib/agePolicy";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
 
 const ZOOM_DELTA = 0.008;
@@ -77,6 +79,7 @@ async function resolveCourtCoordinates(
 
 export default function AddCourtScreen() {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const mapRef = useRef<MapView>(null);
   /** Last region from GPS / initial load — map returns here when the address field is cleared. */
   const gpsRegionRef = useRef<Region | null>(null);
@@ -226,6 +229,17 @@ export default function AddCourtScreen() {
     }
 
     const trimmedAddress = address.trim();
+    if (profile?.date_of_birth) {
+      const age = ageInFullYears(profile.date_of_birth);
+      const bracket = age !== null ? getAgeBracket(age) : null;
+      if (bracket === "13-15" && trimmedAddress.length === 0) {
+        Alert.alert(
+          "Address required",
+          "Users aged 13–15 must enter a street address to add a court (map pin alone is not enough)."
+        );
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       const coords = await resolveCourtCoordinates(trimmedAddress, region);

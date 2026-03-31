@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ChatScreen } from "../../../components/ChatScreen";
+import { AddMemberToChatModal } from "../../../components/AddMemberToChatModal";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
@@ -30,11 +31,40 @@ export default function ChatRouteScreen() {
   const { getDisplayName, refresh } = useCourtAliases();
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
+  const [chatKind, setChatKind] = useState<"dm" | "group" | "court" | null>(
+    null
+  );
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
   const displayTitle = title ?? "Chat";
   const resolvedCourtId = courtId ?? "";
   const resolvedCourtName = courtName ?? "Court";
   const canRename = !!resolvedCourtId && !!user?.id;
   const isCourtChat = !!resolvedCourtId;
+  const showAddMember =
+    !isCourtChat && (chatKind === "dm" || chatKind === "group");
+
+  useEffect(() => {
+    if (!conversationId) return;
+    if (resolvedCourtId) {
+      setChatKind("court");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("conversations")
+        .select("type")
+        .eq("id", conversationId)
+        .maybeSingle();
+      if (cancelled) return;
+      const t = data?.type as string | undefined;
+      if (t === "dm" || t === "group") setChatKind(t);
+      else setChatKind(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId, resolvedCourtId]);
 
   const openRename = () => {
     setEditName(getDisplayName(resolvedCourtId, resolvedCourtName));
@@ -113,6 +143,15 @@ export default function ChatRouteScreen() {
               <Ionicons name="pencil" size={18} color={colors.textMuted} />
             </Pressable>
           )}
+          {showAddMember && (
+            <Pressable
+              hitSlop={12}
+              onPress={() => setAddMemberOpen(true)}
+              style={styles.headerIconButton}
+            >
+              <Ionicons name="person-add-outline" size={22} color={colors.primary} />
+            </Pressable>
+          )}
         </View>
       </View>
       <ChatScreen conversationId={conversationId} title={displayTitle} />
@@ -164,6 +203,26 @@ export default function ChatRouteScreen() {
           </KeyboardAvoidingView>
         </Pressable>
       </Modal>
+
+      {showAddMember && chatKind && (
+        <AddMemberToChatModal
+          visible={addMemberOpen}
+          onClose={() => setAddMemberOpen(false)}
+          conversationId={conversationId}
+          chatType={chatKind}
+          onPromotedToGroup={(newConversationId, newTitle) => {
+            setAddMemberOpen(false);
+            router.replace({
+              pathname: "/(app)/chat/[conversationId]",
+              params: {
+                conversationId: newConversationId,
+                title: newTitle,
+              },
+            });
+          }}
+          onMemberAdded={() => setAddMemberOpen(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }

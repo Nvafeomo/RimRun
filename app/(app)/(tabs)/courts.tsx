@@ -24,7 +24,6 @@ const DEFAULT_REGION: Region = {
 
 const ZOOM_DELTA = 0.01;
 
-// Dark map style matching RimRun theme (background, surface, primary)
 const RIMRUN_MAP_THEME = [
   { elementType: "geometry", stylers: [{ color: colors.surface }] },
   { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
@@ -365,7 +364,11 @@ export default function CourtsScreen() {
         <Ionicons name="locate" size={24} color={colors.text} />
       </Pressable>
       <Pressable onPress={handleAddCourt} style={styles.addCourtButton}>
-        <Ionicons name="add-outline" size={24} color={colors.text} />
+        <Ionicons
+          name="add-outline"
+          size={24}
+          color={styles.addCourtButtonIcon.color}
+        />
       </Pressable>
     </View>
   );

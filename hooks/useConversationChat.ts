@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import { useProfile } from '../context/ProfileContext';
@@ -187,6 +188,10 @@ export function useConversationChat(conversationId: string | undefined) {
 
       if (error) {
         console.error('Error sending message:', error);
+        Alert.alert(
+          'Message not sent',
+          error.message || 'Could not send your message. Check your connection and try again.'
+        );
       }
       setSending(false);
     },

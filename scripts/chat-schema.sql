@@ -111,11 +111,11 @@ create policy "Participants can read participants"
   on public.conversation_participants for select to authenticated
   using (public.user_is_conversation_participant(conversation_id));
 
+-- No INSERT policy for authenticated on conversation_participants: DM/group rows are added only
+-- inside SECURITY DEFINER RPCs (see friend-requests-migration.sql + phase-1-chat-security-migration.sql).
+-- Court chat does not use participant rows; access is via court_subscriptions.
+
 drop policy if exists "Users can add themselves to conversations" on public.conversation_participants;
--- Lets users join participant sets (e.g. DM creation) as themselves only.
-create policy "Users can add themselves to conversations"
-  on public.conversation_participants for insert to authenticated
-  with check (user_id = auth.uid());
 
 drop policy if exists "Read messages if in conversation" on public.messages;
 -- Same access rule as conversations: participants or court subscribers.
@@ -152,7 +152,7 @@ create policy "Send message if in conversation"
     )
   );
 
--- Idempotent court chat thread: return existing conversation id or create type=court row.
+-- Court chat RPC (requires authenticated caller). Full definition with auth guard: phase-1-chat-security-migration.sql
 create or replace function public.get_or_create_court_conversation(p_court_id uuid)
 returns uuid
 language plpgsql
@@ -162,6 +162,12 @@ as $$
 declare
   v_conv_id uuid;
 begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+  if p_court_id is null then
+    raise exception 'Court id required';
+  end if;
   select id into v_conv_id from conversations where court_id = p_court_id and type = 'court' limit 1;
   if v_conv_id is null then
     insert into conversations (type, court_id) values ('court', p_court_id)

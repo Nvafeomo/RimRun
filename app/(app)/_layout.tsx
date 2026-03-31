@@ -1,16 +1,26 @@
 // app/(app)/_layout.tsx
 import { Stack, Redirect } from 'expo-router';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useProfile } from '../../context/ProfileContext';
 import { colors } from '../../constants/theme';
 
 export default function AppLayout() {
-  const {user, loading} = useAuth();
-  if (loading) {
-    return <ActivityIndicator size="large" color={colors.primary} />;
+  const { user, loading: authLoading } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
+
+  if (authLoading || (user && profileLoading)) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
-  if (!loading && !user) {
+  if (!user) {
     return <Redirect href="/(auth)/login" />;
+  }
+  if (!profile?.date_of_birth) {
+    return <Redirect href="/(auth)/onboarding" />;
   }
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -18,7 +28,7 @@ export default function AppLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="court/[courtId]" />
       <Stack.Screen name="chat/[conversationId]" />
-      <Stack.Screen name="friends" />
+      <Stack.Screen name="friends/index" />
       <Stack.Screen name="court/add" />
       <Stack.Screen name="account" />
     </Stack>

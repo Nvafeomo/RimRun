@@ -10,7 +10,11 @@
     "web": "expo start --web",
     "import-courts": "node scripts/import-courts.js",
     "import-courts:upsert": "node scripts/import-courts.js --upsert",
-    "geocode-courts": "node scripts/geocode-courts.js"
+    "geocode-courts": "node scripts/geocode-courts.js",
+    "prune-indoor-courts": "node scripts/prune-indoor-courts.js",
+    "prune-indoor-courts:execute": "node scripts/prune-indoor-courts.js --execute",
+    "prune-indoor-courts:overpass": "node scripts/prune-indoor-courts.js --overpass",
+    "prune-indoor-courts:overpass:execute": "node scripts/prune-indoor-courts.js --overpass --execute"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -21,6 +25,7 @@
     "expo": "~54.0.33",
     "expo-file-system": "~19.0.21",
     "expo-image": "~3.0.11",
+    "expo-image-manipulator": "~14.0.8",
     "expo-image-picker": "~17.0.10",
     "expo-linking": "~8.0.11",
     "expo-location": "~19.0.8",

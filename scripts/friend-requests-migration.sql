@@ -51,8 +51,10 @@ declare
   v_user_a uuid;
   v_user_b uuid;
 begin
-  -- Reject anonymous, missing target, or self-DM.
-  if v_my_id is null or p_other_user_id is null or v_my_id = p_other_user_id then
+  if v_my_id is null then
+    raise exception 'Not authenticated';
+  end if;
+  if p_other_user_id is null or v_my_id = p_other_user_id then
     return null;
   end if;
 
@@ -90,7 +92,10 @@ declare
   v_receiver_id uuid := auth.uid();
   v_sender_id uuid;
 begin
-  -- Only the receiver can accept a pending request they own.
+  if v_receiver_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
   select sender_id into v_sender_id
   from friend_requests
   where id = p_request_id and receiver_id = v_receiver_id and status = 'pending';
