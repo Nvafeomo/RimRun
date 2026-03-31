@@ -1,77 +1,50 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Image,
+  Platform,
   Text,
 } from "react-native";
-import ClusteredMapView from "react-native-map-clustering";
-import MapView, { Region, Marker, Callout } from "react-native-maps";
+import MapView, { Region, Marker } from "react-native-maps";
 import { router } from "expo-router";
+import CourtMapMarker from "../../../components/CourtMapMarker";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { supabase } from "../../../lib/supabase";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, borderRadius, spacing } from "../../../constants/theme";
+import {
+  boundingBoxForRadiusMiles,
+  haversineMiles,
+} from "../../../lib/geo";
 
 const DEFAULT_REGION: Region = {
   latitude: 37.78825,
   longitude: -122.4324,
-  latitudeDelta: 0.0922,
-  longitudeDelta: 0.0421,
+  /** ~30–35 mi span so ~20 mi radius is comfortably in view */
+  latitudeDelta: 0.52,
+  longitudeDelta: 0.52,
 };
 
-const ZOOM_DELTA = 0.01;
+/** Map zoom when recentering on user (~20 mi context). */
+const MAP_DELTA_NEAR_USER = 0.52;
+
+/** Show courts within this radius of the anchor point (user or default map center). */
+const COURTS_RADIUS_MILES = 20;
 
 /**
- * Rows per viewport request. Keep ≤ Supabase API max rows (e.g. 50k).
- * Clustering keeps native marker count low; this cap bounds JS/network load.
+ * One Supabase request cap. No `.order()` — ordering would truncate to a lat/lng stripe
+ * inside the bbox and hide courts elsewhere in the circle.
  */
-const VIEWPORT_FETCH_LIMIT = 50000;
+const FETCH_ROW_CAP = 50_000;
 
-/** Debounce map-driven refetches so panning does not spam the API / cluster rebuild. */
-const VIEWPORT_FETCH_DEBOUNCE_MS = 420;
+/** How many markers to add per animation frame when revealing (near → far). */
+const REVEAL_MARKERS_PER_FRAME = 36;
 
-/**
- * Only treat a region change as worth refetching if the view moved or zoomed enough.
- * Stops micro-jitter from onRegionChangeComplete from clearing/rebuilding pins constantly.
- */
-function regionWarrantsRefetch(prev: Region, next: Region): boolean {
-  const latSpan = Math.max(prev.latitudeDelta, 1e-9);
-  const lngSpan = Math.max(prev.longitudeDelta, 1e-9);
-  const latMove = Math.abs(next.latitude - prev.latitude) / latSpan;
-  const lngMove = Math.abs(next.longitude - prev.longitude) / lngSpan;
-  const zoomRatio =
-    Math.max(prev.latitudeDelta, next.latitudeDelta) /
-    Math.min(prev.latitudeDelta, next.latitudeDelta);
-  const zoomChanged = Math.abs(zoomRatio - 1) > 0.12;
-  return latMove > 0.1 || lngMove > 0.1 || zoomChanged;
-}
-
-function regionToBounds(r: Region, paddingRatio = 0.12) {
-  const padLat = r.latitudeDelta * paddingRatio;
-  const padLng = r.longitudeDelta * paddingRatio;
-  return {
-    minLat: r.latitude - r.latitudeDelta / 2 - padLat,
-    maxLat: r.latitude + r.latitudeDelta / 2 + padLat,
-    minLng: r.longitude - r.longitudeDelta / 2 - padLng,
-    maxLng: r.longitude + r.longitudeDelta / 2 + padLng,
-  };
-}
-
-/** Same asset as single-court pins; scale up slightly for larger clusters. */
-function clusterPinDimensions(pointCount: number) {
-  const baseW = 60;
-  const baseH = 70;
-  const n = Math.max(pointCount, 2);
-  const scale = Math.min(1.55, Math.max(1, 0.9 + Math.log10(n) * 0.22));
-  const width = Math.round(baseW * scale);
-  const height = Math.round(baseH * scale);
-  const fontSize = Math.min(16, 10 + Math.round(Math.log10(n + 1) * 3.2));
-  return { width, height, fontSize };
-}
+const PIN_WIDTH = 36;
+const PIN_HEIGHT = 44;
 
 const RIMRUN_MAP_THEME = [
   { elementType: "geometry", stylers: [{ color: colors.surface }] },
@@ -184,35 +157,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.background,
   },
-  markerImage: {
-    width: 60,
-    height: 70,
-  },
-  clusterPinWrap: {
-    position: "relative",
-    alignItems: "center",
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 20, 25, 0.55)",
     justifyContent: "center",
-  },
-  clusterBadge: {
-    position: "absolute",
-    top: 2,
-    right: -4,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 2,
-    borderColor: colors.background,
-    minWidth: 24,
     alignItems: "center",
-    justifyContent: "center",
+    zIndex: 10,
   },
-  clusterBadgeText: {
-    color: colors.text,
-    fontWeight: "700",
+  loadingLabel: {
+    marginTop: spacing.md,
+    fontSize: 15,
+    color: colors.textSecondary,
   },
   callout: {
-    minWidth: 140,
+    minWidth: 160,
+    maxWidth: 280,
+    minHeight: 72,
     padding: spacing.sm,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.sm,
@@ -277,23 +237,43 @@ const styles = StyleSheet.create({
 export default function CourtsScreen() {
   const { getDisplayName } = useCourtAliases();
   const [region, setRegion] = useState<Region | null>(null);
-  /** Current map view; drives bbox queries (not the full global table). */
-  const [viewportRegion, setViewportRegion] = useState<Region | null>(null);
-  const [courts, setCourts] = useState<Court[]>([]);
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
+  /** Courts within COURTS_RADIUS_MILES, sorted nearest → farthest from anchor. */
+  const [sortedCourts, setSortedCourts] = useState<Court[]>([]);
+  /** Subset revealed progressively for smooth “spread” from user. */
+  const [visibleCourts, setVisibleCourts] = useState<Court[]>([]);
+  const [courtsLoading, setCourtsLoading] = useState(false);
+
   const mapRef = useRef<MapView | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
-  /** Last region we used to trigger a fetch (for “meaningful move” gating). */
-  const viewportForFetchRef = useRef<Region | null>(null);
-  /** Monotonic id so stale in-flight responses never replace current pins. */
   const fetchRequestIdRef = useRef(0);
+  const courtsLoadStartedRef = useRef(false);
 
-  const fetchCourtsForViewport = useCallback(
-    async (r: Region, requestId: number) => {
-      const { minLat, maxLat, minLng, maxLng } = regionToBounds(r);
+  /** Single load when `region` is ready (not on every GPS tick). Anchor = user if granted, else map center. */
+  useEffect(() => {
+    if (!region || courtsLoadStartedRef.current) {
+      return;
+    }
+    courtsLoadStartedRef.current = true;
+
+    const centerLat = userLocation?.latitude ?? region.latitude;
+    const centerLng = userLocation?.longitude ?? region.longitude;
+    const requestId = ++fetchRequestIdRef.current;
+
+    setCourtsLoading(true);
+    setSortedCourts([]);
+    setVisibleCourts([]);
+
+    const { minLat, maxLat, minLng, maxLng } = boundingBoxForRadiusMiles(
+      centerLat,
+      centerLng,
+      COURTS_RADIUS_MILES
+    );
+
+    void (async () => {
       const { data, error } = await supabase
         .from("courts")
         .select("id, name, address, latitude, longitude, hoops, is_private")
@@ -301,50 +281,69 @@ export default function CourtsScreen() {
         .lte("latitude", maxLat)
         .gte("longitude", minLng)
         .lte("longitude", maxLng)
-        .order("latitude", { ascending: true })
-        .order("longitude", { ascending: true })
-        .limit(VIEWPORT_FETCH_LIMIT);
+        .limit(FETCH_ROW_CAP);
+
       if (requestId !== fetchRequestIdRef.current) {
         return;
       }
+
       if (error) {
         console.error("Error fetching courts:", error);
+        setCourtsLoading(false);
         return;
       }
-      setCourts(data ?? []);
-    },
-    []
-  );
 
-  const onRegionChangeComplete = useCallback((r: Region) => {
-    const prev = viewportForFetchRef.current;
-    if (prev !== null && !regionWarrantsRefetch(prev, r)) {
-      return;
-    }
-    viewportForFetchRef.current = r;
-    setViewportRegion(r);
-  }, []);
+      const rows = data ?? [];
+      const inRadius = rows.filter((c) => {
+        const d = haversineMiles(
+          centerLat,
+          centerLng,
+          c.latitude,
+          c.longitude
+        );
+        return d <= COURTS_RADIUS_MILES;
+      });
 
-  useEffect(() => {
-    if (region) {
-      viewportForFetchRef.current = region;
-      setViewportRegion(region);
-    }
+      inRadius.sort(
+        (a, b) =>
+          haversineMiles(centerLat, centerLng, a.latitude, a.longitude) -
+          haversineMiles(centerLat, centerLng, b.latitude, b.longitude)
+      );
+
+      setSortedCourts(inRadius);
+      setCourtsLoading(false);
+    })();
   }, [region]);
 
+  /** Reveal markers from nearest to farthest in small batches each frame. */
   useEffect(() => {
-    if (!viewportRegion) {
+    if (sortedCourts.length === 0) {
+      setVisibleCourts([]);
       return;
     }
-    const requestId = ++fetchRequestIdRef.current;
-    const r = viewportRegion;
-    const t = setTimeout(() => {
-      void fetchCourtsForViewport(r, requestId);
-    }, VIEWPORT_FETCH_DEBOUNCE_MS);
-    return () => {
-      clearTimeout(t);
+
+    let index = 0;
+    let raf = 0;
+
+    const tick = () => {
+      index = Math.min(
+        sortedCourts.length,
+        index + REVEAL_MARKERS_PER_FRAME
+      );
+      setVisibleCourts(sortedCourts.slice(0, index));
+      if (index < sortedCourts.length) {
+        raf = requestAnimationFrame(tick);
+      }
     };
-  }, [viewportRegion, fetchCourtsForViewport]);
+
+    setVisibleCourts([]);
+    index = 0;
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+    };
+  }, [sortedCourts]);
 
   useEffect(() => {
     (async () => {
@@ -362,8 +361,8 @@ export default function CourtsScreen() {
         setRegion({
           latitude,
           longitude,
-          latitudeDelta: ZOOM_DELTA,
-          longitudeDelta: ZOOM_DELTA,
+          latitudeDelta: MAP_DELTA_NEAR_USER,
+          longitudeDelta: MAP_DELTA_NEAR_USER,
         });
       } catch {
         setRegion(DEFAULT_REGION);
@@ -376,7 +375,10 @@ export default function CourtsScreen() {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== "granted") return;
       locationSubRef.current = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.Balanced, distanceInterval: 10 },
+        {
+          accuracy: Location.Accuracy.Balanced,
+          distanceInterval: 75,
+        },
         (loc) => {
           setUserLocation({
             latitude: loc.coords.latitude,
@@ -388,46 +390,10 @@ export default function CourtsScreen() {
     return () => locationSubRef.current?.remove();
   }, []);
 
-  const renderCluster = useCallback((cluster: {
-    id: number;
-    geometry: { coordinates: [number, number] };
-    properties: { point_count?: number };
-    onPress: () => void;
-  }) => {
-    const { geometry, properties, onPress, id } = cluster;
-    const count = properties?.point_count ?? 0;
-    const { width, height, fontSize } = clusterPinDimensions(count);
-    return (
-      <Marker
-        key={`cluster-${id}`}
-        coordinate={{
-          latitude: geometry.coordinates[1],
-          longitude: geometry.coordinates[0],
-        }}
-        onPress={onPress}
-        tracksViewChanges={false}
-        anchor={{ x: 0.5, y: 1 }}
-        style={{ zIndex: Math.min(count + 100, 9999) }}
-      >
-        <View style={styles.clusterPinWrap}>
-          <Image
-            source={require("../../../assets/rimrun-logo.png")}
-            style={{ width, height }}
-            resizeMode="contain"
-          />
-          <View style={styles.clusterBadge}>
-            <Text style={[styles.clusterBadgeText, { fontSize }]}>
-              {count > 9999 ? "9999+" : String(count)}
-            </Text>
-          </View>
-        </View>
-      </Marker>
-    );
-  }, []);
-
   const handleAddCourt = () => {
     router.push("/(app)/court/add");
   };
+
   const handleRecenter = async () => {
     try {
       const loc = await Location.getCurrentPositionAsync({
@@ -437,8 +403,8 @@ export default function CourtsScreen() {
       mapRef.current?.animateToRegion({
         latitude,
         longitude,
-        latitudeDelta: ZOOM_DELTA,
-        longitudeDelta: ZOOM_DELTA,
+        latitudeDelta: MAP_DELTA_NEAR_USER,
+        longitudeDelta: MAP_DELTA_NEAR_USER,
       });
     } catch {
       // Location unavailable
@@ -455,74 +421,47 @@ export default function CourtsScreen() {
 
   return (
     <View style={styles.container}>
-      <ClusteredMapView
+      <MapView
         ref={mapRef}
         style={styles.map}
-        customMapStyle={RIMRUN_MAP_THEME}
+        customMapStyle={
+          Platform.OS === "android" ? undefined : RIMRUN_MAP_THEME
+        }
         initialRegion={region}
-        onRegionChangeComplete={onRegionChangeComplete}
         showsUserLocation={false}
-        userInterfaceStyle="dark"
-        clusteringEnabled
-        spiralEnabled
-        radius={72}
-        minZoom={1}
-        maxZoom={20}
-        minPoints={2}
-        extent={512}
-        renderCluster={renderCluster}
-        tracksViewChanges={false}
-        animationEnabled={false}
+        userInterfaceStyle={Platform.OS === "android" ? "light" : "dark"}
       >
         {userLocation && (
           <Marker
             coordinate={userLocation}
             anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
-            {...({ cluster: false } as Record<string, unknown>)}
+            tracksViewChanges={Platform.OS === "android"}
           >
             <View style={styles.userLocationMarker} />
           </Marker>
         )}
-        {courts.map((court) => (
-          <Marker
+        {visibleCourts.map((court) => (
+          <CourtMapMarker
             key={court.id}
-            tracksViewChanges={false}
-            coordinate={{
-              latitude: court.latitude,
-              longitude: court.longitude,
-            }}
-            onCalloutPress={() => router.push(`/(app)/court/${court.id}`)}
-          >
-            <Image
-              source={require("../../../assets/rimrun-logo.png")}
-              style={styles.markerImage}
-              resizeMode="contain"
-            />
-            <Callout tooltip>
-              <View style={styles.callout}>
-                <Text style={styles.calloutTitle}>
-                  {getDisplayName(court.id, court.name ?? "Basketball Court")}
-                </Text>
-                {court.hoops != null && (
-                  <Text style={styles.calloutText}>
-                    {court.hoops} hoop{court.hoops !== 1 ? "s" : ""}
-                  </Text>
-                )}
-                {court.address && (
-                  <Text style={styles.calloutText} numberOfLines={2}>
-                    {court.address}
-                  </Text>
-                )}
-                {court.is_private && (
-                  <Text style={styles.calloutText}>Private</Text>
-                )}
-                <Text style={styles.calloutHint}>Tap to view court →</Text>
-              </View>
-            </Callout>
-          </Marker>
+            court={court}
+            pinWidth={PIN_WIDTH}
+            pinHeight={PIN_HEIGHT}
+            getDisplayName={getDisplayName}
+            callout={styles.callout}
+            calloutTitle={styles.calloutTitle}
+            calloutText={styles.calloutText}
+            calloutHint={styles.calloutHint}
+          />
         ))}
-      </ClusteredMapView>
+      </MapView>
+
+      {courtsLoading && (
+        <View style={styles.loadingOverlay} pointerEvents="none">
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingLabel}>Loading nearby courts…</Text>
+        </View>
+      )}
+
       <Pressable onPress={handleRecenter} style={styles.recenterButton}>
         <Ionicons name="locate" size={24} color={colors.text} />
       </Pressable>
