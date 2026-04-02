@@ -31,6 +31,7 @@ export default function AppLayout() {
       <Stack.Screen name="friends/index" />
       <Stack.Screen name="court/add" />
       <Stack.Screen name="account" />
+      <Stack.Screen name="privacy-policy" />
     </Stack>
   );
 }

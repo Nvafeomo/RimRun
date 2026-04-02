@@ -209,6 +209,15 @@ export default function ProfileScreen() {
             <Text style={styles.actionButtonText}>Account</Text>
             <Text style={styles.actionChevron}>›</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/(app)/privacy-policy')}
+            accessibilityRole="button"
+            accessibilityLabel="Privacy policy"
+          >
+            <Text style={styles.actionButtonText}>Privacy Policy</Text>
+            <Text style={styles.actionChevron}>›</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.spacer} />

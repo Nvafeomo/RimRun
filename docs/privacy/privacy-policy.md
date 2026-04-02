@@ -1,6 +1,8 @@
 # Privacy Policy
 
-The full, store-ready version (including US state tables and table of contents) is **[privacy-policy.html](./privacy-policy.html)**.
+**In-app copy:** This file is the source of truth. After you edit it, run `npm run sync-privacy-policy` to regenerate `constants/privacyPolicyMarkdown.ts` before you build or ship.
+
+**Stores / GitHub Pages (long-form HTML):** [privacy-policy.html](./privacy-policy.html) — keep wording aligned with this markdown when you can.
 
 ---
 
