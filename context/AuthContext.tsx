@@ -7,6 +7,7 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { signInWithGoogle as oauthGoogle } from '../lib/oauth';
 
 type AuthContextValue = {
     user: User | null;
@@ -19,6 +20,7 @@ type AuthContextValue = {
       username: string,
       dateOfBirthIso: string,
     ) => Promise<void>;
+    signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
   };
   
@@ -177,6 +179,10 @@ type AuthContextValue = {
       }
     }
   
+    async function signInWithGoogle() {
+      await oauthGoogle();
+    }
+
     async function signOut() {
       const { error } = await supabase.auth.signOut();
       if (error) {
@@ -195,6 +201,7 @@ type AuthContextValue = {
       loading,
       signIn,
       signUp,
+      signInWithGoogle,
       signOut,
     };
   

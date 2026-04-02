@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
   ScrollView,
+  TouchableWithoutFeedback
 } from "react-native";
 import MapView, { Region, Marker } from "react-native-maps";
 import { router } from "expo-router";
@@ -168,55 +169,89 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  searchRow: {
+  searchSection: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.background,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  searchCard: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.xs,
+    paddingVertical: Platform.OS === "ios" ? 6 : 4,
+    minHeight: 52,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  searchFieldCluster: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+    paddingLeft: spacing.xs,
     gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    paddingTop: spacing.xs,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   searchInput: {
     flex: 1,
     minWidth: 0,
-    height: 40,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.inputBg,
+    paddingVertical: Platform.OS === "ios" ? 10 : 8,
+    paddingRight: spacing.sm,
+    fontSize: 16,
     color: colors.text,
-    fontSize: 15,
+  },
+  radiusGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.sm,
+    paddingVertical: spacing.xs,
+    gap: 2,
   },
   milesInput: {
-    width: 52,
-    height: 40,
-    paddingHorizontal: spacing.xs,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.inputBg,
+    width: 40,
+    minWidth: 40,
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+    fontSize: 16,
+    fontWeight: "600",
     color: colors.text,
-    fontSize: 15,
     textAlign: "center",
   },
-  searchButton: {
-    height: 40,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.sm,
+  radiusUnit: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textMuted,
+    letterSpacing: 0.3,
+  },
+  searchIconButton: {
+    width: 35,
+    height: 35,
+    borderRadius: borderRadius.full,
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
+    marginLeft: spacing.xs,
   },
-  searchButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.background,
-  },
-  searchButtonDisabled: {
+  searchIconButtonDisabled: {
     opacity: 0.55,
   },
   pickModalBackdrop: {
@@ -230,45 +265,71 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     maxHeight: "78%",
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.35,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 12,
+      },
+    }),
+  },
+  pickModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
   },
   pickModalTitle: {
-    fontSize: 17,
+    flex: 1,
+    fontSize: 18,
     fontWeight: "700",
     color: colors.text,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    letterSpacing: -0.2,
   },
   pickModalSubtitle: {
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.textSecondary,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   pickModalScroll: {
     maxHeight: 360,
   },
   pickOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
   pickOptionText: {
+    flex: 1,
     fontSize: 15,
     color: colors.text,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   pickModalCancel: {
     paddingVertical: spacing.md,
     alignItems: "center",
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
   pickModalCancelText: {
     fontSize: 16,
@@ -405,32 +466,59 @@ export default function CourtsScreen() {
       setSortedCourts([]);
       setVisibleCourts([]);
 
-      const { minLat, maxLat, minLng, maxLng } = boundingBoxForRadiusMiles(
-        centerLat,
-        centerLng,
-        radiusMiles
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "courts_within_radius_miles",
+        {
+          p_lat: centerLat,
+          p_lng: centerLng,
+          p_radius_miles: radiusMiles,
+        }
       );
-
-      const { data, error } = await supabase
-        .from("courts")
-        .select("id, name, address, latitude, longitude, hoops, is_private")
-        .gte("latitude", minLat)
-        .lte("latitude", maxLat)
-        .gte("longitude", minLng)
-        .lte("longitude", maxLng)
-        .limit(FETCH_ROW_CAP);
 
       if (requestId !== fetchRequestIdRef.current) {
         return false;
       }
 
-      if (error) {
-        console.error("Error fetching courts:", error);
-        setCourtsLoading(false);
-        return false;
+      let rows: Court[] = [];
+
+      if (!rpcError && Array.isArray(rpcData)) {
+        rows = rpcData as Court[];
+      } else {
+        if (rpcError) {
+          console.warn(
+            "courts_within_radius_miles unavailable (run scripts/courts-within-radius-rpc.sql); using bbox fallback:",
+            rpcError.message
+          );
+        }
+        const { minLat, maxLat, minLng, maxLng } = boundingBoxForRadiusMiles(
+          centerLat,
+          centerLng,
+          radiusMiles,
+          1.08
+        );
+
+        const { data, error } = await supabase
+          .from("courts")
+          .select("id, name, address, latitude, longitude, hoops, is_private")
+          .gte("latitude", minLat)
+          .lte("latitude", maxLat)
+          .gte("longitude", minLng)
+          .lte("longitude", maxLng)
+          .limit(FETCH_ROW_CAP);
+
+        if (requestId !== fetchRequestIdRef.current) {
+          return false;
+        }
+
+        if (error) {
+          console.error("Error fetching courts:", error);
+          setCourtsLoading(false);
+          return false;
+        }
+
+        rows = (data ?? []) as Court[];
       }
 
-      const rows = data ?? [];
       const inRadius = rows.filter((c) => {
         const d = haversineMiles(
           centerLat,
@@ -750,48 +838,59 @@ export default function CourtsScreen() {
   }
 
   return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
     <View style={styles.container}>
-      <View style={styles.searchRow}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="City, neighborhood, or address"
-          placeholderTextColor={colors.textMuted}
-          value={locationQuery}
-          onChangeText={setLocationQuery}
-          returnKeyType="search"
-          onSubmitEditing={handleCourtsSearch}
-          editable={!geocodingSearch}
-          autoCorrect
-          autoCapitalize="words"
-        />
-        <TextInput
-          style={styles.milesInput}
-          placeholder="mi"
-          placeholderTextColor={colors.textMuted}
-          value={milesInput}
-          onChangeText={setMilesInput}
-          editable={!geocodingSearch}
-          keyboardType={
-            Platform.OS === "ios" ? "number-pad" : "numeric"
-          }
-          maxLength={4}
-        />
-        <Pressable
-          style={[
-            styles.searchButton,
-            geocodingSearch && styles.searchButtonDisabled,
-          ]}
-          onPress={handleCourtsSearch}
-          disabled={geocodingSearch}
-          accessibilityRole="button"
-          accessibilityLabel="Search courts"
-        >
-          {geocodingSearch ? (
-            <ActivityIndicator color={colors.background} size="small" />
-          ) : (
-            <Text style={styles.searchButtonText}>Search</Text>
-          )}
-        </Pressable>
+      <View style={styles.searchSection}>
+        <View style={styles.searchCard}>
+          <View style={styles.searchFieldCluster}>
+            <Ionicons name="search" size={20} color={colors.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="City, address, or state"
+              placeholderTextColor={colors.textMuted}
+              value={locationQuery}
+              onChangeText={setLocationQuery}
+              returnKeyType="search"
+              onSubmitEditing={handleCourtsSearch}
+              editable={!geocodingSearch}
+              autoCorrect
+              autoCapitalize="words"
+              selectionColor={colors.primary}
+            />
+          </View>
+          <View style={styles.radiusGroup}>
+            <TextInput
+              style={styles.milesInput}
+              placeholder="15"
+              placeholderTextColor={colors.textMuted}
+              value={milesInput}
+              onChangeText={setMilesInput}
+              editable={!geocodingSearch}
+              keyboardType={
+                Platform.OS === "ios" ? "number-pad" : "numeric"
+              }
+              maxLength={4}
+              selectionColor={colors.primary}
+            />
+            <Text style={styles.radiusUnit}>mi</Text>
+          </View>
+          <Pressable
+            style={[
+              styles.searchIconButton,
+              geocodingSearch && styles.searchIconButtonDisabled,
+            ]}
+            onPress={handleCourtsSearch}
+            disabled={geocodingSearch}
+            accessibilityRole="button"
+            accessibilityLabel="Search courts"
+          >
+            {geocodingSearch ? (
+              <ActivityIndicator color={colors.background} size="small" />
+            ) : (
+              <Ionicons name="arrow-forward" size={22} color={colors.background} />
+            )}
+          </Pressable>
+        </View>
       </View>
 
       <Modal
@@ -807,9 +906,12 @@ export default function CourtsScreen() {
             accessibilityLabel="Dismiss"
           />
           <View style={[styles.pickModalCard, { zIndex: 1 }]}>
-            <Text style={styles.pickModalTitle}>Which place?</Text>
+            <View style={styles.pickModalHeader}>
+              <Ionicons name="location-outline" size={26} color={colors.primary} />
+              <Text style={styles.pickModalTitle}>Choose a location</Text>
+            </View>
             <Text style={styles.pickModalSubtitle}>
-              Several locations matched. Choose one to search nearby courts.
+              Multiple places matched your search. Pick one to load courts nearby.
             </Text>
             <ScrollView
               keyboardShouldPersistTaps="handled"
@@ -818,10 +920,19 @@ export default function CourtsScreen() {
               {locationPickOptions.map((opt, index) => (
                 <Pressable
                   key={`${opt.latitude.toFixed(4)},${opt.longitude.toFixed(4)}-${index}`}
-                  style={styles.pickOptionRow}
+                  style={({ pressed }) => [
+                    styles.pickOptionRow,
+                    pressed && { backgroundColor: colors.surfaceElevated },
+                  ]}
                   onPress={() => void handlePickSearchLocation(opt)}
+                  android_ripple={{ color: colors.border }}
                 >
                   <Text style={styles.pickOptionText}>{opt.label}</Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={colors.textMuted}
+                  />
                 </Pressable>
               ))}
             </ScrollView>
@@ -887,5 +998,6 @@ export default function CourtsScreen() {
         />
       </Pressable>
     </View>
+    </TouchableWithoutFeedback>
   );
 }

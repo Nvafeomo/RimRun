@@ -28,19 +28,23 @@ export function haversineMiles(
  * Axis-aligned bounding box that fully contains a circle of `radiusMiles` around (lat, lng).
  * Used to narrow the Supabase query; filter again with haversineMiles on the client.
  */
+/**
+ * @param pad - Multiplier on lat/lng span (e.g. 1.08) for a looser prefilter before haversine.
+ */
 export function boundingBoxForRadiusMiles(
   lat: number,
   lng: number,
-  radiusMiles: number
+  radiusMiles: number,
+  pad = 1
 ): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
-  const latSpan = radiusMiles / MI_PER_DEG_LAT;
+  const latSpanBase = radiusMiles / MI_PER_DEG_LAT;
   const cosLat = Math.cos((lat * Math.PI) / 180);
-  const lngSpan =
-    cosLat > 1e-6 ? radiusMiles / (MI_PER_DEG_LAT * cosLat) : latSpan;
+  const lngSpanBase =
+    cosLat > 1e-6 ? radiusMiles / (MI_PER_DEG_LAT * cosLat) : latSpanBase;
   return {
-    minLat: lat - latSpan,
-    maxLat: lat + latSpan,
-    minLng: lng - lngSpan,
-    maxLng: lng + lngSpan,
+    minLat: lat - latSpanBase * pad,
+    maxLat: lat + latSpanBase * pad,
+    minLng: lng - lngSpanBase * pad,
+    maxLng: lng + lngSpanBase * pad,
   };
 }

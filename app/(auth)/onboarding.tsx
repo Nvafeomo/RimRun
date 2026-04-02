@@ -1,6 +1,7 @@
 import {
     View,
     Text,
+    TextInput,
     TouchableOpacity,
     StyleSheet,
     ActivityIndicator,
@@ -27,6 +28,22 @@ import {
     validateDateOfBirthForSignup,
   } from '../../lib/agePolicy';
 
+  const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
+  function validateUsername(value: string): string | null {
+    if (!value.trim()) return 'Username is required';
+    if (!USERNAME_REGEX.test(value.trim())) {
+      return '3–20 chars, letters, numbers, underscore only';
+    }
+    return null;
+  }
+
+  function validateEmail(value: string): string | null {
+    if (!value.trim()) return 'Email is required';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value.trim())) return 'Invalid email address';
+    return null;
+  }
+
   const formatDateForDisplay = (isoDate: string) => {
     const [y, m, d] = isoDate.split('-').map(Number);
     return new Date(y, m - 1, d).toLocaleDateString('en-US', {
@@ -42,6 +59,8 @@ import {
     const [profilePicture, setProfilePicture] = useState<string | null>(null);
     /** Local file URI for upload (strip EXIF via re-encode before storage). */
     const [profilePictureUri, setProfilePictureUri] = useState<string | null>(null);
+    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
     const [dateOfBirth, setDateOfBirth] = useState('');
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -97,13 +116,37 @@ import {
         ]);
     };
 
+    const needsUsername = !profile?.username?.trim();
+    /** OAuth users must attach an email in Auth + profile when missing. */
+    const needsEmail = !user?.email?.trim();
     const needsLegacyDob = !profile?.date_of_birth;
+    const hasProfileRow = profile !== null;
 
     const handleCompleteProfile = async () => {
         if (!user?.id) {
             setError('You must be signed in to complete your profile.');
             return;
         }
+
+        let normalizedUsername: string | null = null;
+        if (needsUsername) {
+            normalizedUsername = username.trim().toLowerCase();
+            const uErr = validateUsername(normalizedUsername);
+            if (uErr) {
+                setError(uErr);
+                return;
+            }
+            const { data: taken } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('username', normalizedUsername)
+                .maybeSingle();
+            if (taken && taken.id !== user.id) {
+                setError('Username is already taken');
+                return;
+            }
+        }
+
         if (needsLegacyDob) {
             const dobCheck = validateDateOfBirthForSignup(dateOfBirth);
             if (!dobCheck.ok) {
@@ -119,9 +162,30 @@ import {
                 return;
             }
         }
+
+        let resolvedEmail = user?.email?.trim() ?? '';
+        if (needsEmail) {
+            const emailErr = validateEmail(email);
+            if (emailErr) {
+                setError(emailErr);
+                return;
+            }
+            resolvedEmail = email.trim();
+        } else if (!resolvedEmail) {
+            setError('Email is required.');
+            return;
+        }
+
         setError('');
         setSubmitting(true);
         try {
+            if (needsEmail) {
+                const { error: emailUpdateError } = await supabase.auth.updateUser({
+                    email: resolvedEmail,
+                });
+                if (emailUpdateError) throw emailUpdateError;
+            }
+
             let avatarUrl: string | null = null;
             if (profilePictureUri) {
                 try {
@@ -146,20 +210,44 @@ import {
                     throw uploadErr;
                 }
             }
-            const updates: Record<string, string | null> = {};
-            if (needsLegacyDob) {
-                updates.date_of_birth = dateOfBirth.trim();
+
+            if (!hasProfileRow) {
+                const { error: insertErr } = await supabase.from('profiles').insert({
+                    id: user.id,
+                    username: normalizedUsername!,
+                    email: resolvedEmail,
+                    date_of_birth: dateOfBirth.trim(),
+                    profile_image_url: avatarUrl,
+                });
+                if (insertErr?.code === '23505') {
+                    setError('Username is already taken');
+                    setSubmitting(false);
+                    return;
+                }
+                if (insertErr) throw insertErr;
+            } else {
+                const updates: Record<string, string | null> = {};
+                if (needsUsername && normalizedUsername) {
+                    updates.username = normalizedUsername;
+                }
+                if (needsLegacyDob) {
+                    updates.date_of_birth = dateOfBirth.trim();
+                }
+                if (needsEmail) {
+                    updates.email = resolvedEmail;
+                }
+                if (avatarUrl !== null) {
+                    updates.profile_image_url = avatarUrl;
+                }
+                if (Object.keys(updates).length > 0) {
+                    const { error: updateError } = await supabase
+                        .from('profiles')
+                        .update(updates)
+                        .eq('id', user.id);
+                    if (updateError) throw updateError;
+                }
             }
-            if (avatarUrl !== null) {
-                updates.profile_image_url = avatarUrl;
-            }
-            if (Object.keys(updates).length > 0) {
-                const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update(updates)
-                    .eq('id', user.id);
-                if (updateError) throw updateError;
-            }
+
             await refreshProfile();
             router.replace('/(app)');
         } catch (e: unknown) {
@@ -188,36 +276,64 @@ import {
                 >
                 <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
-            <ScrollView style={styles.container}>
+            <ScrollView
+                style={styles.container}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.scrollInner}
+            >
                 <View style={styles.header}>
                     <Image source={require('../../assets/rimrun-logo.png')} style={styles.logo} contentFit="contain" />
                     <Text style={styles.title}>Complete Your Profile</Text>
                     <Text style={styles.subtitle}>
-                        {needsLegacyDob
-                            ? 'Your account needs a date of birth (13+). Add an optional profile photo below.'
-                            : 'Add a profile picture if you like. Date of birth was set when you signed up.'}
+                        {(() => {
+                            const parts: string[] = [];
+                            if (needsUsername) parts.push('username');
+                            if (needsEmail) parts.push('email');
+                            if (needsLegacyDob) parts.push('date of birth (13+)');
+                            if (parts.length > 0) {
+                                return `Add your ${parts.join(', ')}. Profile photo is optional.`;
+                            }
+                            return 'Add a profile picture if you like. Date of birth was set when you signed up.';
+                        })()}
                     </Text>
                 </View>
                 <View style={styles.card}>
-                    <TouchableOpacity style={styles.imageContainer} onPress={showImagePicker}>
-                        {profilePicture ? <Image source={{ uri: profilePicture }} style={styles.profilePicture} contentFit="cover" /> : (
-                        <View style={styles.placeholderImage}>
-                            <Text style={styles.placeholderText}>+</Text>
-                        </View>
-                        )}
-                        <View style={styles.editBadge}>
-                            <Text style={styles.editText}>Edit</Text>
-                        </View>
-                    </TouchableOpacity>
+                    {needsUsername ? (
+                        <TextInput
+                            placeholder="Username"
+                            placeholderTextColor={colors.textMuted}
+                            keyboardType="default"
+                            autoCapitalize="none"
+                            autoComplete="username"
+                            autoCorrect={false}
+                            style={[styles.input, styles.inputFullWidth]}
+                            value={username}
+                            onChangeText={setUsername}
+                        />
+                    ) : null}
+
+                    {needsEmail ? (
+                        <TextInput
+                            placeholder="Email"
+                            placeholderTextColor={colors.textMuted}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoComplete="email"
+                            autoCorrect={false}
+                            style={[styles.input, styles.inputFullWidth]}
+                            value={email}
+                            onChangeText={setEmail}
+                        />
+                    ) : null}
 
                     {needsLegacyDob ? (
                         <>
                             <TouchableOpacity
-                                style={[styles.input, { width: '80%', alignSelf: 'center', justifyContent: 'center', alignItems: 'center' }]}
+                                style={[styles.input, styles.inputFullWidth, styles.dobTouchable]}
                                 onPress={() => setShowDatePicker(true)}
                             >
-                                <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 16, fontWeight: '500', alignSelf: 'center' }}>
-                                    {dateOfBirth ? formatDateForDisplay(dateOfBirth) : 'Select Date of Birth'}
+                                <Text style={[styles.dobText, !dateOfBirth && styles.dobPlaceholder]}>
+                                    {dateOfBirth ? formatDateForDisplay(dateOfBirth) : 'Date of birth (13+ only)'}
                                 </Text>
                             </TouchableOpacity>
 
@@ -245,6 +361,18 @@ import {
                             ) : null}
                         </>
                     ) : null}
+
+                    <TouchableOpacity style={styles.imageContainer} onPress={showImagePicker}>
+                        {profilePicture ? <Image source={{ uri: profilePicture }} style={styles.profilePicture} contentFit="cover" /> : (
+                        <View style={styles.placeholderImage}>
+                            <Text style={styles.placeholderText}>+</Text>
+                        </View>
+                        )}
+                        <View style={styles.editBadge}>
+                            <Text style={styles.editText}>Edit</Text>
+                        </View>
+                    </TouchableOpacity>
+
                     {error ? <Text style={styles.error}>{error}</Text> : null}
                     <TouchableOpacity
                         style={styles.button}
@@ -255,7 +383,9 @@ import {
                         {submitting ? (
                         <ActivityIndicator color={colors.text} />
                         ) : (
-                        <Text style={styles.buttonText}>{needsLegacyDob ? 'Complete Profile' : 'Continue'}</Text>
+                        <Text style={styles.buttonText}>
+                            {needsLegacyDob || needsUsername || needsEmail ? 'Complete Profile' : 'Continue'}
+                        </Text>
                         )}
                     </TouchableOpacity>
                 </View>
@@ -337,6 +467,9 @@ import {
       flex: 1,
       backgroundColor: colors.background,
     },
+    scrollInner: {
+      paddingBottom: spacing.xl,
+    },
     keyboardView: {
       flex: 1,
     },
@@ -414,6 +547,21 @@ import {
       color: colors.text,
       backgroundColor: colors.inputBg,
       marginBottom: spacing.md,
+    },
+    inputFullWidth: {
+      alignSelf: 'stretch',
+      width: '100%',
+    },
+    dobTouchable: {
+      justifyContent: 'center',
+    },
+    dobText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    dobPlaceholder: {
+      color: colors.textMuted,
     },
     button: {
       width: '100%',

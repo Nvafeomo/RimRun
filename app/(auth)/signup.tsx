@@ -17,6 +17,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
+import { SocialAuthButtons } from '../../components/SocialAuthButtons';
 import {
   formatLocalIsoDate,
   maxBirthDateForMinAge,
@@ -33,7 +34,8 @@ export default function SignupScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { signUp } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { signUp, signInWithGoogle } = useAuth();
 
   const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
   function validateUsername(value: string): string | null {
@@ -115,6 +117,22 @@ export default function SignupScreen() {
       setError(e instanceof Error ? e.message : 'Sign up failed');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleGoogle() {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+      router.replace('/(app)');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Google sign-in failed';
+      if (!msg.toLowerCase().includes('cancel')) {
+        setError(msg);
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   }
 
@@ -226,7 +244,7 @@ export default function SignupScreen() {
             <TouchableOpacity
               style={styles.button}
               onPress={handleSignUp}
-              disabled={submitting}
+              disabled={submitting || googleLoading}
               activeOpacity={0.8}
             >
               {submitting ? (
@@ -235,6 +253,12 @@ export default function SignupScreen() {
                 <Text style={styles.buttonText}>Sign Up</Text>
               )}
             </TouchableOpacity>
+
+            <SocialAuthButtons
+              onGooglePress={handleGoogle}
+              disabled={submitting}
+              loading={googleLoading}
+            />
           </View>
 
           <TouchableOpacity

@@ -8,12 +8,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
+import { SocialAuthButtons } from '../../components/SocialAuthButtons';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -21,7 +23,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { signIn } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { signIn, signInWithGoogle } = useAuth();
 
   function validateEmailOrUsername(value: string): string | null {
     if (!value.trim()) return 'Email or Username is required';
@@ -55,12 +58,33 @@ export default function LoginScreen() {
     }
   }
 
+  async function handleGoogle() {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+      router.replace('/(app)');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Google sign-in failed';
+      if (!msg.toLowerCase().includes('cancel')) {
+        setError(msg);
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.header}>
           <Image
             source={require('../../assets/rimrun-logo.png')}
@@ -104,7 +128,7 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={styles.button}
             onPress={handleSignIn}
-            disabled={submitting}
+            disabled={submitting || googleLoading}
             activeOpacity={0.8}
           >
             {submitting ? (
@@ -113,6 +137,12 @@ export default function LoginScreen() {
               <Text style={styles.buttonText}>Sign In</Text>
             )}
           </TouchableOpacity>
+
+          <SocialAuthButtons
+            onGooglePress={handleGoogle}
+            disabled={submitting}
+            loading={googleLoading}
+          />
 
           <TouchableOpacity
             style={styles.forgotLink}
@@ -132,6 +162,7 @@ export default function LoginScreen() {
             Don't have an account? <Text style={styles.linkButtonTextBold}>Sign Up</Text>
           </Text>
         </TouchableOpacity>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -144,8 +175,12 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
   header: {
     alignItems: 'center',
