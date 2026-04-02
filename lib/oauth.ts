@@ -1,16 +1,23 @@
 /**
  * Google OAuth for Supabase: enable Google under Authentication → Providers.
- * Redirect URLs must include the URL from `getOAuthRedirectUrl()` (scheme rimrun), e.g.
- * rimrun://auth/callback — plus Expo Go / dev client URLs when testing.
+ *
+ * Redirect URLs: add EVERY exact URL returned by getOAuthRedirectUrl() to
+ * Supabase → Authentication → URL Configuration → Redirect URLs.
+ * - Expo Go uses exp://... (changes with host/port; use __DEV__ log below).
+ * - Dev / release builds use rimrun://auth/callback
  */
-import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from './supabase';
 
 export const OAUTH_REDIRECT_PATH = 'auth/callback';
 
+/** Use expo-auth-session so Expo Go (exp://) vs dev build (rimrun://) matches Supabase + WebBrowser. */
 export function getOAuthRedirectUrl(): string {
-  return Linking.createURL(OAUTH_REDIRECT_PATH);
+  return makeRedirectUri({
+    scheme: 'rimrun',
+    path: `/${OAUTH_REDIRECT_PATH}`,
+  });
 }
 
 type ParsedOAuthResult =
@@ -56,7 +63,12 @@ function parseOAuthCallbackUrl(url: string): ParsedOAuthResult | null {
 async function completeOAuthFromUrl(url: string): Promise<void> {
   const parsed = parseOAuthCallbackUrl(url);
   if (!parsed) {
-    throw new Error('Could not complete sign-in. Invalid callback URL.');
+    if (__DEV__) {
+      console.warn('[OAuth] Could not parse callback URL (first 300 chars):', url.slice(0, 300));
+    }
+    throw new Error(
+      'Could not complete sign-in. Invalid callback URL. If this persists, copy the redirect URL from the Metro log and add it to Supabase → Authentication → Redirect URLs.',
+    );
   }
   if (parsed.kind === 'error') {
     throw new Error(parsed.message || 'Sign-in was cancelled or failed.');
@@ -75,6 +87,13 @@ async function completeOAuthFromUrl(url: string): Promise<void> {
 
 export async function signInWithGoogle(): Promise<void> {
   const redirectTo = getOAuthRedirectUrl();
+  if (__DEV__) {
+    console.log(
+      '[OAuth] redirectTo — add this exact URL to Supabase Auth → URL Configuration → Redirect URLs:\n',
+      redirectTo,
+    );
+  }
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -86,9 +105,29 @@ export async function signInWithGoogle(): Promise<void> {
   if (!data?.url) {
     throw new Error('Could not start Google sign-in.');
   }
+
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type !== 'success' || !result.url) {
+
+  if (result.type === 'success' && result.url) {
+    await completeOAuthFromUrl(result.url);
+    return;
+  }
+
+  if (result.type === 'cancel') {
     throw new Error('Sign-in was cancelled.');
   }
-  await completeOAuthFromUrl(result.url);
+
+  // iOS: redirect URL did not match the second argument to openAuthSessionAsync (allowlist / wrong exp:// vs rimrun://).
+  if (result.type === 'dismiss') {
+    throw new Error(
+      'Sign-in did not return to the app. Add the exact [OAuth] redirectTo URL from Metro to Supabase Redirect URLs (Expo Go uses exp://…; dev builds use rimrun://…).',
+    );
+  }
+
+  if (__DEV__) {
+    console.warn('[OAuth] Unexpected WebBrowser result:', result);
+  }
+  throw new Error(
+    'Sign-in did not finish. Add the printed [OAuth] redirectTo URL to Supabase, or use a development build (rimrun://) if Expo Go keeps failing.',
+  );
 }

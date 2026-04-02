@@ -209,14 +209,6 @@ export default function ProfileScreen() {
             <Text style={styles.actionButtonText}>Account</Text>
             <Text style={styles.actionChevron}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => {}}>
-            <Text style={styles.actionButtonText}>Notifications</Text>
-            <Text style={styles.actionChevron}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => {}}>
-            <Text style={styles.actionButtonText}>Privacy</Text>
-            <Text style={styles.actionChevron}>›</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.spacer} />
