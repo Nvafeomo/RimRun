@@ -2,12 +2,591 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="refresh" content="0; url=privacy-policy.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
   <title>Privacy Policy — RimRun</title>
-  <link rel="canonical" href="privacy-policy.html" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #e85d04;
+      --accent-soft: rgba(232, 93, 4, 0.12);
+      --accent-border: rgba(232, 93, 4, 0.35);
+      --court: #0f1419;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(15, 20, 25, 0.06), 0 8px 24px rgba(15, 20, 25, 0.06);
+      --font: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      text-underline-offset: 2px;
+    }
+    a:hover { text-decoration: underline; }
+
+    .wrap {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 0 1.25rem 4rem;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(145deg, var(--court) 0%, #1a2332 50%, #243044 100%);
+      color: #fff;
+      padding: 2.75rem 1.25rem 2.25rem;
+      margin-bottom: 2rem;
+      border-radius: 0 0 var(--radius) var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero-inner {
+      max-width: 42rem;
+      margin: 0 auto;
+    }
+    .brand {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.55);
+      margin-bottom: 0.5rem;
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.75rem, 4vw, 2.25rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .hero-meta {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.75);
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+    }
+    .pill strong { color: #fff; font-weight: 600; }
+
+    /* Cards & sections */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 1.5rem 1.35rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .summary-intro {
+      border-left: 4px solid var(--accent);
+      background: linear-gradient(90deg, var(--accent-soft), var(--surface));
+    }
+
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--court);
+      margin: 2.25rem 0 0.75rem;
+      letter-spacing: -0.015em;
+      scroll-margin-top: 1.25rem;
+    }
+    h2:first-of-type { margin-top: 0; }
+
+    h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 1.5rem 0 0.65rem;
+      scroll-margin-top: 1.25rem;
+    }
+
+    p { margin: 0 0 1rem; color: var(--text); }
+    p:last-child { margin-bottom: 0; }
+
+    .muted { color: var(--text-muted); font-size: 0.95rem; }
+
+    .toc-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 0 0 1rem;
+    }
+
+    ol.toc {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: toc;
+    }
+    ol.toc li {
+      counter-increment: toc;
+      margin: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    ol.toc li:last-child { border-bottom: none; }
+    ol.toc a {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.65rem 0;
+      font-weight: 500;
+      color: var(--text);
+      text-decoration: none;
+    }
+    ol.toc a::before {
+      content: counter(toc);
+      flex-shrink: 0;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 0.1rem;
+    }
+    ol.toc a:hover {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    ol.toc a:hover::before {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    ul {
+      margin: 0 0 1rem;
+      padding-left: 1.25rem;
+    }
+    li { margin: 0.4rem 0; }
+    li::marker { color: var(--accent); }
+
+    .in-short {
+      font-size: 0.95rem;
+      padding: 0.85rem 1rem;
+      background: #f8fafc;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+    .in-short strong { color: var(--court); }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto;
+      margin: 1rem -0.25rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      min-width: 520px;
+    }
+    th {
+      text-align: left;
+      padding: 0.65rem 0.75rem;
+      background: #f1f5f9;
+      color: var(--court);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    td {
+      padding: 0.75rem;
+      border-top: 1px solid var(--border);
+      vertical-align: top;
+    }
+    td.center {
+      text-align: center;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    tbody tr:nth-child(even) td { background: #fafbfc; }
+    .tag {
+      display: inline-block;
+      min-width: 2.5rem;
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+    }
+    .tag-yes { background: #dcfce7; color: #166534; }
+    .tag-no { background: #f1f5f9; color: #475569; }
+
+    .contact-block {
+      background: linear-gradient(135deg, var(--accent-soft), #fff);
+      border: 1px solid var(--accent-border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.35rem;
+      margin-top: 0.5rem;
+    }
+    .contact-block strong { display: block; margin-bottom: 0.35rem; color: var(--court); }
+
+    footer.site-footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+    footer.site-footer a { color: var(--text-muted); font-weight: 600; }
+    footer.site-footer a:hover { color: var(--accent); }
+
+    @media (min-width: 640px) {
+      .wrap { padding: 0 2rem 4rem; }
+      .hero { padding: 3rem 2rem 2.5rem; }
+    }
+  </style>
 </head>
 <body>
-  <p><a href="privacy-policy.html">Privacy policy</a></p>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="brand">RimRun</p>
+    <h1>Privacy policy</h1>
+    <div class="hero-meta">
+      <span class="pill"><strong>Updated</strong> April 2, 2026</span>
+      <span class="pill">Basketball Courts &amp; Communities</span>
+    </div>
+   </div>
+</header>
+
+<main class="wrap">
+
+  <p>This privacy notice for <strong>RimRun</strong> (“<strong>we</strong>,” “<strong>us</strong>,” or “<strong>our</strong>”) describes how and why we might access, collect, store, use, and/or share (“<strong>process</strong>”) your personal information when you use our services (“<strong>Services</strong>”), including when you:</p>
+
+  <ul>
+    <li>Download and use our mobile application (<strong>RimRun</strong>), or any other application of ours that links to this privacy notice</li>
+    <li>Use <strong>RimRun</strong> — a mobile app for finding basketball courts and communities</li>
+    <li>Engage with us in other related ways, including any marketing or events</li>
+  </ul>
+
+  <p><strong>Questions or concerns?</strong> Reading this notice will help you understand your privacy rights and choices. We are responsible for making decisions about how your personal information is processed. If you do not agree with our policies and practices, please do not use our Services. For questions, contact <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a>.</p>
+
+  <div class="card summary-intro">
+    <p class="toc-title" style="margin-bottom: 0.5rem;">At a glance</p>
+    <p class="muted" style="margin: 0;"><em>This summary highlights key points. Use the <a href="#toc">table of contents</a> to jump to any section.</em></p>
+  </div>
+
+  <p><strong>What personal information do we process?</strong> When you visit, use, or navigate our Services, we may process personal information depending on how you interact with us, the choices you make, and the features you use. See <a href="#personalinfo">personal information you disclose to us</a>.</p>
+
+  <p><strong>Do we process sensitive personal information?</strong> Some information may be considered “special” or “sensitive” in certain jurisdictions. We do not process sensitive personal information.</p>
+
+  <p><strong>Do we collect information from third parties?</strong> If you sign in with Google, we receive limited profile information from Google as part of that login. See <a href="#sociallogins">How we handle your social logins</a>.</p>
+
+  <p><strong>How do we process your information?</strong> We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent. Learn more in <a href="#infouse">How we process your information</a>.</p>
+
+  <p><strong>When do we share personal information?</strong> We may share information in specific situations and with specific third parties. See <a href="#whoshare">When and with whom we share your personal information</a>.</p>
+
+  <p><strong>How do we keep your information safe?</strong> We use organizational and technical measures to protect your personal information. No method is 100% secure. See <a href="#infosafe">How we keep your information safe</a>.</p>
+
+  <p><strong>What are your rights?</strong> Depending on where you live, applicable law may give you rights regarding your personal information. See <a href="#privacyrights">Your privacy rights</a>.</p>
+
+  <p><strong>How do you exercise your rights?</strong> Email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a> or use the details in <a href="#contact">How to contact us</a>. We will respond in line with applicable data protection laws.</p>
+
+  <p>Want the full picture? <a href="#toc">Browse the sections below</a>.</p>
+
+  <div class="card" id="toc">
+    <p class="toc-title">Table of contents</p>
+    <ol class="toc">
+      <li><a href="#infocollect">What information do we collect?</a></li>
+      <li><a href="#infouse">How do we process your information?</a></li>
+      <li><a href="#whoshare">When and with whom do we share your personal information?</a></li>
+      <li><a href="#sociallogins">How do we handle your social logins?</a></li>
+      <li><a href="#inforetain">How long do we keep your information?</a></li>
+      <li><a href="#infosafe">How do we keep your information safe?</a></li>
+      <li><a href="#privacyrights">What are your privacy rights?</a></li>
+      <li><a href="#DNT">Controls for Do-Not-Track features</a></li>
+      <li><a href="#uslaws">U.S. resident privacy rights</a></li>
+      <li><a href="#policyupdates">Updates to this notice</a></li>
+      <li><a href="#contact">How to contact us</a></li>
+      <li><a href="#request">Review, update, or delete your data</a></li>
+    </ol>
+  </div>
+
+  <h2 id="infocollect">1. What information do we collect?</h2>
+
+  <h3 id="personalinfo">Personal information you disclose to us</h3>
+  <div class="in-short"><strong>In short:</strong> <em>We collect personal information that you provide to us.</em></div>
+
+  <p>We collect personal information that you voluntarily provide when you register on the Services, express an interest in obtaining information about us or our products and Services, participate in activities on the Services, or otherwise contact us.</p>
+
+  <p><strong>Personal information provided by you.</strong> The personal information we collect depends on the context of your interactions with us and the Services, the choices you make, and the products and features you use. It may include:</p>
+  <ul>
+    <li>names</li>
+    <li>email addresses</li>
+    <li>usernames</li>
+    <li>passwords</li>
+    <li>phone numbers</li>
+  </ul>
+
+  <p id="sensitiveinfo"><strong>Sensitive information.</strong> We do not process sensitive information.</p>
+
+  <p><strong>Social login data.</strong> You may register using a third-party account (for example, Google). If you do, we collect certain profile information as described in <a href="#sociallogins">How do we handle your social logins?</a></p>
+
+  <p><strong>Application data.</strong> If you use our application(s), we may collect the following if you grant access or permission:</p>
+  <ul>
+    <li><em>Geolocation.</em> We may request location from your device while you use our app to provide location-based services. You can change this in your device settings.</li>
+    <li><em>Push notifications.</em> We may request permission to send notifications about your account or features. You can turn these off in your device settings.</li>
+  </ul>
+  <p>This information helps us operate and secure our application(s), troubleshoot, and run internal analytics and reporting.</p>
+
+  <p>All personal information you provide must be true, complete, and accurate, and you must notify us of any changes.</p>
+
+  <h3>Google API</h3>
+  <p>Our use of information received from Google APIs follows the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the <a href="https://developers.google.com/terms/api-services-user-data-policy#limited-use" target="_blank" rel="noopener noreferrer">Limited Use requirements</a>.</p>
+
+  <h2 id="infouse">2. How do we process your information?</h2>
+  <div class="in-short"><strong>In short:</strong> <em>We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent.</em></div>
+
+  <p><strong>We may process your personal information to:</strong></p>
+  <ul>
+    <li><strong>Facilitate account creation and authentication</strong> and manage user accounts.</li>
+    <li><strong>Deliver services</strong> you request.</li>
+    <li><strong>Respond to inquiries</strong> and offer support.</li>
+    <li><strong>Enable user-to-user communications</strong> when you use those features.</li>
+    <li><strong>Request feedback</strong> about our Services.</li>
+    <li><strong>Evaluate and improve</strong> our Services, products, marketing, and your experience.</li>
+    <li><strong>Comply with legal obligations</strong>, respond to legal requests, and protect our rights.</li>
+  </ul>
+
+  <h2 id="whoshare">3. When and with whom do we share your personal information?</h2>
+  <div class="in-short"><strong>In short:</strong> <em>We may share information in specific situations described in this section and/or with certain third parties.</em></div>
+
+  <p>We may need to share your personal information in situations such as:</p>
+  <ul>
+    <li><strong>Business transfers.</strong> We may share or transfer your information in connection with a merger, sale of assets, financing, or acquisition.</li>
+    <li><strong>Other users.</strong> When you share information publicly (for example, comments or contributions), it may be visible to other users and may remain available outside the Services.</li>
+  </ul>
+
+  <h2 id="sociallogins">4. How do we handle your social logins?</h2>
+  <div class="in-short"><strong>In short:</strong> <em>If you log in with a third-party account (such as Google), we may receive certain information about you from that provider.</em></div>
+
+  <p>You may register and log in using your Google account. We receive profile information from Google, which may include your name, email address, and profile picture, and other information you make available on that platform.</p>
+
+  <p>We use that information only for the purposes described in this notice. We do not control Google’s other uses of your data. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google’s Privacy Policy</a>.</p>
+
+  <h2 id="inforetain">5. How long do we keep your information?</h2>
+  <div class="in-short"><strong>In short:</strong> <em>We keep your information as long as necessary to fulfill the purposes in this notice unless the law requires otherwise.</em></div>
+
+  <p>We retain personal information only as long as needed for the purposes in this notice, unless a longer period is required or permitted by law. No purpose in this notice requires keeping your personal information longer than while you have an account with us.</p>
+
+  <p>When we no longer have a legitimate need to process your information, we delete or anonymize it, or securely isolate it (for example, in backups) until deletion is possible.</p>
+
+  <h2 id="infosafe">6. How do we keep your information safe?</h2>
+  <div class="in-short"><strong>In short:</strong> <em>We use organizational and technical measures to protect your personal information.</em></div>
+
+  <p>We implement reasonable technical and organizational safeguards. No electronic transmission or storage is completely secure; we cannot guarantee that unauthorized parties will never defeat our security. Use the Services at your own risk and in a secure environment.</p>
+
+  <h2 id="privacyrights">7. What are your privacy rights?</h2>
+  <div class="in-short"><strong>In short:</strong> <em>You may review, change, or terminate your account depending on where you live.</em></div>
+
+  <p id="withdrawconsent"><strong>Withdrawing consent.</strong> If we rely on your consent to process your personal information, you may withdraw it at any time by contacting us as described in <a href="#contact">How to contact us</a>. Withdrawal does not affect lawfulness of processing before withdrawal where the law allows.</p>
+
+  <h3>Account information</h3>
+  <p>To review, change, or delete your account, you can log in and update your account settings.</p>
+  <p>When you ask us to delete your account, we deactivate or delete it from active databases. We may retain some information as needed for fraud prevention, troubleshooting, investigations, enforcing our terms, or legal compliance.</p>
+
+  <p>Questions about privacy rights? Email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a>.</p>
+
+  <h2 id="DNT">8. Controls for Do-Not-Track features</h2>
+  <p>Some browsers and devices offer a Do-Not-Track (DNT) setting. There is no uniform standard for DNT yet, so we do not currently respond to DNT signals. If standards change, we will update this notice.</p>
+  <p>California law requires us to state that we do not respond to DNT signals at this time because no industry or legal standard for honoring them exists yet.</p>
+
+  <h2 id="uslaws">9. Do United States residents have specific privacy rights?</h2>
+  <div class="in-short"><strong>In short:</strong> <em>Residents of certain states may have additional rights under state privacy laws.</em></div>
+
+  <p>If you are a resident of California, Colorado, Connecticut, Delaware, Florida, Indiana, Iowa, Kentucky, Maryland, Minnesota, Montana, Nebraska, New Hampshire, New Jersey, Oregon, Rhode Island, Tennessee, Texas, Utah, or Virginia, you may have rights to access, correct, delete, or obtain copies of your personal information, among others, subject to limitations in applicable law.</p>
+
+  <h3>Categories of personal information we collect</h3>
+  <p>The table below summarizes categories we may have collected in the last twelve (12) months. Examples are illustrative. For detail, see <a href="#infocollect">What information do we collect?</a></p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Examples</th>
+          <th>Collected</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>A. Identifiers</td>
+          <td>Contact details, name, alias, postal address, phone, online identifiers, IP address, email, account name</td>
+          <td class="center"><span class="tag tag-yes">YES</span></td>
+        </tr>
+        <tr>
+          <td>B. California Customer Records</td>
+          <td>Name, contact information, education, employment, employment history, financial information</td>
+          <td class="center"><span class="tag tag-yes">YES</span></td>
+        </tr>
+        <tr>
+          <td>C. Protected classifications</td>
+          <td>Gender, age, date of birth, race and ethnicity, national origin, marital status, demographic data</td>
+          <td class="center"><span class="tag tag-yes">YES</span></td>
+        </tr>
+        <tr>
+          <td>D. Commercial information</td>
+          <td>Transactions, purchase history, financial details, payment information</td>
+          <td class="center"><span class="tag tag-no">NO</span></td>
+        </tr>
+        <tr>
+          <td>E. Biometric information</td>
+          <td>Fingerprints, voiceprints</td>
+          <td class="center"><span class="tag tag-no">NO</span></td>
+        </tr>
+        <tr>
+          <td>F. Internet or network activity</td>
+          <td>Browsing history, search history, online behavior, ad interactions</td>
+          <td class="center"><span class="tag tag-no">NO</span></td>
+        </tr>
+        <tr>
+          <td>G. Geolocation data</td>
+          <td>Device location</td>
+          <td class="center"><span class="tag tag-yes">YES</span></td>
+        </tr>
+        <tr>
+          <td>H. Audio, electronic, sensory</td>
+          <td>Images, audio, video or call recordings</td>
+          <td class="center"><span class="tag tag-no">NO</span></td>
+        </tr>
+        <tr>
+          <td>I. Professional or employment</td>
+          <td>Business contacts, job title, work history, qualifications if you apply for a job</td>
+          <td class="center"><span class="tag tag-no">NO</span></td>
+        </tr>
+        <tr>
+          <td>J. Education information</td>
+          <td>Student records, directory information</td>
+          <td class="center"><span class="tag tag-no">NO</span></td>
+        </tr>
+        <tr>
+          <td>K. Inferences</td>
+          <td>Profiles or summaries about preferences or characteristics</td>
+          <td class="center"><span class="tag tag-no">NO</span></td>
+        </tr>
+        <tr>
+          <td>L. Sensitive personal information</td>
+          <td>—</td>
+          <td class="center"><span class="tag tag-no">NO</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>We may also collect other personal information when you contact us for support, take surveys, or when we deliver Services.</p>
+
+  <p>We retain categories as needed to provide the Services, including: Categories A, B, C, and G — for as long as you have an account with us.</p>
+
+  <h3>Sources of personal information</h3>
+  <p>See <a href="#infocollect">What information do we collect?</a></p>
+
+  <h3>How we use and share personal information</h3>
+  <p>See <a href="#infouse">How do we process your information?</a> and <a href="#whoshare">When and with whom do we share your personal information?</a></p>
+
+  <p>We may use personal information for internal research and product improvement; that is not a “sale” of your personal information. We have not sold or shared personal information for commercial purposes in the preceding twelve (12) months and do not plan to sell or share it in that manner.</p>
+
+  <h3>Your rights</h3>
+  <p>You have rights under certain US state data protection laws. These rights are not absolute, and we may decline requests where permitted by law. They include:</p>
+  <ul>
+    <li><strong>Right to know</strong> whether we are processing your personal data</li>
+    <li><strong>Right to access</strong> your personal data</li>
+    <li><strong>Right to correct</strong> inaccuracies in your personal data</li>
+    <li><strong>Right to request deletion</strong> of your personal data</li>
+    <li><strong>Right to obtain a copy</strong> of personal data you previously shared with us</li>
+    <li><strong>Right to non-discrimination</strong> for exercising your rights</li>
+    <li><strong>Right to opt out</strong> of processing for targeted advertising (or “sharing” under California law), sale of personal data, or profiling that produces legal or similarly significant effects</li>
+  </ul>
+  <p>Depending on your state, you may also have rights such as:</p>
+  <ul>
+    <li>Access to categories of personal data being processed (including under Minnesota law)</li>
+    <li>A list of categories of third parties to which we have disclosed personal data (including under California, Delaware, and Maryland law)</li>
+    <li>A list of specific third parties to which we have disclosed personal data (including under Minnesota and Oregon law)</li>
+    <li>A list of third parties to which we have sold personal data (including under Connecticut law)</li>
+    <li>Review and correction of profiling (including under Connecticut and Minnesota law)</li>
+    <li>Limiting use of sensitive personal data (including under California law)</li>
+    <li>Opting out of collection via voice or facial recognition features (including under Florida law)</li>
+  </ul>
+
+  <h3>How to exercise your rights</h3>
+  <p>Email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a> or use the contact section below. Authorized agents may submit requests with proof of authorization where required.</p>
+
+  <h3>Request verification</h3>
+  <p>We may verify your identity before fulfilling a request. If we cannot verify you from information we already have, we may ask for additional information for security and fraud prevention.</p>
+
+  <h3>Appeals</h3>
+  <p>If we deny your request, you may appeal by emailing <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a>. If an appeal is denied, you may contact your state attorney general where applicable.</p>
+
+  <h2 id="policyupdates">10. Do we make updates to this notice?</h2>
+  <div class="in-short"><strong>In short:</strong> <em>Yes. We update this notice when needed to stay compliant with applicable laws.</em></div>
+
+  <p>We may update this privacy notice from time to time. The “Last updated” date at the top shows when it was last revised. For material changes, we may post a notice or notify you directly. Please review this notice periodically.</p>
+
+  <h2 id="contact">11. How can you contact us?</h2>
+  <p>Questions about this notice? Email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a> or write to:</p>
+  <div class="contact-block">
+    <strong>RimRun</strong>
+    Upper Darby, PA<br />
+    United States
+  </div>
+
+  <h2 id="request">12. How can you review, update, or delete your data?</h2>
+  <p>Depending on applicable law, you may request access, correction, deletion, or other rights regarding your personal information. To request to review, update, or delete your personal information, please email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a>.</p>
+
+</main>
+
+<footer class="site-footer">
+  <p><strong>RimRun</strong> · Privacy policy · <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a></p>
+</footer>
+
 </body>
 </html>
