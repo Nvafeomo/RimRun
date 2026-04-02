@@ -161,7 +161,7 @@ export default function ChatRouteScreen() {
               onPress={goToCourt}
               style={styles.headerIconButton}
             >
-              <Ionicons name="location" size={20} color={colors.primary} />
+              <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
             </Pressable>
           )}
           {canRename && (
