@@ -56,4 +56,4 @@ Age-related rules for DMs and friend requests are enforced in app code (`lib/age
 
 ## License
 
-Private / all rights reserved unless you add a public license file.
+Proprietary — [all rights reserved](LICENSE). Not licensed for copying or redistribution without written permission. Update the copyright line in `LICENSE` to your legal name if you use one.
