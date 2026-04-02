@@ -29,6 +29,7 @@ import {
   enrichPickOptions,
   type LocationPickOption,
 } from "../../../lib/courtMapSearch";
+import { resolveUsStateCenter } from "../../../lib/usStateCentroids";
 
 const DEFAULT_REGION: Region = {
   latitude: 37.78825,
@@ -647,6 +648,19 @@ export default function CourtsScreen() {
       return;
     }
 
+    const stateCenter = resolveUsStateCenter(trimmed);
+    if (stateCenter) {
+      setLocationQuery(stateCenter.label);
+      await runCourtsSearch({
+        anchorLat: stateCenter.latitude,
+        anchorLng: stateCenter.longitude,
+        radiusMiles,
+        userAnchored: false,
+        animateMap: true,
+      });
+      return;
+    }
+
     setGeocodingSearch(true);
     try {
       const raw = await geocodeSearchQuery(trimmed, userLocation);
@@ -705,23 +719,27 @@ export default function CourtsScreen() {
     router.push("/(app)/court/add");
   };
 
-  const handleRecenter = async () => {
+  const handleRecenter = useCallback(async () => {
+    Keyboard.dismiss();
     try {
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
       const { latitude, longitude } = loc.coords;
-      const d = mapDeltaForRadiusMiles(radiusMilesRef.current);
-      mapRef.current?.animateToRegion({
-        latitude,
-        longitude,
-        latitudeDelta: d,
-        longitudeDelta: d,
+      setUserLocation({ latitude, longitude });
+      setLocationQuery("");
+      const radiusMiles = parseMilesInput(milesInput);
+      await runCourtsSearch({
+        anchorLat: latitude,
+        anchorLng: longitude,
+        radiusMiles,
+        userAnchored: true,
+        animateMap: true,
       });
     } catch {
       // Location unavailable
     }
-  };
+  }, [milesInput, runCourtsSearch]);
 
   if (!region) {
     return (

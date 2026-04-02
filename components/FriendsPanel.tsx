@@ -15,6 +15,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../lib/supabase";
+import { removeFriendship } from "../lib/friendshipActions";
 import { useAuth } from "../context/AuthContext";
 import { colors, spacing, borderRadius } from "../constants/theme";
 
@@ -239,6 +240,34 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     fetchRequests();
   };
 
+  const executeRemoveFriend = async (friendUserId: string) => {
+    if (!user?.id) return;
+    setActioningId(friendUserId);
+    const { error } = await removeFriendship(user.id, friendUserId);
+    setActioningId(null);
+    if (error) {
+      Alert.alert("Could not remove friend", error.message);
+      return;
+    }
+    await loadAll();
+  };
+
+  const promptRemoveFriend = (friend: ProfileRow) => {
+    const name = friend.username ?? "this person";
+    Alert.alert(
+      "Remove friend?",
+      `Remove ${name} from your friends? You can send a new request later if allowed.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => void executeRemoveFriend(friend.id),
+        },
+      ]
+    );
+  };
+
   const openDM = async (otherUserId: string) => {
     if (!user?.id) return;
     const { data: convId, error } = await supabase.rpc(
@@ -246,10 +275,35 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
       { p_other_user_id: otherUserId }
     );
     if (error || !convId) {
-      Alert.alert(
-        "Cannot start chat",
-        error?.message || "Could not start chat."
-      );
+      const msg = error?.message ?? "";
+      const isAgePolicy =
+        /age policy|does not allow this connection/i.test(msg);
+      if (isAgePolicy) {
+        const other = friends.find((f) => f.id === otherUserId)?.friend;
+        const label = other?.username ?? "them";
+        Alert.alert("Cannot start chat", msg, [
+          { text: "OK", style: "cancel" },
+          {
+            text: "Remove friend",
+            style: "destructive",
+            onPress: () =>
+              Alert.alert(
+                "Remove friend?",
+                `Remove ${label} from your friends?`,
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Remove",
+                    style: "destructive",
+                    onPress: () => void executeRemoveFriend(otherUserId),
+                  },
+                ]
+              ),
+          },
+        ]);
+        return;
+      }
+      Alert.alert("Cannot start chat", msg || "Could not start chat.");
       return;
     }
     const other = friends.find((f) => f.id === otherUserId)?.friend;
@@ -353,30 +407,49 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     );
   };
 
-  const renderFriendRow = ({ item }: { item: FriendRow }) => (
-    <Pressable
-      style={styles.friendRow}
-      onPress={() => openDM(item.id)}
-      android_ripple={{ color: colors.border }}
-    >
-      {item.friend.profile_image_url ? (
-        <Image
-          source={{ uri: item.friend.profile_image_url }}
-          style={styles.avatar}
-        />
-      ) : (
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>
-            {(item.friend.username ?? "?")[0].toUpperCase()}
+  const renderFriendRow = ({ item }: { item: FriendRow }) => {
+    const busy = actioningId === item.id;
+    return (
+      <View style={styles.friendRow}>
+        <Pressable
+          style={styles.friendRowMain}
+          onPress={() => openDM(item.id)}
+          disabled={busy}
+          android_ripple={{ color: colors.border }}
+        >
+          {item.friend.profile_image_url ? (
+            <Image
+              source={{ uri: item.friend.profile_image_url }}
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>
+                {(item.friend.username ?? "?")[0].toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.friendName} numberOfLines={1}>
+            {item.friend.username ?? "Unknown"}
           </Text>
-        </View>
-      )}
-      <Text style={styles.friendName} numberOfLines={1}>
-        {item.friend.username ?? "Unknown"}
-      </Text>
-      <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-    </Pressable>
-  );
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+        </Pressable>
+        <Pressable
+          style={styles.friendRemoveBtn}
+          onPress={() => promptRemoveFriend(item.friend)}
+          disabled={busy}
+          hitSlop={8}
+          accessibilityLabel="Remove friend"
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color={colors.textMuted} />
+          ) : (
+            <Ionicons name="person-remove-outline" size={22} color={colors.textMuted} />
+          )}
+        </Pressable>
+      </View>
+    );
+  };
 
   const renderRequestRow = ({ item }: { item: FriendRequestRow }) => (
     <View style={styles.requestRow}>
@@ -719,12 +792,27 @@ const styles = StyleSheet.create({
   friendRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: "hidden",
+  },
+  friendRowMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.md,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
+    minWidth: 0,
+  },
+  friendRemoveBtn: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   requestRow: {
     flexDirection: "row",

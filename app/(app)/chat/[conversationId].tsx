@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ChatScreen } from "../../../components/ChatScreen";
 import { AddMemberToChatModal } from "../../../components/AddMemberToChatModal";
 import { supabase } from "../../../lib/supabase";
+import { clearConversationAndLeave } from "../../../lib/chatDeletion";
 import { useAuth } from "../../../context/AuthContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
@@ -40,8 +41,37 @@ export default function ChatRouteScreen() {
   const resolvedCourtName = courtName ?? "Court";
   const canRename = !!resolvedCourtId && !!user?.id;
   const isCourtChat = !!resolvedCourtId;
-  const showAddMember =
+  const showDmGroupActions =
     !isCourtChat && (chatKind === "dm" || chatKind === "group");
+
+  const handleDeleteConversation = () => {
+    if (!conversationId || !user?.id) return;
+    const name = displayTitle;
+    Alert.alert(
+      chatKind === "group" ? "Delete group chat?" : "Delete conversation?",
+      chatKind === "group"
+        ? `This deletes all messages in "${name}" for everyone and removes you from the group.`
+        : `This deletes all messages with ${name} and removes the chat from your list. This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => void runDeleteConversation(),
+        },
+      ]
+    );
+  };
+
+  const runDeleteConversation = async () => {
+    if (!conversationId || !user?.id) return;
+    const { error } = await clearConversationAndLeave(conversationId, user.id);
+    if (error) {
+      Alert.alert("Could not delete", error.message);
+      return;
+    }
+    router.back();
+  };
 
   useEffect(() => {
     if (!conversationId) return;
@@ -143,7 +173,17 @@ export default function ChatRouteScreen() {
               <Ionicons name="pencil" size={18} color={colors.textMuted} />
             </Pressable>
           )}
-          {showAddMember && (
+          {showDmGroupActions && (
+            <Pressable
+              hitSlop={12}
+              onPress={handleDeleteConversation}
+              style={styles.headerIconButton}
+              accessibilityLabel="Delete conversation"
+            >
+              <Ionicons name="trash-outline" size={22} color={colors.textMuted} />
+            </Pressable>
+          )}
+          {showDmGroupActions && (
             <Pressable
               hitSlop={12}
               onPress={() => setAddMemberOpen(true)}
@@ -204,7 +244,7 @@ export default function ChatRouteScreen() {
         </Pressable>
       </Modal>
 
-      {showAddMember && chatKind && (
+      {showDmGroupActions && chatKind && (
         <AddMemberToChatModal
           visible={addMemberOpen}
           onClose={() => setAddMemberOpen(false)}

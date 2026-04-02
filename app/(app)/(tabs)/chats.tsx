@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +15,7 @@ import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
+import { clearConversationAndLeave } from "../../../lib/chatDeletion";
 import { FriendsPanel } from "../../../components/FriendsPanel";
 import { NewGroupChatModal } from "../../../components/NewGroupChatModal";
 
@@ -56,6 +58,7 @@ export default function ChatsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [threadDeletingId, setThreadDeletingId] = useState<string | null>(null);
 
   const fetchCourtChats = useCallback(async () => {
     if (!user?.id) {
@@ -300,6 +303,40 @@ export default function ChatsScreen() {
     });
   };
 
+  const confirmDeleteThread = (item: MessageThreadItem) => {
+    const isGroup = item.kind === "group";
+    const name = item.kind === "dm" ? item.otherUsername : item.title;
+    Alert.alert(
+      isGroup ? "Delete group chat?" : "Delete conversation?",
+      isGroup
+        ? `This deletes all messages in "${name}" for everyone and removes you from the group.`
+        : `This deletes all messages with ${name} and removes the chat from your list. This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => void handleDeleteThread(item),
+        },
+      ]
+    );
+  };
+
+  const handleDeleteThread = async (item: MessageThreadItem) => {
+    if (!user?.id) return;
+    setThreadDeletingId(item.conversationId);
+    const { error } = await clearConversationAndLeave(
+      item.conversationId,
+      user.id
+    );
+    setThreadDeletingId(null);
+    if (error) {
+      Alert.alert("Could not delete", error.message);
+      return;
+    }
+    await fetchMessageThreads();
+  };
+
   const openCourtChat = (item: CourtChatItem) => {
     if (!item.conversationId) return;
     router.push({
@@ -334,30 +371,49 @@ export default function ChatsScreen() {
     </Pressable>
   );
 
-  const renderMessageThreadItem = ({ item }: { item: MessageThreadItem }) => (
-    <Pressable
-      style={styles.chatItem}
-      onPress={() => openMessageThread(item)}
-      android_ripple={{ color: colors.border }}
-    >
-      <View style={styles.chatItemIcon}>
-        <Ionicons
-          name={item.kind === "group" ? "people" : "person"}
-          size={24}
-          color={colors.primary}
-        />
+  const renderMessageThreadItem = ({ item }: { item: MessageThreadItem }) => {
+    const deleting = threadDeletingId === item.conversationId;
+    return (
+      <View style={styles.threadRow}>
+        <Pressable
+          style={styles.threadRowMain}
+          onPress={() => openMessageThread(item)}
+          disabled={deleting}
+          android_ripple={{ color: colors.border }}
+        >
+          <View style={styles.chatItemIcon}>
+            <Ionicons
+              name={item.kind === "group" ? "people" : "person"}
+              size={24}
+              color={colors.primary}
+            />
+          </View>
+          <View style={styles.chatItemContent}>
+            <Text style={styles.chatItemTitle} numberOfLines={1}>
+              {item.kind === "dm" ? item.otherUsername : item.title}
+            </Text>
+            <Text style={styles.chatItemPreview} numberOfLines={1}>
+              {item.lastMessage ?? "No messages yet"}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+        </Pressable>
+        <Pressable
+          style={styles.threadDeleteBtn}
+          onPress={() => confirmDeleteThread(item)}
+          disabled={deleting}
+          hitSlop={10}
+          accessibilityLabel="Delete conversation"
+        >
+          {deleting ? (
+            <ActivityIndicator size="small" color={colors.textMuted} />
+          ) : (
+            <Ionicons name="trash-outline" size={22} color={colors.textMuted} />
+          )}
+        </Pressable>
       </View>
-      <View style={styles.chatItemContent}>
-        <Text style={styles.chatItemTitle} numberOfLines={1}>
-          {item.kind === "dm" ? item.otherUsername : item.title}
-        </Text>
-        <Text style={styles.chatItemPreview} numberOfLines={1}>
-          {item.lastMessage ?? "No messages yet"}
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-    </Pressable>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -609,6 +665,30 @@ const styles = StyleSheet.create({
   },
   emptyList: {
     flex: 1,
+  },
+  threadRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
+  threadRowMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.md,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
+    minWidth: 0,
+  },
+  threadDeleteBtn: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
   },
   chatItem: {
     flexDirection: "row",
