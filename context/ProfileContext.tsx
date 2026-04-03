@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { reencodeJpegWithoutExif } from '../lib/stripImageForUpload';
 import { validateDateOfBirthForSignup } from '../lib/agePolicy';
+import { resolveAvatarUriForDisplay } from '../lib/avatarUrls';
 import { useAuth } from './AuthContext';
 
 function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
@@ -56,13 +57,6 @@ const IMAGE_PICKER_OPTIONS = {
   base64: false,
 };
 
-/** Same Storage URL after upsert — expo-image caches by URI; bust so new bytes show after login. */
-function withImageCacheBust(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const base = url.split('?')[0];
-  return `${base}?v=${Date.now()}`;
-}
-
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile>(null);
@@ -104,9 +98,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         }
       }
       if (row) {
+        const avatarUri = await resolveAvatarUriForDisplay(
+          user.id,
+          row.profile_image_url,
+        );
         setProfile({
           ...row,
-          profile_image_url: withImageCacheBust(row.profile_image_url),
+          profile_image_url: avatarUri,
         });
       } else {
         setProfile(null);
@@ -153,9 +151,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           );
         }
 
+        const avatarUri = await resolveAvatarUriForDisplay(
+          user.id,
+          updated.profile_image_url ?? avatarUrl,
+        );
         setProfile({
           ...updated,
-          profile_image_url: withImageCacheBust(updated.profile_image_url ?? avatarUrl),
+          profile_image_url: avatarUri,
         });
       } catch (err: unknown) {
         const message =

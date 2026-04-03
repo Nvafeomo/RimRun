@@ -8,7 +8,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Image,
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { colors, spacing, borderRadius } from "../constants/theme";
+import { AvatarImage } from "./AvatarImage";
 
 type FriendRow = {
   id: string;
@@ -205,18 +205,12 @@ export function AddMemberToChatModal({
                   onPress={() => !busy && addFriend(item.id)}
                   disabled={!!workingId}
                 >
-                  {item.profile_image_url ? (
-                    <Image
-                      source={{ uri: item.profile_image_url }}
-                      style={styles.avatar}
-                    />
-                  ) : (
-                    <View style={styles.avatarPh}>
-                      <Text style={styles.avatarTx}>
-                        {(item.username ?? "?")[0].toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
+                  <AvatarImage
+                    userId={item.id}
+                    username={item.username}
+                    profileImageUrl={item.profile_image_url}
+                    size={44}
+                  />
                   <Text style={styles.name} numberOfLines={1}>
                     {item.username ?? "Unknown"}
                   </Text>

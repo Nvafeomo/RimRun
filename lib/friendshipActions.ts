@@ -1,21 +1,15 @@
 import { supabase } from "./supabase";
 
-/** Removes both friendship rows for this pair (RLS allows delete when user is either side). */
+/**
+ * Ends friendship and records dissolution for 7-day grace re-add (see phase-3 SQL).
+ */
 export async function removeFriendship(
-  currentUserId: string,
+  _currentUserId: string,
   friendUserId: string
 ): Promise<{ error: Error | null }> {
-  const { error: e1 } = await supabase
-    .from("friendships")
-    .delete()
-    .eq("user_id", currentUserId)
-    .eq("friend_id", friendUserId);
-  if (e1) return { error: new Error(e1.message) };
-  const { error: e2 } = await supabase
-    .from("friendships")
-    .delete()
-    .eq("user_id", friendUserId)
-    .eq("friend_id", currentUserId);
-  if (e2) return { error: new Error(e2.message) };
+  const { error } = await supabase.rpc("remove_friendship_graceful", {
+    p_other_user_id: friendUserId,
+  });
+  if (error) return { error: new Error(error.message) };
   return { error: null };
 }

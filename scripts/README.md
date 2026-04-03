@@ -9,6 +9,7 @@ Import basketball courts from Overpass Turbo GeoJSON into Supabase.
 | `rimrun-full-database-setup.sql` | New empty project: tables, Storage bucket `Avatars`, RLS + RPCs. |
 | `rimrun-consolidated-migrations.sql` | Project already has tables; apply security/RPC/trigger layer only. |
 | `fix-rls-policy-drift.sql` | Production or dev DB has **duplicate or dangerous policies** (e.g. open INSERT on `courts`, anon `SELECT` on `profiles`). Safe to re-run. |
+| `phase-3-blocks-grace-discovery-avatars.sql` | After consolidated + phase 2b: **user blocks**, **7-day friendship grace**, **`search_profiles_for_discovery`** (age matrix + minors-only discovery), **private Avatars** + authenticated read (app uses signed URLs). |
 
 Run SQL files in the Supabase Dashboard → SQL Editor unless you use the Supabase CLI migration workflow.
 

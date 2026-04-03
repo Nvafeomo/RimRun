@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useConversationChat } from "../hooks/useConversationChat";
 import { useAuth } from "../hooks/useAuth";
 import { useProfile } from "../context/ProfileContext";
+import { AvatarImage } from "./AvatarImage";
 import { colors, spacing, borderRadius } from "../constants/theme";
 import type { Message } from "../types/chat";
 
@@ -88,17 +89,13 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
     const displayName = isOwn
       ? (profile?.username ?? "You")
       : (item.sender?.username ?? "Unknown");
-    const avatarUrl = isOwn
-      ? profile?.profile_image_url
-      : item.sender?.profile_image_url;
-    const avatarLetter = isOwn
-      ? avatarPlaceholderLetter(
-          profile?.username,
-          user?.email?.split("@")[0] ?? null
-        )
-      : avatarPlaceholderLetter(item.sender?.username);
 
     if (isOwn) {
+      const avatarUrl = profile?.profile_image_url;
+      const avatarLetter = avatarPlaceholderLetter(
+        profile?.username,
+        user?.email?.split("@")[0] ?? null
+      );
       return (
         <View style={[styles.messageRow, styles.messageRowOwn]}>
           <View style={[styles.messageContent, styles.messageContentOwn]}>
@@ -131,7 +128,12 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
           >
             {displayName}
           </Text>
-          {renderAvatar(avatarUrl ?? null, avatarLetter)}
+          <AvatarImage
+            userId={item.sender_id}
+            username={item.sender?.username}
+            profileImageUrl={item.sender?.profile_image_url}
+            size={36}
+          />
         </View>
         <View style={[styles.messageContent, styles.messageContentOther]}>
           <View style={[styles.bubble, styles.bubbleOther]}>

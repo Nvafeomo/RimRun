@@ -8,14 +8,15 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Image,
   RefreshControl,
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../lib/supabase";
+import { AvatarImage } from "./AvatarImage";
 import { removeFriendship } from "../lib/friendshipActions";
+import { blockUser, unblockUser } from "../lib/blocking";
 import { useAuth } from "../context/AuthContext";
 import { colors, spacing, borderRadius } from "../constants/theme";
 
@@ -49,7 +50,7 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
   const router = useRouter();
   const { user } = useAuth();
   const [friendSubTab, setFriendSubTab] = useState<
-    "all" | "requests" | "add"
+    "all" | "requests" | "add" | "blocked"
   >("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ProfileRow[]>([]);
@@ -59,6 +60,7 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [blockedUsers, setBlockedUsers] = useState<ProfileRow[]>([]);
 
   const incomingCount = useMemo(
     () => requests.filter((r) => r.direction === "incoming").length,
@@ -88,6 +90,30 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
           profile_image_url: p.profile_image_url,
         },
       }))
+    );
+  }, [user?.id]);
+
+  const fetchBlocked = useCallback(async () => {
+    if (!user?.id) return;
+    const { data: rows } = await supabase
+      .from("user_blocks")
+      .select("blocked_id")
+      .eq("blocker_id", user.id)
+      .order("created_at", { ascending: false });
+    if (!rows?.length) {
+      setBlockedUsers([]);
+      return;
+    }
+    const ids = rows.map((r) => r.blocked_id);
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, username, profile_image_url")
+      .in("id", ids);
+    const order = new Map(ids.map((id, i) => [id, i]));
+    setBlockedUsers(
+      (profiles ?? []).sort(
+        (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
+      ),
     );
   }, [user?.id]);
 
@@ -144,8 +170,8 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
   }, [user?.id]);
 
   const loadAll = useCallback(async () => {
-    await Promise.all([fetchFriends(), fetchRequests()]);
-  }, [fetchFriends, fetchRequests]);
+    await Promise.all([fetchFriends(), fetchRequests(), fetchBlocked()]);
+  }, [fetchFriends, fetchRequests, fetchBlocked]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -160,13 +186,16 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
       return;
     }
     setSearching(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, profile_image_url")
-      .ilike("username", `%${q}%`)
-      .neq("id", user?.id ?? "")
-      .limit(20);
-    setSearchResults(data ?? []);
+    const { data, error } = await supabase.rpc("search_profiles_for_discovery", {
+      p_query: q,
+      p_limit: 20,
+    });
+    if (error) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearchResults((data ?? []) as ProfileRow[]);
     setSearching(false);
   }, [searchQuery, user?.id]);
 
@@ -252,11 +281,50 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     await loadAll();
   };
 
+  const executeBlock = async (targetId: string) => {
+    if (!user?.id) return;
+    setActioningId(targetId);
+    const { error } = await blockUser(targetId);
+    setActioningId(null);
+    if (error) {
+      Alert.alert("Could not block", error.message);
+      return;
+    }
+    await loadAll();
+  };
+
+  const promptBlockUser = (p: ProfileRow) => {
+    const name = p.username ?? "this user";
+    Alert.alert(
+      `Block ${name}?`,
+      "They won't be able to interact with you or appear in your discovery search. You can unblock later from the Blocked tab.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: () => void executeBlock(p.id),
+        },
+      ],
+    );
+  };
+
+  const executeUnblock = async (targetId: string) => {
+    setActioningId(targetId);
+    const { error } = await unblockUser(targetId);
+    setActioningId(null);
+    if (error) {
+      Alert.alert("Could not unblock", error.message);
+      return;
+    }
+    await loadAll();
+  };
+
   const promptRemoveFriend = (friend: ProfileRow) => {
     const name = friend.username ?? "this person";
     Alert.alert(
       "Remove friend?",
-      `Remove ${name} from your friends? You can send a new request later if allowed.`,
+      `Remove ${name} from your friends? Within 7 days you can add each other back without a pending request (if age rules allow).`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -325,18 +393,12 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     const isLoading = actioningId === profile.id;
     return (
       <View style={styles.resultRow}>
-        {profile.profile_image_url ? (
-          <Image
-            source={{ uri: profile.profile_image_url }}
-            style={styles.avatar}
-          />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>
-              {(profile.username ?? "?")[0].toUpperCase()}
-            </Text>
-          </View>
-        )}
+        <AvatarImage
+          userId={profile.id}
+          username={profile.username}
+          profileImageUrl={profile.profile_image_url}
+          size={44}
+        />
         <Text style={styles.resultName} numberOfLines={1}>
           {profile.username ?? "Unknown"}
         </Text>
@@ -402,6 +464,16 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
               </Pressable>
             </View>
           )}
+          {(relation === "none" || relation === "outgoing") && (
+            <Pressable
+              style={styles.blockMiniBtn}
+              onPress={() => promptBlockUser(profile)}
+              disabled={isLoading}
+              hitSlop={6}
+            >
+              <Text style={styles.blockMiniBtnText}>Block</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
@@ -417,18 +489,12 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
           disabled={busy}
           android_ripple={{ color: colors.border }}
         >
-          {item.friend.profile_image_url ? (
-            <Image
-              source={{ uri: item.friend.profile_image_url }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {(item.friend.username ?? "?")[0].toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <AvatarImage
+            userId={item.friend.id}
+            username={item.friend.username}
+            profileImageUrl={item.friend.profile_image_url}
+            size={44}
+          />
           <Text style={styles.friendName} numberOfLines={1}>
             {item.friend.username ?? "Unknown"}
           </Text>
@@ -447,24 +513,55 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
             <Ionicons name="person-remove-outline" size={22} color={colors.textMuted} />
           )}
         </Pressable>
+        <Pressable
+          style={styles.friendBlockBtn}
+          onPress={() => promptBlockUser(item.friend)}
+          disabled={busy}
+          hitSlop={8}
+          accessibilityLabel="Block user"
+        >
+          <Ionicons name="ban-outline" size={22} color={colors.textMuted} />
+        </Pressable>
+      </View>
+    );
+  };
+
+  const renderBlockedRow = (p: ProfileRow) => {
+    const busy = actioningId === p.id;
+    return (
+      <View style={styles.blockedRow}>
+        <AvatarImage
+          userId={p.id}
+          username={p.username}
+          profileImageUrl={p.profile_image_url}
+          size={44}
+        />
+        <Text style={styles.friendName} numberOfLines={1}>
+          {p.username ?? "Unknown"}
+        </Text>
+        <Pressable
+          style={styles.unblockBtn}
+          onPress={() => executeUnblock(p.id)}
+          disabled={busy}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text style={styles.unblockBtnText}>Unblock</Text>
+          )}
+        </Pressable>
       </View>
     );
   };
 
   const renderRequestRow = ({ item }: { item: FriendRequestRow }) => (
     <View style={styles.requestRow}>
-      {item.other_user.profile_image_url ? (
-        <Image
-          source={{ uri: item.other_user.profile_image_url }}
-          style={styles.avatar}
-        />
-      ) : (
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>
-            {(item.other_user.username ?? "?")[0].toUpperCase()}
-          </Text>
-        </View>
-      )}
+      <AvatarImage
+        userId={item.other_user.id}
+        username={item.other_user.username}
+        profileImageUrl={item.other_user.profile_image_url}
+        size={44}
+      />
       <View style={styles.requestContent}>
         <Text style={styles.requestName} numberOfLines={1}>
           {item.other_user.username ?? "Unknown"}
@@ -568,9 +665,55 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
             Add friends
           </Text>
         </Pressable>
+        <Pressable
+          style={[
+            styles.subTab,
+            friendSubTab === "blocked" && styles.subTabActive,
+          ]}
+          onPress={() => setFriendSubTab("blocked")}
+        >
+          <Text
+            style={[
+              styles.subTabText,
+              friendSubTab === "blocked" && styles.subTabTextActive,
+            ]}
+            numberOfLines={1}
+          >
+            Blocked
+          </Text>
+        </Pressable>
       </View>
 
-      {friendSubTab === "add" ? (
+      {friendSubTab === "blocked" ? (
+        loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            data={blockedUsers}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => renderBlockedRow(item)}
+            contentContainerStyle={
+              blockedUsers.length === 0 ? styles.emptyList : styles.list
+            }
+            refreshControl={<RefreshControl {...refreshProps} />}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={48}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.emptyTitle}>No blocked users</Text>
+                <Text style={styles.emptySub}>
+                  Block someone from their friend row or Add friends search
+                </Text>
+              </View>
+            }
+          />
+        )
+      ) : friendSubTab === "add" ? (
         <View style={styles.addKeyboardRoot}>
           <View style={styles.searchBar}>
             <Ionicons name="search" size={20} color={colors.textMuted} />
@@ -706,7 +849,7 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   subTabText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "500",
     color: colors.textMuted,
   },
@@ -813,6 +956,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+  },
+  friendBlockBtn: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  blockMiniBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginLeft: spacing.xs,
+  },
+  blockMiniBtnText: {
+    fontSize: 12,
+    color: colors.textMuted,
+    fontWeight: "600",
+  },
+  blockedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  unblockBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  unblockBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.primary,
   },
   requestRow: {
     flexDirection: "row",
