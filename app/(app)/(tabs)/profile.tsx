@@ -16,6 +16,31 @@ import { useProfile } from '../../../context/ProfileContext';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
 
+/** Edge Functions return JSON `{ error: string }` on failure; `FunctionsHttpError` hides it unless we read `response`. */
+async function messageFromEdgeFunctionFailure(
+  error: unknown,
+  response?: Response,
+): Promise<string> {
+  if (response) {
+    try {
+      const ct = response.headers.get('Content-Type') ?? '';
+      if (ct.includes('application/json')) {
+        const j = (await response.clone().json()) as { error?: string };
+        if (typeof j?.error === 'string' && j.error.trim()) {
+          return j.error;
+        }
+      }
+      const text = (await response.clone().text()).trim();
+      if (text) return text.slice(0, 400);
+    } catch {
+      /* ignore parse errors */
+    }
+    return `Request failed (HTTP ${response.status}).`;
+  }
+  if (error instanceof Error) return error.message;
+  return 'Unknown error';
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
@@ -82,10 +107,17 @@ export default function ProfileScreen() {
       if (!accessToken) {
         throw new Error('Your session expired. Sign in again and try deleting your account.');
       }
-      const { data, error } = await supabase.functions.invoke('delete-account', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (error) throw error;
+      const { data, error, response } = await supabase.functions.invoke(
+        'delete-account',
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
+      );
+      if (error) {
+        const detail = await messageFromEdgeFunctionFailure(error, response);
+        console.error('Delete account error', { detail, status: response?.status });
+        throw new Error(detail);
+      }
       if (data?.error) throw new Error(data.error);
       await signOut();
       router.replace('/(auth)/login');

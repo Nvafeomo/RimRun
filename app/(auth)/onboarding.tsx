@@ -27,15 +27,12 @@ import {
     maxBirthDateForMinAge,
     validateDateOfBirthForSignup,
   } from '../../lib/agePolicy';
-
-  const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
-  function validateUsername(value: string): string | null {
-    if (!value.trim()) return 'Username is required';
-    if (!USERNAME_REGEX.test(value.trim())) {
-      return '3–20 chars, letters, numbers, underscore only';
-    }
-    return null;
-  }
+  import {
+    normalizeUsername,
+    validateUsernameFormat,
+    USERNAME_RULES_USER_HINT,
+    mapProfileUsernameError,
+  } from '../../lib/usernameRules';
 
   function validateEmail(value: string): string | null {
     if (!value.trim()) return 'Email is required';
@@ -130,8 +127,8 @@ import {
 
         let normalizedUsername: string | null = null;
         if (needsUsername) {
-            normalizedUsername = username.trim().toLowerCase();
-            const uErr = validateUsername(normalizedUsername);
+            normalizedUsername = normalizeUsername(username);
+            const uErr = validateUsernameFormat(normalizedUsername);
             if (uErr) {
                 setError(uErr);
                 return;
@@ -224,7 +221,11 @@ import {
                     setSubmitting(false);
                     return;
                 }
-                if (insertErr) throw insertErr;
+                if (insertErr) {
+                    setError(mapProfileUsernameError(insertErr));
+                    setSubmitting(false);
+                    return;
+                }
             } else {
                 const updates: Record<string, string | null> = {};
                 if (needsUsername && normalizedUsername) {
@@ -244,7 +245,11 @@ import {
                         .from('profiles')
                         .update(updates)
                         .eq('id', user.id);
-                    if (updateError) throw updateError;
+                    if (updateError) {
+                        setError(mapProfileUsernameError(updateError));
+                        setSubmitting(false);
+                        return;
+                    }
                 }
             }
 
@@ -299,6 +304,7 @@ import {
                 </View>
                 <View style={styles.card}>
                     {needsUsername ? (
+                        <>
                         <TextInput
                             placeholder="Username"
                             placeholderTextColor={colors.textMuted}
@@ -310,6 +316,8 @@ import {
                             value={username}
                             onChangeText={setUsername}
                         />
+                        <Text style={styles.usernameHint}>{USERNAME_RULES_USER_HINT}</Text>
+                        </>
                     ) : null}
 
                     {needsEmail ? (
@@ -551,6 +559,14 @@ import {
     inputFullWidth: {
       alignSelf: 'stretch',
       width: '100%',
+    },
+    usernameHint: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: -spacing.sm,
+      marginBottom: spacing.md,
+      paddingHorizontal: spacing.xs,
+      alignSelf: 'stretch',
     },
     dobTouchable: {
       justifyContent: 'center',

@@ -23,6 +23,11 @@ import {
   maxBirthDateForMinAge,
   validateDateOfBirthForSignup,
 } from '../../lib/agePolicy';
+import {
+  normalizeUsername,
+  validateUsernameInput,
+  USERNAME_RULES_USER_HINT,
+} from '../../lib/usernameRules';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -37,11 +42,8 @@ export default function SignupScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const { signUp, signInWithGoogle } = useAuth();
 
-  const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
   function validateUsername(value: string): string | null {
-    if (!value.trim()) return 'Username is required';
-    if (!USERNAME_REGEX.test(value)) return '3–20 chars, letters, numbers, underscore only';
-    return null;
+    return validateUsernameInput(value);
   }
   function validateEmail(value: string): string | null {
     if (!value.trim()) return 'Email is required';
@@ -97,7 +99,7 @@ export default function SignupScreen() {
     setSubmitting(true);
 
     try {
-      const normalizedUsername = username.trim().toLowerCase();
+      const normalizedUsername = normalizeUsername(username);
       const { data: existingUser } = await supabase
         .from('profiles')
         .select('id')
@@ -173,6 +175,7 @@ export default function SignupScreen() {
               value={username}
               onChangeText={setUsername}
             />
+            <Text style={styles.fieldHint}>{USERNAME_RULES_USER_HINT}</Text>
             <TextInput
               placeholder="Email"
               placeholderTextColor={colors.textMuted}
@@ -342,6 +345,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.inputBg,
     marginBottom: spacing.md,
+  },
+  fieldHint: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
   },
   dobTouchable: {
     justifyContent: 'center',

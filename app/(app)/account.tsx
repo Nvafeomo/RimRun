@@ -18,8 +18,12 @@ import { useAuth } from "../../context/AuthContext";
 import { useProfile } from "../../context/ProfileContext";
 import { colors, spacing, borderRadius } from "../../constants/theme";
 import { supabase } from "../../lib/supabase";
-
-const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
+import {
+  normalizeUsername,
+  validateUsernameInput,
+  USERNAME_RULES_USER_HINT,
+  mapProfileUsernameError,
+} from "../../lib/usernameRules";
 
 function formatDateOfBirthDisplay(isoDate: string) {
   const [y, m, d] = isoDate.split("-").map(Number);
@@ -30,12 +34,6 @@ function formatDateOfBirthDisplay(isoDate: string) {
   });
 }
 
-function validateUsername(value: string): string | null {
-  if (!value.trim()) return "Username is required";
-  if (!USERNAME_REGEX.test(value))
-    return "3–20 characters: letters, numbers, underscore only";
-  return null;
-}
 
 function validateEmail(value: string): string | null {
   if (!value.trim()) return "Email is required";
@@ -64,14 +62,14 @@ export default function AccountScreen() {
     if (!user?.id) return;
     setError("");
 
-    const usernameErr = validateUsername(username.trim());
+    const usernameErr = validateUsernameInput(username);
     const emailErr = validateEmail(email);
     if (usernameErr || emailErr) {
       setError(usernameErr ?? emailErr ?? "Invalid input");
       return;
     }
 
-    const normalizedUsername = username.trim().toLowerCase();
+    const normalizedUsername = normalizeUsername(username);
     const trimmedEmail = email.trim().toLowerCase();
     const currentUsername = (profile?.username ?? "").toLowerCase();
     const currentEmail = (user.email ?? "").toLowerCase();
@@ -105,7 +103,11 @@ export default function AccountScreen() {
           .update({ username: normalizedUsername })
           .eq("id", user.id);
 
-        if (profileErr) throw profileErr;
+        if (profileErr) {
+          setError(mapProfileUsernameError(profileErr));
+          setSubmitting(false);
+          return;
+        }
       }
 
       if (emailChanged) {
@@ -178,8 +180,9 @@ export default function AccountScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.intro}>
-            Update your username and email. Username must be unique. Email
-            changes may require confirmation from your inbox (Supabase settings).
+            Update your username and email. Usernames must be unique (6–20
+            characters). Email changes may require confirmation from your inbox
+            (Supabase settings).
           </Text>
 
           <View style={styles.card}>
@@ -209,6 +212,7 @@ export default function AccountScreen() {
               autoComplete="username"
               editable={!submitting}
             />
+            <Text style={styles.fieldHint}>{USERNAME_RULES_USER_HINT}</Text>
 
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -322,6 +326,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.inputBg,
     marginBottom: spacing.md,
+  },
+  fieldHint: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
   },
   error: {
     color: colors.error,

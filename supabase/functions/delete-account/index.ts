@@ -1,9 +1,12 @@
+/// <reference path="./deno-shim.d.ts" />
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+/** CLI cannot set names starting with SUPABASE_; use `SERVICE_ROLE_KEY` via `supabase secrets set`. */
+const SERVICE_ROLE_KEY =
+  Deno.env.get("SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,11 +54,27 @@ Deno.serve(async (req) => {
     return json({ error: "Unauthorized" }, 401);
   }
 
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  if (!SERVICE_ROLE_KEY) {
+    console.error("Missing SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY) for admin client");
+    return json({ error: "Server misconfigured" }, 500);
+  }
+
+  const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
   if (deleteError) {
     console.error("Delete user error:", deleteError);
-    return json({ error: deleteError.message }, 500);
+    // Wrong/missing service role in Edge secrets often surfaces as this exact message.
+    const msg = deleteError.message ?? "delete failed";
+    if (/invalid api key/i.test(msg)) {
+      return json(
+        {
+          error:
+            "Edge Function secret SERVICE_ROLE_KEY is wrong or not the service_role key for this project. Fix in Dashboard → Edge Functions → Secrets (not the app .env).",
+        },
+        500,
+      );
+    }
+    return json({ error: msg }, 500);
   }
 
   return json({ success: true });

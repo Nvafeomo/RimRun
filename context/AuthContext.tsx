@@ -14,6 +14,7 @@ import {
   clearPendingPasswordRecovery,
   isLikelyAuthCallback,
 } from '../lib/supabaseAuthDeepLink';
+import { mapProfileUsernameError } from '../lib/usernameRules';
 
 type AuthContextValue = {
     user: User | null;
@@ -172,10 +173,7 @@ type AuthContextValue = {
           .update({ date_of_birth: dateOfBirthIso, username, email })
           .eq('id', uid);
         if (profileError) {
-          throw new Error(
-            profileError.message ||
-              'Could not save date of birth. Check RLS allows UPDATE on profiles.',
-          );
+          throw new Error(mapProfileUsernameError(profileError));
         }
       } else {
         const { error: insertErr } = await supabase.from('profiles').insert({
@@ -190,13 +188,10 @@ type AuthContextValue = {
             .update({ date_of_birth: dateOfBirthIso, username, email })
             .eq('id', uid);
           if (retryErr) {
-            throw new Error(retryErr.message || 'Could not save date of birth after sign up.');
+            throw new Error(mapProfileUsernameError(retryErr));
           }
         } else if (insertErr) {
-          throw new Error(
-            insertErr.message ||
-              'Could not create your profile. Run scripts/profiles-upsert-own-row.sql (insert policy) in Supabase.',
-          );
+          throw new Error(mapProfileUsernameError(insertErr));
         }
       }
     }
