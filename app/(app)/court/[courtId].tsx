@@ -11,7 +11,10 @@ import {
   Alert,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
@@ -30,6 +33,7 @@ type Court = {
 };
 
 export default function CourtDetailScreen() {
+  const insets = useSafeAreaInsets();
   const { courtId } = useLocalSearchParams<{ courtId: string }>();
   const { user } = useAuth();
   const { getDisplayName } = useCourtAliases();
@@ -211,17 +215,25 @@ export default function CourtDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {court.name ?? "Basketball Court"}
-        </Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <View style={styles.body}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </Pressable>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {court.name ?? "Basketball Court"}
+          </Text>
+        </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.contentInner,
+            { paddingBottom: Math.max(spacing.lg, insets.bottom + spacing.md) },
+          ]}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Details</Text>
           {court.hoops != null && (
@@ -308,7 +320,8 @@ export default function CourtDetailScreen() {
             </Text>
           </Pressable>
         ) : null}
-      </ScrollView>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -342,11 +355,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.text,
   },
-  content: {
+  /** Fills stack; minHeight:0 lets ScrollView take remaining space on Android flex. */
+  body: {
+    flex: 1,
+    minHeight: 0,
+  },
+  scroll: {
     flex: 1,
   },
   contentInner: {
     padding: spacing.lg,
+    flexGrow: 1,
   },
   section: {
     marginBottom: spacing.xl,

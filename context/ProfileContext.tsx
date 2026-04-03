@@ -14,6 +14,26 @@ import { validateDateOfBirthForSignup } from '../lib/agePolicy';
 import { resolveAvatarUriForDisplay } from '../lib/avatarUrls';
 import { useAuth } from './AuthContext';
 
+/** Columns added by `scripts/profile-privacy-public-profile.sql`; optional until migration runs. */
+const PROFILE_SELECT_BASE =
+  'profile_image_url, date_of_birth, username, email' as const;
+const PROFILE_SELECT_WITH_PRIVACY =
+  `${PROFILE_SELECT_BASE}, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added, messages_only_from_friends` as const;
+
+function isUndefinedColumnError(err: unknown): boolean {
+  if (err && typeof err === 'object' && 'code' in err) {
+    const code = (err as { code?: string }).code;
+    if (code === '42703') return true;
+  }
+  const msg =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'object' && err !== null && 'message' in err
+        ? String((err as { message: unknown }).message)
+        : '';
+  return /column .* does not exist/i.test(msg);
+}
+
 function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(
@@ -33,11 +53,31 @@ function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
   });
 }
 
+/** Row shape from `profiles` (privacy columns optional until migration is applied). */
+export type ProfileDbRow = {
+  profile_image_url: string | null;
+  date_of_birth: string | null;
+  username?: string | null;
+  email?: string | null;
+  profile_public_show_friends?: boolean;
+  profile_public_show_courts_joined?: boolean;
+  profile_public_show_courts_added?: boolean;
+  messages_only_from_friends?: boolean;
+};
+
 export type Profile = {
   profile_image_url: string | null;
   date_of_birth: string | null;
   username?: string | null;
   email?: string | null;
+  /** When false, friends count is hidden on your public profile. Default true. */
+  profile_public_show_friends?: boolean;
+  /** When false, courts joined count is hidden on your public profile. Default true. */
+  profile_public_show_courts_joined?: boolean;
+  /** When false, courts added count is hidden on your public profile. Default true. */
+  profile_public_show_courts_added?: boolean;
+  /** When true, only friends can start a new DM with you. Default false. */
+  messages_only_from_friends?: boolean;
 } | null;
 
 type ProfileContextValue = {
@@ -70,14 +110,27 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from('profiles')
-          .select('profile_image_url, date_of_birth, username, email')
-          .eq('id', user.id)
-          .maybeSingle(),
-        20_000,
-      );
+      const query = supabase
+        .from('profiles')
+        .select(PROFILE_SELECT_WITH_PRIVACY)
+        .eq('id', user.id)
+        .maybeSingle();
+      const first = await withTimeout(query, 20_000);
+      let data: ProfileDbRow | null = first.data as ProfileDbRow | null;
+      let error = first.error;
+
+      if (error && isUndefinedColumnError(error)) {
+        const fallback = await withTimeout(
+          supabase
+            .from('profiles')
+            .select(PROFILE_SELECT_BASE)
+            .eq('id', user.id)
+            .maybeSingle(),
+          20_000,
+        );
+        data = fallback.data as ProfileDbRow | null;
+        error = fallback.error;
+      }
 
       if (error) throw error;
       let row = data;
@@ -138,12 +191,21 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         const { data: urlData } = supabase.storage.from('Avatars').getPublicUrl(filePath);
         const avatarUrl = urlData.publicUrl;
 
-        const { data: updated, error: updateError } = await supabase
+        let updateResult = await supabase
           .from('profiles')
           .update({ profile_image_url: avatarUrl })
           .eq('id', user.id)
-          .select('profile_image_url, date_of_birth, username, email')
+          .select(PROFILE_SELECT_WITH_PRIVACY)
           .maybeSingle();
+        if (updateResult.error && isUndefinedColumnError(updateResult.error)) {
+          updateResult = await supabase
+            .from('profiles')
+            .update({ profile_image_url: avatarUrl })
+            .eq('id', user.id)
+            .select(PROFILE_SELECT_BASE)
+            .maybeSingle();
+        }
+        const { data: updated, error: updateError } = updateResult;
         if (updateError) throw updateError;
         if (!updated) {
           throw new Error(
@@ -151,12 +213,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           );
         }
 
+        const row = updated as ProfileDbRow;
         const avatarUri = await resolveAvatarUriForDisplay(
           user.id,
-          updated.profile_image_url ?? avatarUrl,
+          row.profile_image_url ?? avatarUrl,
         );
         setProfile({
-          ...updated,
+          ...row,
           profile_image_url: avatarUri,
         });
       } catch (err: unknown) {

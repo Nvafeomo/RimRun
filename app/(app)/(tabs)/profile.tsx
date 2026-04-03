@@ -209,7 +209,12 @@ export default function ProfileScreen() {
             <View style={styles.statDivider} />
             <TouchableOpacity
               style={styles.statItem}
-              onPress={() => router.push('/(app)/(tabs)/courts')}
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/(tabs)/chats',
+                  params: { tab: 'courts' },
+                })
+              }
               activeOpacity={0.7}
             >
               <Text style={styles.statValue}>
@@ -239,6 +244,13 @@ export default function ProfileScreen() {
             onPress={() => router.push('/(app)/account')}
           >
             <Text style={styles.actionButtonText}>Account</Text>
+            <Text style={styles.actionChevron}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/(app)/privacy-settings')}
+          >
+            <Text style={styles.actionButtonText}>Privacy Settings</Text>
             <Text style={styles.actionChevron}>›</Text>
           </TouchableOpacity>
           <TouchableOpacity

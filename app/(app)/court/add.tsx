@@ -24,6 +24,13 @@ import { ageInFullYears, getAgeBracket } from "../../../lib/agePolicy";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
 
 const ZOOM_DELTA = 0.008;
+/** Shown immediately so the screen does not wait on GPS (Android fix is slow with Balanced). */
+const FALLBACK_REGION: Region = {
+  latitude: 37.78825,
+  longitude: -122.4324,
+  latitudeDelta: ZOOM_DELTA,
+  longitudeDelta: ZOOM_DELTA,
+};
 /** Minimum characters before we geocode while typing (avoids noisy API calls). */
 const MIN_ADDRESS_PREVIEW_CHARS = 4;
 /** Wait for a typing pause before geocoding and moving the map. */
@@ -82,12 +89,12 @@ export default function AddCourtScreen() {
   const { profile } = useProfile();
   const mapRef = useRef<MapView>(null);
   /** Last region from GPS / initial load — map returns here when the address field is cleared. */
-  const gpsRegionRef = useRef<Region | null>(null);
+  const gpsRegionRef = useRef<Region>(FALLBACK_REGION);
   /** Bumps when a new address preview geocode starts; stale async results are ignored. */
   const addressPreviewGen = useRef(0);
   /** True while the address field had text (so clearing it can snap the map back to GPS). */
   const hadAddressContentRef = useRef(false);
-  const [region, setRegion] = useState<Region | null>(null);
+  const [region, setRegion] = useState<Region>(FALLBACK_REGION);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [hoopsRaw, setHoopsRaw] = useState("");
@@ -96,43 +103,55 @@ export default function AddCourtScreen() {
   const [locating, setLocating] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    const apply = (next: Region) => {
+      if (cancelled) return;
+      gpsRegionRef.current = next;
+      setRegion(next);
+      requestAnimationFrame(() => {
+        mapRef.current?.animateToRegion(next, 350);
+      });
+    };
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      if (cancelled) return;
       if (status !== "granted") {
-        const fallback = {
-          latitude: 37.78825,
-          longitude: -122.4324,
-          latitudeDelta: ZOOM_DELTA,
-          longitudeDelta: ZOOM_DELTA,
-        };
-        gpsRegionRef.current = fallback;
-        setRegion(fallback);
         return;
       }
+
+      const last = await Location.getLastKnownPositionAsync({
+        maxAge: 120_000,
+      });
+      if (!cancelled && last) {
+        apply({
+          latitude: last.coords.latitude,
+          longitude: last.coords.longitude,
+          latitudeDelta: ZOOM_DELTA,
+          longitudeDelta: ZOOM_DELTA,
+        });
+      }
+
       try {
         const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+          accuracy:
+            Platform.OS === "android"
+              ? Location.Accuracy.Low
+              : Location.Accuracy.Balanced,
         });
-        const { latitude, longitude } = loc.coords;
-        const next = {
-          latitude,
-          longitude,
+        if (cancelled) return;
+        apply({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
           latitudeDelta: ZOOM_DELTA,
           longitudeDelta: ZOOM_DELTA,
-        };
-        gpsRegionRef.current = next;
-        setRegion(next);
+        });
       } catch {
-        const fallback = {
-          latitude: 37.78825,
-          longitude: -122.4324,
-          latitudeDelta: ZOOM_DELTA,
-          longitudeDelta: ZOOM_DELTA,
-        };
-        gpsRegionRef.current = fallback;
-        setRegion(fallback);
+        /* keep fallback / last-known */
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Debounced: pan map to geocoded address while typing. Clearing the field snaps back to last GPS (not the geocode).
@@ -195,7 +214,10 @@ export default function AddCourtScreen() {
         }
       }
       const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy:
+          Platform.OS === "android"
+            ? Location.Accuracy.Low
+            : Location.Accuracy.Balanced,
       });
       const { latitude, longitude } = loc.coords;
       const next = {
@@ -292,14 +314,6 @@ export default function AddCourtScreen() {
       setSubmitting(false);
     }
   };
-
-  if (!region) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
 
   const hasAddress = address.trim().length > 0;
 
@@ -426,12 +440,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   flex: { flex: 1 },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.background,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",

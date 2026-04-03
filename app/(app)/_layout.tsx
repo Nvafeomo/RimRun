@@ -5,6 +5,12 @@ import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import { colors } from '../../constants/theme';
 
+const stackScreenOptions = {
+  headerShown: false as const,
+  /** Android: stack card must fill height or flex children (e.g. ScrollView) collapse. */
+  contentStyle: { flex: 1, backgroundColor: colors.background },
+};
+
 export default function AppLayout() {
   const { user, loading: authLoading } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
@@ -23,7 +29,7 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/onboarding" />;
   }
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={stackScreenOptions}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="court/[courtId]" />
@@ -31,7 +37,9 @@ export default function AppLayout() {
       <Stack.Screen name="friends/index" />
       <Stack.Screen name="court/add" />
       <Stack.Screen name="account" />
+      <Stack.Screen name="privacy-settings" />
       <Stack.Screen name="privacy-policy" />
+      <Stack.Screen name="user/[userId]" />
     </Stack>
   );
 }

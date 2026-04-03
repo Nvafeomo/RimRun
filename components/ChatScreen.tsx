@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useConversationChat } from "../hooks/useConversationChat";
 import { useAuth } from "../hooks/useAuth";
 import { useProfile } from "../context/ProfileContext";
@@ -37,6 +38,7 @@ function avatarPlaceholderLetter(
 }
 
 export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) {
+  const router = useRouter();
   const { user } = useAuth();
   const { profile } = useProfile();
   const { messages, loading, sending, typingUsers, sendMessage, sendTyping } =
@@ -60,6 +62,15 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
   const handleChangeText = (text: string) => {
     setInputText(text);
     sendTyping();
+  };
+
+  const openSenderProfile = (senderId: string) => {
+    if (!senderId) return;
+    if (senderId === user?.id) {
+      router.push("/(app)/(tabs)/profile");
+      return;
+    }
+    router.push(`/(app)/user/${senderId}`);
   };
 
   const typingList = Object.entries(typingUsers)
@@ -99,25 +110,37 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
       return (
         <View style={[styles.messageRow, styles.messageRowOwn]}>
           <View style={[styles.messageContent, styles.messageContentOwn]}>
-            <Text style={[styles.senderName, styles.senderNameOwn]}>
-              {displayName}
-            </Text>
+            <Pressable onPress={() => openSenderProfile(user?.id ?? "")}>
+              <Text style={[styles.senderName, styles.senderNameOwn]}>
+                {displayName}
+              </Text>
+            </Pressable>
             <View style={[styles.bubble, styles.bubbleOwn]}>
               <Text style={[styles.messageText, styles.messageTextOwn]}>
                 {item.content}
               </Text>
             </View>
           </View>
-          <View style={styles.avatarColumn}>
+          <Pressable
+            style={styles.avatarColumn}
+            onPress={() => openSenderProfile(user?.id ?? "")}
+            hitSlop={8}
+            accessibilityLabel="Open your profile"
+          >
             {renderAvatar(avatarUrl ?? null, avatarLetter)}
-          </View>
+          </Pressable>
         </View>
       );
     }
 
     return (
       <View style={[styles.messageRow, styles.messageRowOther]}>
-        <View style={styles.avatarColumn}>
+        <Pressable
+          style={styles.avatarColumn}
+          onPress={() => openSenderProfile(item.sender_id)}
+          hitSlop={8}
+          accessibilityLabel={`Open ${displayName}'s profile`}
+        >
           <Text
             style={[
               styles.senderName,
@@ -134,7 +157,7 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
             profileImageUrl={item.sender?.profile_image_url}
             size={36}
           />
-        </View>
+        </Pressable>
         <View style={[styles.messageContent, styles.messageContentOther]}>
           <View style={[styles.bubble, styles.bubbleOther]}>
             <Text style={[styles.messageText, styles.messageTextOther]}>

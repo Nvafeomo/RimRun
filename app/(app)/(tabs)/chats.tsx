@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
@@ -46,6 +46,9 @@ type MessageThreadItem =
 
 export default function ChatsScreen() {
   const router = useRouter();
+  const { tab: tabParam } = useLocalSearchParams<{
+    tab?: string | string[];
+  }>();
   const { user } = useAuth();
   const { getDisplayName } = useCourtAliases();
   const [activeTab, setActiveTab] = useState<
@@ -59,6 +62,19 @@ export default function ChatsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [threadDeletingId, setThreadDeletingId] = useState<string | null>(null);
+
+  const tabFromParams =
+    typeof tabParam === "string"
+      ? tabParam
+      : Array.isArray(tabParam)
+        ? tabParam[0]
+        : undefined;
+
+  useEffect(() => {
+    if (tabFromParams === "courts") setActiveTab("courts");
+    else if (tabFromParams === "messages") setActiveTab("messages");
+    else if (tabFromParams === "friends") setActiveTab("friends");
+  }, [tabFromParams]);
 
   const fetchCourtChats = useCallback(async () => {
     if (!user?.id) {
@@ -153,114 +169,106 @@ export default function ChatsScreen() {
       const myConvIds = [
         ...new Set((myParts ?? []).map((p) => p.conversation_id)),
       ];
-
-      let groupItems: MessageThreadItem[] = [];
-      if (myConvIds.length) {
-        const { data: groupConvs } = await supabase
-          .from("conversations")
-          .select("id, name")
-          .eq("type", "group")
-          .in("id", myConvIds);
-
-        groupItems = await Promise.all(
-          (groupConvs ?? []).map(async (c) => {
-            const { data: parts } = await supabase
-              .from("conversation_participants")
-              .select("user_id")
-              .eq("conversation_id", c.id);
-            const otherIds = (parts ?? [])
-              .map((p) => p.user_id)
-              .filter((id) => id !== user.id);
-            const { data: profs } = await supabase
-              .from("profiles")
-              .select("username")
-              .in("id", otherIds);
-            const names = (profs ?? [])
-              .map((p) => p.username ?? "?")
-              .sort()
-              .join(", ");
-            const title = c.name?.trim() || names || "Group chat";
-            const { data: lastMsg } = await supabase
-              .from("messages")
-              .select("content, created_at")
-              .eq("conversation_id", c.id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            return {
-              kind: "group" as const,
-              conversationId: c.id,
-              title,
-              lastMessage: lastMsg?.content,
-              lastMessageAt: lastMsg?.created_at,
-            };
-          })
-        );
+      if (!myConvIds.length) {
+        setMessageThreads([]);
+        return;
       }
 
-      const { data: friendIds } = await supabase
-        .from("friendships")
-        .select("friend_id")
-        .eq("user_id", user.id);
-      const dmItems: MessageThreadItem[] = [];
-      if (friendIds?.length) {
-        const ids = friendIds.map((r) => r.friend_id);
-        const { data: convs } = await supabase
-          .from("conversations")
-          .select("id")
-          .eq("type", "dm");
-        if (convs?.length) {
-          const convIds = convs.map((c) => c.id);
+      const { data: convRows } = await supabase
+        .from("conversations")
+        .select("id, type, name")
+        .in("id", myConvIds);
+
+      const groupConvs = (convRows ?? []).filter((c) => c.type === "group");
+      const dmIds = (convRows ?? []).filter((c) => c.type === "dm").map((c) => c.id);
+
+      const groupItems: MessageThreadItem[] = await Promise.all(
+        groupConvs.map(async (c) => {
           const { data: parts } = await supabase
             .from("conversation_participants")
-            .select("conversation_id, user_id")
-            .in("conversation_id", convIds)
-            .in("user_id", [user.id, ...ids]);
-          const myDmConvs = new Set(
-            (parts ?? [])
-              .filter((p) => p.user_id === user.id)
-              .map((p) => p.conversation_id)
-          );
-          const dmPairs: { convId: string; otherId: string }[] = [];
-          for (const cid of myDmConvs) {
-            const convParts = (parts ?? []).filter(
-              (p) => p.conversation_id === cid
-            );
-            const other = convParts.find((p) => p.user_id !== user.id);
-            if (other && ids.includes(other.user_id))
-              dmPairs.push({ convId: cid, otherId: other.user_id });
-          }
-          const { data: profiles } = await supabase
+            .select("user_id")
+            .eq("conversation_id", c.id);
+          const otherIds = (parts ?? [])
+            .map((p) => p.user_id)
+            .filter((id) => id !== user.id);
+          const { data: profs } = await supabase
             .from("profiles")
-            .select("id, username")
-            .in("id", dmPairs.map((p) => p.otherId));
-          const nameMap = Object.fromEntries(
-            (profiles ?? []).map((p) => [p.id, p.username ?? "Unknown"])
+            .select("username")
+            .in("id", otherIds);
+          const names = (profs ?? [])
+            .map((p) => p.username ?? "?")
+            .sort()
+            .join(", ");
+          const title = c.name?.trim() || names || "Group chat";
+          const { data: lastMsg } = await supabase
+            .from("messages")
+            .select("content, created_at")
+            .eq("conversation_id", c.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          return {
+            kind: "group" as const,
+            conversationId: c.id,
+            title,
+            lastMessage: lastMsg?.content,
+            lastMessageAt: lastMsg?.created_at,
+          };
+        }),
+      );
+
+      const dmItems: MessageThreadItem[] = [];
+      if (dmIds.length) {
+        const { data: allDmParts } = await supabase
+          .from("conversation_participants")
+          .select("conversation_id, user_id")
+          .in("conversation_id", dmIds);
+
+        const otherByConv = new Map<string, string>();
+        for (const cid of dmIds) {
+          const parts = (allDmParts ?? []).filter(
+            (p) => p.conversation_id === cid,
           );
-          for (const { convId, otherId } of dmPairs) {
-            const { data: lastMsg } = await supabase
-              .from("messages")
-              .select("content, created_at")
-              .eq("conversation_id", convId)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            dmItems.push({
-              kind: "dm",
-              conversationId: convId,
-              otherUserId: otherId,
-              otherUsername: nameMap[otherId] ?? "Unknown",
-              lastMessage: lastMsg?.content,
-              lastMessageAt: lastMsg?.created_at,
-            });
-          }
+          const other = parts.find((p) => p.user_id !== user.id);
+          if (other) otherByConv.set(cid, other.user_id);
+        }
+        const otherIds = [...new Set([...otherByConv.values()])];
+        const { data: profiles } =
+          otherIds.length > 0
+            ? await supabase
+                .from("profiles")
+                .select("id, username")
+                .in("id", otherIds)
+            : { data: [] as { id: string; username: string | null }[] };
+        const nameMap = Object.fromEntries(
+          (profiles ?? []).map((p) => [p.id, p.username ?? "Unknown"]),
+        );
+
+        for (const cid of dmIds) {
+          const otherId = otherByConv.get(cid);
+          if (!otherId) continue;
+          const { data: lastMsg } = await supabase
+            .from("messages")
+            .select("content, created_at")
+            .eq("conversation_id", cid)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          dmItems.push({
+            kind: "dm",
+            conversationId: cid,
+            otherUserId: otherId,
+            otherUsername: nameMap[otherId] ?? "Unknown",
+            lastMessage: lastMsg?.content,
+            lastMessageAt: lastMsg?.created_at,
+          });
         }
       }
 
       const merged = [...dmItems, ...groupItems].sort(
         (a, b) =>
           new Date(b.lastMessageAt ?? 0).getTime() -
-          new Date(a.lastMessageAt ?? 0).getTime()
+          new Date(a.lastMessageAt ?? 0).getTime(),
       );
       setMessageThreads(merged);
     } catch (err) {
@@ -286,6 +294,13 @@ export default function ChatsScreen() {
   useEffect(() => {
     if (activeTab === "messages") fetchMessageThreads();
   }, [activeTab, fetchMessageThreads]);
+
+  /** Refresh when returning from a chat or profile so new DMs appear in the list. */
+  useFocusEffect(
+    useCallback(() => {
+      fetchMessageThreads();
+    }, [fetchMessageThreads]),
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -382,11 +397,19 @@ export default function ChatsScreen() {
           android_ripple={{ color: colors.border }}
         >
           <View style={styles.chatItemIcon}>
-            <Ionicons
-              name={item.kind === "group" ? "people" : "person"}
-              size={24}
-              color={colors.primary}
-            />
+            {item.kind === "dm" ? (
+              <Pressable
+                onPress={() =>
+                  router.push(`/(app)/user/${item.otherUserId}`)
+                }
+                hitSlop={8}
+                accessibilityLabel="View profile"
+              >
+                <Ionicons name="person" size={24} color={colors.primary} />
+              </Pressable>
+            ) : (
+              <Ionicons name="people" size={24} color={colors.primary} />
+            )}
           </View>
           <View style={styles.chatItemContent}>
             <Text style={styles.chatItemTitle} numberOfLines={1}>

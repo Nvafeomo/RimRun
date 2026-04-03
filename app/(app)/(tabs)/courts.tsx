@@ -11,11 +11,14 @@ import {
   Alert,
   Modal,
   ScrollView,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  type LayoutChangeEvent,
 } from "react-native";
 import MapView, { Region, Marker } from "react-native-maps";
 import { router } from "expo-router";
-import CourtMapMarker from "../../../components/CourtMapMarker";
+import CourtMapMarker, {
+  CourtCalloutBubbleContent,
+} from "../../../components/CourtMapMarker";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { supabase } from "../../../lib/supabase";
@@ -52,6 +55,9 @@ const REVEAL_MARKERS_PER_FRAME = 36;
 
 const PIN_WIDTH = 36;
 const PIN_HEIGHT = 44;
+/** Android floating card size (for layout math next to pin). */
+const ANDROID_CALLOUT_W = 150;
+const ANDROID_CALLOUT_H = 100;
 
 function parseMilesInput(raw: string): number {
   const n = parseFloat(raw.replace(/,/g, "").trim());
@@ -336,8 +342,58 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textSecondary,
   },
+  mapSlot: {
+    flex: 1,
+    position: "relative",
+  },
   map: {
     flex: 1,
+  },
+  androidCourtBubbleWrap: {
+    position: "absolute",
+    zIndex: 1000,
+    pointerEvents: "box-none",
+  },
+  androidCourtBubbleCard: {
+    position: "relative",
+    width: ANDROID_CALLOUT_W,
+  },
+  androidCourtClose: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    zIndex: 2,
+    padding: spacing.xs,
+  },
+  androidCallout: {
+    width: ANDROID_CALLOUT_W,
+    maxWidth: ANDROID_CALLOUT_W,
+    minHeight: 56,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden" as const,
+    elevation: 8,
+  },
+  androidCalloutTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 4,
+  },
+  androidCalloutText: {
+    fontSize: 11,
+    lineHeight: 14,
+    color: colors.textSecondary,
+  },
+  androidCalloutHint: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -361,20 +417,22 @@ const styles = StyleSheet.create({
     minWidth: 160,
     maxWidth: 280,
     minHeight: 72,
-    padding: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
   },
   calloutTitle: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   calloutText: {
     fontSize: 12,
+    lineHeight: 16,
     color: colors.textSecondary,
   },
   calloutHint: {
@@ -432,6 +490,16 @@ export default function CourtsScreen() {
   const [sortedCourts, setSortedCourts] = useState<Court[]>([]);
   const [visibleCourts, setVisibleCourts] = useState<Court[]>([]);
   const [courtsLoading, setCourtsLoading] = useState(false);
+  /** Android: native map callouts are unreliable; we show the same UI as a floating card. */
+  const [androidSelectedCourt, setAndroidSelectedCourt] = useState<Court | null>(
+    null,
+  );
+  const [androidBubbleScreenPos, setAndroidBubbleScreenPos] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
+  const mapSlotLayoutRef = useRef({ width: 0, height: 0 });
+  const androidSelectedCourtRef = useRef<Court | null>(null);
 
   const [locationQuery, setLocationQuery] = useState("");
   const [milesInput, setMilesInput] = useState(String(DEFAULT_RADIUS_MILES));
@@ -440,6 +508,10 @@ export default function CourtsScreen() {
   const [locationPickOptions, setLocationPickOptions] = useState<
     LocationPickOption[]
   >([]);
+
+  useEffect(() => {
+    androidSelectedCourtRef.current = androidSelectedCourt;
+  }, [androidSelectedCourt]);
 
   const mapRef = useRef<MapView | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
@@ -807,27 +879,137 @@ export default function CourtsScreen() {
     router.push("/(app)/court/add");
   };
 
+  const handleAndroidCourtPin = useCallback((c: Court) => {
+    setTimeout(() => setAndroidSelectedCourt(c), 50);
+  }, []);
+
+  const clearAndroidCourtSelection = useCallback(() => {
+    setAndroidSelectedCourt(null);
+  }, []);
+
+  const updateAndroidBubblePosition = useCallback(async () => {
+    const court = androidSelectedCourtRef.current;
+    if (Platform.OS !== "android" || !court) return;
+    const map = mapRef.current;
+    const { width: w, height: h } = mapSlotLayoutRef.current;
+    if (!map || w < 8) return;
+    try {
+      const pt = await map.pointForCoordinate({
+        latitude: court.latitude,
+        longitude: court.longitude,
+      });
+      const gap = 8;
+      const margin = 8;
+      const pinTop = pt.y - PIN_HEIGHT;
+      const pinBottom = pt.y;
+
+      let left = pt.x - ANDROID_CALLOUT_W / 2;
+      left = Math.max(margin, Math.min(left, w - ANDROID_CALLOUT_W - margin));
+
+      let top = pinTop - gap - ANDROID_CALLOUT_H;
+      top = Math.max(margin, Math.min(top, h - ANDROID_CALLOUT_H - margin));
+      if (top + ANDROID_CALLOUT_H > pinTop - gap) {
+        top = pinBottom + gap;
+        top = Math.max(margin, Math.min(top, h - ANDROID_CALLOUT_H - margin));
+      }
+
+      setAndroidBubbleScreenPos({ left, top });
+    } catch {
+      setAndroidBubbleScreenPos(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!androidSelectedCourt) {
+      setAndroidBubbleScreenPos(null);
+      return;
+    }
+    if (Platform.OS !== "android") return;
+    if (mapSlotLayoutRef.current.width < 8) return;
+    const id = requestAnimationFrame(() => {
+      void updateAndroidBubblePosition();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [androidSelectedCourt, updateAndroidBubblePosition]);
+
+  const onMapSlotLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const { width, height } = e.nativeEvent.layout;
+      const rw = Math.round(width);
+      const rh = Math.round(height);
+      const prev = mapSlotLayoutRef.current;
+      if (prev.width === rw && prev.height === rh) return;
+      mapSlotLayoutRef.current = { width: rw, height: rh };
+      if (
+        Platform.OS === "android" &&
+        androidSelectedCourtRef.current &&
+        rw >= 8
+      ) {
+        requestAnimationFrame(() => void updateAndroidBubblePosition());
+      }
+    },
+    [updateAndroidBubblePosition],
+  );
+
+  const applyMapToAnchor = useCallback(
+    (latitude: number, longitude: number, radiusMiles: number) => {
+      const d = mapDeltaForRadiusMiles(radiusMiles);
+      const next: Region = {
+        latitude,
+        longitude,
+        latitudeDelta: d,
+        longitudeDelta: d,
+      };
+      requestAnimationFrame(() => {
+        mapRef.current?.animateToRegion(next);
+        setRegion(next);
+      });
+    },
+    []
+  );
+
   const handleRecenter = useCallback(async () => {
     Keyboard.dismiss();
-    try {
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const { latitude, longitude } = loc.coords;
+    const radiusMiles = parseMilesInput(milesInput);
+
+    const moveAndRefetch = (latitude: number, longitude: number) => {
       setUserLocation({ latitude, longitude });
       setLocationQuery("");
-      const radiusMiles = parseMilesInput(milesInput);
-      await runCourtsSearch({
+      applyMapToAnchor(latitude, longitude, radiusMiles);
+      void runCourtsSearch({
         anchorLat: latitude,
         anchorLng: longitude,
         radiusMiles,
         userAnchored: true,
-        animateMap: true,
+        animateMap: false,
       });
+    };
+
+    try {
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy:
+          Platform.OS === "android"
+            ? Location.Accuracy.Low
+            : Location.Accuracy.Balanced,
+      });
+      moveAndRefetch(loc.coords.latitude, loc.coords.longitude);
     } catch {
-      // Location unavailable
+      try {
+        const last = await Location.getLastKnownPositionAsync({
+          maxAge: 120_000,
+        });
+        if (last) {
+          moveAndRefetch(last.coords.latitude, last.coords.longitude);
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+      if (userLocation) {
+        moveAndRefetch(userLocation.latitude, userLocation.longitude);
+      }
     }
-  }, [milesInput, runCourtsSearch]);
+  }, [milesInput, runCourtsSearch, userLocation, applyMapToAnchor]);
 
   if (!region) {
     return (
@@ -946,57 +1128,104 @@ export default function CourtsScreen() {
         </View>
       </Modal>
 
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        customMapStyle={
-          Platform.OS === "android" ? undefined : RIMRUN_MAP_THEME
-        }
-        initialRegion={region}
-        showsUserLocation={false}
-        userInterfaceStyle={Platform.OS === "android" ? "light" : "dark"}
-      >
-        {userLocation && (
-          <Marker
-            coordinate={userLocation}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={Platform.OS === "android"}
-          >
-            <View style={styles.userLocationMarker} />
-          </Marker>
+      <View style={styles.mapSlot} onLayout={onMapSlotLayout}>
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          customMapStyle={RIMRUN_MAP_THEME}
+          initialRegion={region}
+          showsUserLocation={false}
+          userInterfaceStyle="dark"
+          onPress={
+            Platform.OS === "android" ? clearAndroidCourtSelection : undefined
+          }
+        >
+          {userLocation && (
+            <Marker
+              coordinate={userLocation}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={Platform.OS === "android"}
+            >
+              <View style={styles.userLocationMarker} />
+            </Marker>
+          )}
+          {visibleCourts.map((court) => (
+            <CourtMapMarker
+              key={court.id}
+              court={court}
+              pinWidth={PIN_WIDTH}
+              pinHeight={PIN_HEIGHT}
+              getDisplayName={getDisplayName}
+              callout={styles.callout}
+              calloutTitle={styles.calloutTitle}
+              calloutText={styles.calloutText}
+              calloutHint={styles.calloutHint}
+              onAndroidPinPress={handleAndroidCourtPin}
+            />
+          ))}
+        </MapView>
+
+        {courtsLoading && (
+          <View style={styles.loadingOverlay} pointerEvents="none">
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingLabel}>Loading nearby courts…</Text>
+          </View>
         )}
-        {visibleCourts.map((court) => (
-          <CourtMapMarker
-            key={court.id}
-            court={court}
-            pinWidth={PIN_WIDTH}
-            pinHeight={PIN_HEIGHT}
-            getDisplayName={getDisplayName}
-            callout={styles.callout}
-            calloutTitle={styles.calloutTitle}
-            calloutText={styles.calloutText}
-            calloutHint={styles.calloutHint}
+
+        {Platform.OS === "android" &&
+          androidSelectedCourt &&
+          androidBubbleScreenPos && (
+            <View
+              style={[
+                styles.androidCourtBubbleWrap,
+                {
+                  left: androidBubbleScreenPos.left,
+                  top: androidBubbleScreenPos.top,
+                },
+              ]}
+              pointerEvents="box-none"
+            >
+              <View style={styles.androidCourtBubbleCard}>
+                <Pressable
+                  onPress={() =>
+                    router.push(`/(app)/court/${androidSelectedCourt.id}`)
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Open court details"
+                >
+                  <CourtCalloutBubbleContent
+                    court={androidSelectedCourt}
+                    getDisplayName={getDisplayName}
+                    callout={styles.androidCallout}
+                    calloutTitle={styles.androidCalloutTitle}
+                    calloutText={styles.androidCalloutText}
+                    calloutHint={styles.androidCalloutHint}
+                  />
+                </Pressable>
+                <Pressable
+                  style={styles.androidCourtClose}
+                  onPress={() => setAndroidSelectedCourt(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Dismiss court preview"
+                  hitSlop={8}
+                >
+                  <Ionicons name="close" size={18} color={colors.textMuted} />
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+        <Pressable onPress={handleRecenter} style={styles.recenterButton}>
+          <Ionicons name="locate" size={24} color={colors.text} />
+        </Pressable>
+        <Pressable onPress={handleAddCourt} style={styles.addCourtButton}>
+          <Ionicons
+            name="add-outline"
+            size={24}
+            color={styles.addCourtButtonIcon.color}
           />
-        ))}
-      </MapView>
-
-      {courtsLoading && (
-        <View style={styles.loadingOverlay} pointerEvents="none">
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingLabel}>Loading nearby courts…</Text>
-        </View>
-      )}
-
-      <Pressable onPress={handleRecenter} style={styles.recenterButton}>
-        <Ionicons name="locate" size={24} color={colors.text} />
-      </Pressable>
-      <Pressable onPress={handleAddCourt} style={styles.addCourtButton}>
-        <Ionicons
-          name="add-outline"
-          size={24}
-          color={styles.addCourtButtonIcon.color}
-        />
-      </Pressable>
+        </Pressable>
+      </View>
     </View>
     </TouchableWithoutFeedback>
   );

@@ -346,6 +346,18 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
       const msg = error?.message ?? "";
       const isAgePolicy =
         /age policy|does not allow this connection/i.test(msg);
+      const isFriendsOnlyDm =
+        /only accepts (direct )?messages from people on their friends list/i.test(
+          msg,
+        );
+      if (isFriendsOnlyDm) {
+        Alert.alert(
+          "Messages limited",
+          msg ||
+            "This person only accepts direct messages from people on their friends list.",
+        );
+        return;
+      }
       if (isAgePolicy) {
         const other = friends.find((f) => f.id === otherUserId)?.friend;
         const label = other?.username ?? "them";
@@ -393,15 +405,21 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     const isLoading = actioningId === profile.id;
     return (
       <View style={styles.resultRow}>
-        <AvatarImage
-          userId={profile.id}
-          username={profile.username}
-          profileImageUrl={profile.profile_image_url}
-          size={44}
-        />
-        <Text style={styles.resultName} numberOfLines={1}>
-          {profile.username ?? "Unknown"}
-        </Text>
+        <Pressable
+          style={styles.resultRowProfile}
+          onPress={() => router.push(`/(app)/user/${profile.id}`)}
+          android_ripple={{ color: colors.border }}
+        >
+          <AvatarImage
+            userId={profile.id}
+            username={profile.username}
+            profileImageUrl={profile.profile_image_url}
+            size={44}
+          />
+          <Text style={styles.resultName} numberOfLines={1}>
+            {profile.username ?? "Unknown"}
+          </Text>
+        </Pressable>
         <View style={styles.resultActions}>
           {relation === "friend" && (
             <Pressable
@@ -484,10 +502,12 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     return (
       <View style={styles.friendRow}>
         <Pressable
-          style={styles.friendRowMain}
-          onPress={() => openDM(item.id)}
+          style={styles.friendAvatarBtn}
+          onPress={() => router.push(`/(app)/user/${item.friend.id}`)}
           disabled={busy}
           android_ripple={{ color: colors.border }}
+          accessibilityLabel="View profile"
+          hitSlop={6}
         >
           <AvatarImage
             userId={item.friend.id}
@@ -495,6 +515,13 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
             profileImageUrl={item.friend.profile_image_url}
             size={44}
           />
+        </Pressable>
+        <Pressable
+          style={styles.friendRowMain}
+          onPress={() => openDM(item.id)}
+          disabled={busy}
+          android_ripple={{ color: colors.border }}
+        >
           <Text style={styles.friendName} numberOfLines={1}>
             {item.friend.username ?? "Unknown"}
           </Text>
@@ -556,22 +583,28 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
 
   const renderRequestRow = ({ item }: { item: FriendRequestRow }) => (
     <View style={styles.requestRow}>
-      <AvatarImage
-        userId={item.other_user.id}
-        username={item.other_user.username}
-        profileImageUrl={item.other_user.profile_image_url}
-        size={44}
-      />
-      <View style={styles.requestContent}>
-        <Text style={styles.requestName} numberOfLines={1}>
-          {item.other_user.username ?? "Unknown"}
-        </Text>
-        <Text style={styles.requestSub}>
-          {item.direction === "incoming"
-            ? "Sent you a friend request"
-            : "Request sent"}
-        </Text>
-      </View>
+      <Pressable
+        style={styles.requestRowProfile}
+        onPress={() => router.push(`/(app)/user/${item.other_user.id}`)}
+        android_ripple={{ color: colors.border }}
+      >
+        <AvatarImage
+          userId={item.other_user.id}
+          username={item.other_user.username}
+          profileImageUrl={item.other_user.profile_image_url}
+          size={44}
+        />
+        <View style={styles.requestContent}>
+          <Text style={styles.requestName} numberOfLines={1}>
+            {item.other_user.username ?? "Unknown"}
+          </Text>
+          <Text style={styles.requestSub}>
+            {item.direction === "incoming"
+              ? "Sent you a friend request"
+              : "Request sent"}
+          </Text>
+        </View>
+      </Pressable>
       {item.direction === "incoming" && (
         <View style={styles.incomingActions}>
           <Pressable
@@ -920,6 +953,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  resultRowProfile: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+    gap: spacing.sm,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -942,14 +982,25 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     overflow: "hidden",
   },
+  friendAvatarBtn: {
+    justifyContent: "center",
+    paddingLeft: spacing.md,
+    paddingVertical: spacing.md,
+  },
   friendRowMain: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: spacing.md,
-    paddingLeft: spacing.md,
+    paddingLeft: spacing.sm,
     paddingRight: spacing.sm,
     minWidth: 0,
+  },
+  friendRowMsgBtn: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
   },
   friendRemoveBtn: {
     justifyContent: "center",
@@ -1001,6 +1052,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  requestRowProfile: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
   },
   requestContent: {
     flex: 1,

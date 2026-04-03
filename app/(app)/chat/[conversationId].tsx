@@ -35,6 +35,8 @@ export default function ChatRouteScreen() {
   const [chatKind, setChatKind] = useState<"dm" | "group" | "court" | null>(
     null
   );
+  /** Other participant in a 1:1 DM (for profile link in header). */
+  const [dmOtherUserId, setDmOtherUserId] = useState<string | null>(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const displayTitle = title ?? "Chat";
   const resolvedCourtId = courtId ?? "";
@@ -96,6 +98,41 @@ export default function ChatRouteScreen() {
     };
   }, [conversationId, resolvedCourtId]);
 
+  useEffect(() => {
+    if (!conversationId || resolvedCourtId) {
+      setDmOtherUserId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data: conv } = await supabase
+        .from("conversations")
+        .select("type")
+        .eq("id", conversationId)
+        .maybeSingle();
+      if (cancelled || conv?.type !== "dm" || !user?.id) {
+        if (!cancelled) setDmOtherUserId(null);
+        return;
+      }
+      const { data: parts } = await supabase
+        .from("conversation_participants")
+        .select("user_id")
+        .eq("conversation_id", conversationId);
+      if (cancelled) return;
+      const other = parts?.find((p) => p.user_id !== user.id);
+      setDmOtherUserId(other?.user_id ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId, resolvedCourtId, user?.id]);
+
+  const openDmPartnerProfile = () => {
+    if (dmOtherUserId) {
+      router.push(`/(app)/user/${dmOtherUserId}`);
+    }
+  };
+
   const openRename = () => {
     setEditName(getDisplayName(resolvedCourtId, resolvedCourtName));
     setEditing(true);
@@ -152,9 +189,23 @@ export default function ChatRouteScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
         <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {displayTitle}
-          </Text>
+          {dmOtherUserId ? (
+            <Pressable
+              onPress={openDmPartnerProfile}
+              style={styles.headerTitlePressable}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Open profile"
+            >
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {displayTitle}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {displayTitle}
+            </Text>
+          )}
           {isCourtChat && (
             <Pressable
               hitSlop={12}
@@ -290,6 +341,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minWidth: 0,
     gap: spacing.xs,
+  },
+  headerTitlePressable: {
+    flex: 1,
+    minWidth: 0,
   },
   headerTitle: {
     flex: 1,
