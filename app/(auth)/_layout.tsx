@@ -22,7 +22,9 @@ export default function AuthLayout() {
   const currentScreen = segments.at(1) ?? '';
   const isOnAuthScreen = segments[0] === '(auth)' && currentScreen !== '';
   const isOnOnboarding = currentScreen === 'onboarding';
-  const shouldRedirectToApp = user && isOnAuthScreen && !isOnOnboarding;
+  // Stay on reset-password until new password is set (recovery session)
+  const shouldRedirectToApp =
+    user && isOnAuthScreen && !isOnOnboarding && currentScreen !== 'reset-password';
 
   // If not logged in and trying to access onboarding, redirect to login
   const shouldRedirectToLogin = !user && isOnOnboarding;

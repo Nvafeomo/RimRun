@@ -52,6 +52,7 @@ Age-related rules for DMs and friend requests are enforced in app code (`lib/age
 ## Docs
 
 - **Privacy policy:** Edit `docs/privacy/privacy-policy.md`, then run `npm run sync-privacy-policy` so the in-app screen picks up changes (`constants/privacyPolicyMarkdown.ts` is generated). Hosted HTML for stores: `docs/privacy/privacy-policy.html`.
+- **Auth / deep links (Supabase redirects, Google OAuth, password reset):** `docs/auth-deployment-checklist.md`
 - Implementation checklists and deeper notes: `docs/` (e.g. `IMPLEMENTATION_STATUS.md` if present)
 
 ## License

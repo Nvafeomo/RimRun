@@ -5,9 +5,15 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { Linking } from 'react-native';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { signInWithGoogle as oauthGoogle } from '../lib/oauth';
+import {
+  applyAuthFromUrl,
+  clearPendingPasswordRecovery,
+  isLikelyAuthCallback,
+} from '../lib/supabaseAuthDeepLink';
 
 type AuthContextValue = {
     user: User | null;
@@ -54,6 +60,15 @@ type AuthContextValue = {
 
       async function initAuth() {
         try {
+          const initialUrl = await Linking.getInitialURL();
+          if (initialUrl && isLikelyAuthCallback(initialUrl)) {
+            await applyAuthFromUrl(initialUrl);
+          }
+        } catch (e) {
+          console.warn('Auth deep link (initial URL)', e);
+        }
+
+        try {
           const {
             data: { session },
             error,
@@ -84,11 +99,18 @@ type AuthContextValue = {
       }
   
       initAuth();
-  
+
+      const linkSub = Linking.addEventListener('url', ({ url }) => {
+        if (url && isLikelyAuthCallback(url)) {
+          void applyAuthFromUrl(url);
+        }
+      });
+
       return () => {
         isMounted = false;
         clearTimeout(timeout);
         authListener.subscription.unsubscribe();
+        linkSub.remove();
       };
     }, []);
   
@@ -184,6 +206,7 @@ type AuthContextValue = {
     }
 
     async function signOut() {
+      await clearPendingPasswordRecovery();
       const { error } = await supabase.auth.signOut();
       if (error) {
         // Invalid token etc: clear local session anyway

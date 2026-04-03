@@ -11,16 +11,44 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { PASSWORD_RESET_REDIRECT_URL } from '../../lib/authRedirects';
+import {
+  clearPendingPasswordRecovery,
+  hasPendingPasswordRecovery,
+} from '../../lib/supabaseAuthDeepLink';
+import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
+
+const MIN_PASSWORD = 8;
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!user) {
+        if (!cancelled) setRecoveryMode(false);
+        return;
+      }
+      const pending = await hasPendingPasswordRecovery();
+      if (!cancelled && pending) setRecoveryMode(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   async function handleResetPassword() {
     setError('');
@@ -38,15 +66,107 @@ export default function ResetPasswordScreen() {
     setSubmitting(true);
     try {
       const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'rimrun://reset-password',
+        redirectTo: PASSWORD_RESET_REDIRECT_URL,
       });
       if (err) throw err;
       setSuccess(true);
-    } catch (e: any) {
-      setError(e?.message ?? 'Failed to send reset email');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to send reset email');
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleSetNewPassword() {
+    setError('');
+    if (newPassword.length < MIN_PASSWORD) {
+      setError(`Password must be at least ${MIN_PASSWORD} characters`);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password: newPassword });
+      if (err) throw err;
+      await clearPendingPasswordRecovery();
+      setRecoveryMode(false);
+      router.replace('/(app)');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not update password');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (recoveryMode && user) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <KeyboardAvoidingView
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/rimrun-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.title}>Choose a new password</Text>
+            <Text style={styles.subtitle}>Your reset link was verified</Text>
+          </View>
+
+          <View style={styles.card}>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <TextInput
+              placeholder="New password"
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+              style={styles.input}
+              value={newPassword}
+              onChangeText={setNewPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TextInput
+              placeholder="Confirm new password"
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+              style={styles.input}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleSetNewPassword}
+              disabled={submitting}
+              activeOpacity={0.8}
+            >
+              {submitting ? (
+                <ActivityIndicator color={colors.text} />
+              ) : (
+                <Text style={styles.buttonText}>Update password</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
   }
 
   if (success) {

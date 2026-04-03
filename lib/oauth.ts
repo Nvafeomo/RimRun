@@ -1,22 +1,20 @@
 /**
- * Google OAuth for Supabase: enable Google under Authentication → Providers.
- *
- * Redirect URLs: add EVERY exact URL returned by getOAuthRedirectUrl() to
- * Supabase → Authentication → URL Configuration → Redirect URLs.
- * - Expo Go uses exp://... (changes with host/port; use __DEV__ log below).
- * - Dev / release builds use rimrun://auth/callback
+ * Google OAuth for Supabase (Authentication → Providers).
+ * Add getOAuthRedirectUrl() output to Supabase → URL Configuration → Redirect URLs
+ * (Expo Go: exp://… from Metro; builds: rimrun://auth/callback). Avoid https://auth.expo.io/… (broken with PKCE).
  */
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from './supabase';
 
 export const OAUTH_REDIRECT_PATH = 'auth/callback';
 
-/** Use expo-auth-session so Expo Go (exp://) vs dev build (rimrun://) matches Supabase + WebBrowser. */
 export function getOAuthRedirectUrl(): string {
   return makeRedirectUri({
     scheme: 'rimrun',
     path: `/${OAUTH_REDIRECT_PATH}`,
+    preferLocalhost: Constants.executionEnvironment === ExecutionEnvironment.StoreClient,
   });
 }
 
@@ -58,6 +56,25 @@ function parseOAuthCallbackUrl(url: string): ParsedOAuthResult | null {
   }
 
   return null;
+}
+
+/**
+ * After OAuth, the browser may close with `dismiss` before the deep link is applied,
+ * or the session may be established only via Linking (Expo Go + exp://). Poll briefly.
+ */
+async function waitForSessionFromDeepLink(timeoutMs: number): Promise<boolean> {
+  const intervalMs = 150;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session) {
+      return true;
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return false;
 }
 
 async function completeOAuthFromUrl(url: string): Promise<void> {
@@ -115,6 +132,15 @@ export async function signInWithGoogle(): Promise<void> {
 
   if (result.type === 'cancel') {
     throw new Error('Sign-in was cancelled.');
+  }
+
+  // Expo Go: auth often completes via exp:// deep link; the session is set in Linking
+  // after WebBrowser reports dismiss or success without url.
+  if (await waitForSessionFromDeepLink(5000)) {
+    if (__DEV__) {
+      console.log('[OAuth] Session detected after browser closed (deep link / async completion).');
+    }
+    return;
   }
 
   // iOS: redirect URL did not match the second argument to openAuthSessionAsync (allowlist / wrong exp:// vs rimrun://).

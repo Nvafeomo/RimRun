@@ -16,6 +16,7 @@
     ],
     "scheme": "rimrun",
     "name": "RimRun",
+    "owner": "nvafeomo",
     "slug": "RimRun",
     "version": "1.0.0",
     "orientation": "portrait",

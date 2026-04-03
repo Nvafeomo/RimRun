@@ -1,4 +1,5 @@
-import { supabase } from './supabase'; // adjust path as needed
+import { supabase } from './supabase';
+import { PASSWORD_RESET_REDIRECT_URL } from './authRedirects';
 
 // Sign in with email and password
 export async function signIn(email: string, password: string) {
@@ -20,10 +21,10 @@ export async function signOut() {
   if (error) throw error;
 }
 
-// Send password reset email
+/** Send password reset email (same redirect as `app/(auth)/reset-password.tsx`). */
 export async function resetPassword(email: string) {
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: 'https://your-app.com/reset-password', // customize this
+    redirectTo: PASSWORD_RESET_REDIRECT_URL,
   });
   if (error) throw error;
   return data;
