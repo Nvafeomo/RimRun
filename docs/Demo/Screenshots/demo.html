@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="RimRun — mobile app demos: courts, chat, auth, and profile." />
+  <link rel="canonical" href="https://nvafeomo.github.io/RimRun/Demo/Screenshots/demo.html" />
+  <title>RimRun — Demos</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a222c;
+      --text: #e8eaed;
+      --muted: #9aa5b1;
+      --accent: #e85d04;
+      --border: #2d3a47;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 34rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.35rem;
+    }
+
+    .tagline {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    section {
+      margin-bottom: 2.75rem;
+    }
+
+    section:last-of-type {
+      margin-bottom: 0;
+    }
+
+    h2 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin: 0 0 0.75rem;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.75rem;
+      overflow: hidden;
+    }
+
+    .panel img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      vertical-align: middle;
+    }
+
+    .caption {
+      margin: 0.75rem 0 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>RimRun</h1>
+      <p class="tagline">
+        Pickup basketball: find courts on a map, connect with players, chat. Short screen recordings below.
+      </p>
+    </header>
+
+    <section>
+      <h2>Courts, search &amp; chat</h2>
+      <div class="panel">
+        <img
+          src="./RimRunDemo1.gif"
+          alt="Screen recording: browsing courts, adding a court, and using chat"
+          width="390"
+          height="844"
+          loading="lazy"
+        />
+      </div>
+      <p class="caption">Map discovery, subscriptions, adding a court, and messaging.</p>
+    </section>
+
+    <section>
+      <h2>Authentication</h2>
+      <div class="panel">
+        <img
+          src="./authdemo.gif"
+          alt="Screen recording: sign-in and account flows"
+          width="390"
+          height="844"
+          loading="lazy"
+        />
+      </div>
+      <p class="caption">Sign-in, session, and account-related flows.</p>
+    </section>
+
+    <section>
+      <h2>Profile</h2>
+      <div class="panel">
+        <img
+          src="./profiledemo.gif"
+          alt="Screen recording: profile and settings"
+          width="390"
+          height="844"
+          loading="lazy"
+        />
+      </div>
+      <p class="caption">Profile, privacy, and related UI.</p>
+    </section>
+
+    <footer>
+      RimRun — pickup basketball: courts, chat, and community.
+    </footer>
+  </div>
+</body>
+</html>
