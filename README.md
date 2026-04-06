@@ -1,22 +1,27 @@
 # RimRun
 
-Cross-platform mobile app for discovering basketball courts on a map, managing a profile, and connecting with other players. Built with Expo and React Native; backend is Supabase (auth, Postgres, storage).
+Cross-platform mobile app for discovering basketball courts on a map, managing a profile, and connecting with other players (friends, DMs, court chats). I built it to ship a real-world Expo + Supabase app with location, chat, and age-aware social rules.
+
+## Features
+
+- **Courts** — Map discovery, search, subscriptions, user-submitted courts (address / location by age rules)
+- **Profile** — Username, photo (with privacy settings), date of birth for age-based rules
+- **Social** — Friends, direct messages, group chats, court-associated threads (DM rules vs court visibility differ)
+- **Auth** — Email/password and Google sign-in (Supabase); password reset via deep link
 
 ## Stack
 
-Expo 54 · React 19 · TypeScript · Expo Router · Supabase · react-native-maps · NativeWind (Tailwind) · Google sign-in (OAuth via Supabase)
+**Expo 54 · React 19 · TypeScript · Expo Router · Supabase (Auth, Postgres, Storage) · react-native-maps · NativeWind (Tailwind) · Google sign-in**
 
-## Getting started
+## Run locally
 
-**Requirements:** Node.js (LTS), npm, and a [Supabase](https://supabase.com) project. Use [Expo Go](https://expo.dev/go) on a device for the quickest loop, or run Android Studio / Xcode if you prefer native builds.
-
-Clone the repo, open a terminal in the project folder, then:
+**Requirements:** Node.js (LTS), npm, and a [Supabase](https://supabase.com) project. [Expo Go](https://expo.dev/go) is the fastest way to test on a device; use Android Studio / Xcode for native builds if you prefer.
 
 ```bash
 npm install --legacy-peer-deps
 ```
 
-Create `.env` in the project root:
+Create `.env` in the project root (do not commit real keys):
 
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -29,31 +34,37 @@ Restart the dev server after changing env vars.
 npm start
 ```
 
-Then press `a` / `i` / `w` for Android, iOS, or web, or scan the QR code with Expo Go.
+Press `a` / `i` / `w` for Android, iOS, or web, or scan the QR code with Expo Go.
 
-**If Expo Go on Android fails with `Failed to download remote update`:** the phone can’t reach Metro on your machine. Try `npm run start:tunnel`, put phone and PC on the same Wi‑Fi (no VPN if possible), or allow Node through Windows Firewall on port 8081. Match Expo Go’s version to SDK 54.
+**If Expo Go on Android shows `Failed to download remote update`:** the device can’t reach Metro. Try `npm run start:tunnel`, use the same Wi‑Fi as your PC (avoid VPN if possible), or allow Node through the firewall on port **8081**. Match Expo Go’s version to **SDK 54**.
 
-Native builds: `npm run android` · `npm run web`
+Native dev builds: `npm run android` · `npm run ios` · `npm run web`
 
-## Repo layout
+## Deploy (e.g. EAS + stores)
 
-| Path | Purpose |
-|------|---------|
-| `app/` | Expo Router screens and navigation |
-| `lib/` | Supabase client, OAuth, domain helpers |
-| `context/` | Auth and profile providers |
-| `scripts/` | Court import/geocode utilities — see `scripts/README.md` |
-| `supabase/` | Edge functions and SQL migrations (where present) |
+Ship **release builds** with a production Supabase project (or a clearly designated prod environment). Use **EAS** (`eas build`) and set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in **EAS secrets** (or your CI env)—not by committing `.env` to git. Local `.env` stays gitignored for development.
 
-## Database and safety
+Configure **Supabase Auth** redirect URLs and **Google OAuth** for production (`rimrun://` scheme, Play/App signing SHA, bundle ID)—see `docs/auth-deployment-checklist.md`. Submit binaries through **App Store Connect** and **Google Play** with your Privacy Policy and Terms URLs.
 
-Age-related rules for DMs and friend requests are enforced in app code (`lib/agePolicy.ts`) and in Supabase RPCs/migrations. Apply the SQL in order (Phase 0/1 → Phase 2 → Phase 2b as needed); consolidated scripts live under `scripts/` with notes in `docs/` where applicable.
+## Backend & Supabase
+
+Data lives in **Supabase** (Postgres + RLS), not in the repo. SQL under `scripts/` defines policies, RPCs, and triggers—**apply the migrations your project needs** to match the app (age rules for friends/DMs, message visibility for court threads, etc.). Client checks in `lib/agePolicy.ts` should stay aligned with the SQL functions you deploy.
+
+The **anon** key is expected in the client bundle; protect **service role** keys and never embed them in the app. Use separate Supabase projects or keys for dev vs production when possible.
 
 ## Docs
 
-- **Privacy policy:** Edit `docs/privacy/privacy-policy.md`, then run `npm run sync-privacy-policy` so the in-app screen picks up changes (`constants/privacyPolicyMarkdown.ts` is generated). Hosted HTML for stores: `docs/privacy/privacy-policy.html`.
-- **Auth / deep links (Supabase redirects, Google OAuth, password reset):** `docs/auth-deployment-checklist.md`
-- Implementation checklists and deeper notes: `docs/` (e.g. `IMPLEMENTATION_STATUS.md` if present)
+- **Privacy policy:** `docs/privacy/privacy-policy.md` → run `npm run sync-privacy-policy` to regenerate `constants/privacyPolicyMarkdown.ts` for the in-app screen. Store-ready HTML: `docs/privacy/privacy-policy.html`.
+- **Auth & deep links:** `docs/auth-deployment-checklist.md`
+- **Implementation / policy notes:** `docs/personal/` (e.g. age & chat policy drafts)
+
+## Ideas
+
+Auth-hardening, richer moderation/reporting, charts/analytics, tests, separate dev Supabase after prod launch.
+
+## Author
+
+**Nvafeomo K. Konneh**
 
 ## License
 

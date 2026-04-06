@@ -95,19 +95,21 @@ export function maxBirthDateForMinAge(reference: Date = new Date()): Date {
  * One-way check: does `viewerAge` policy allow interacting with someone aged `partnerAge`?
  * Assumes both users are app-eligible (>= 13). Mutual consent = both directions must pass.
  *
- * Server enforcement: `scripts/phase-2-age-policy.sql` must match this logic (allows_partner_age / mutual_interaction_allowed).
+ * **DMs and non-court social only** — not for court-associated thread visibility; see policy doc Section 5.
+ *
+ * Matches `docs/personal/rimrun-age-safety-brackets.tex` Section 2 (mutual rule):
+ * - viewer 13–17: partner in [max(13, viewer−3), viewer+3]
+ * - viewer 18+: partner >= 16
+ *
+ * Replicate the same predicates in database RLS or RPCs when enforcing server-side.
  */
 export function allowsPartnerAge(viewerAge: number, partnerAge: number): boolean {
   if (viewerAge < MIN_ACCOUNT_AGE || partnerAge < MIN_ACCOUNT_AGE) return false;
 
-  if (viewerAge <= 15) {
-    return partnerAge >= 13 && partnerAge <= 17;
-  }
-  if (viewerAge === 16) {
-    return partnerAge >= 13 && partnerAge <= 20;
-  }
-  if (viewerAge === 17) {
-    return partnerAge >= 13 && partnerAge <= 21;
+  if (viewerAge <= 17) {
+    const low = Math.max(MIN_ACCOUNT_AGE, viewerAge - 3);
+    const high = viewerAge + 3;
+    return partnerAge >= low && partnerAge <= high;
   }
   return partnerAge >= 16;
 }

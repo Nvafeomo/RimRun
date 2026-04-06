@@ -498,7 +498,7 @@ export default function ChatsScreen() {
             ]}
             numberOfLines={1}
           >
-            Court
+            Courts
           </Text>
         </Pressable>
         <Pressable

@@ -52,6 +52,15 @@ export default function AccountScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  /** Avoid GO_BACK when there is no screen to pop (e.g. after auth refresh). */
+  const exitAccountSettings = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(app)/(tabs)/profile");
+    }
+  }, [router]);
+
   useEffect(() => {
     if (!user) return;
     setEmail(user.email ?? "");
@@ -78,7 +87,7 @@ export default function AccountScreen() {
     const emailChanged = trimmedEmail !== currentEmail;
 
     if (!usernameChanged && !emailChanged) {
-      router.back();
+      exitAccountSettings();
       return;
     }
 
@@ -133,7 +142,7 @@ export default function AccountScreen() {
         );
       }
 
-      router.back();
+      exitAccountSettings();
     } catch (e: unknown) {
       const msg =
         e instanceof Error
@@ -151,7 +160,7 @@ export default function AccountScreen() {
     username,
     email,
     refreshProfile,
-    router,
+    exitAccountSettings,
   ]);
 
   if (!user || profileLoading) {
@@ -169,7 +178,7 @@ export default function AccountScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={exitAccountSettings} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </Pressable>
           <Text style={styles.headerTitle}>Account</Text>
