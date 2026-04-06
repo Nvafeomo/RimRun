@@ -13,6 +13,14 @@ A mobile app for finding pickup basketball: browse courts on a map, save the spo
 
 **Expo 54 · React 19 · TypeScript · Expo Router · Supabase (Auth, Postgres, Storage) · react-native-maps · NativeWind (Tailwind) · Google sign-in**
 
+## Demo
+
+Screen recording of the app in use:
+
+- **[rimrundemo.mov](docs/Demo/Screenshots/rimrundemo.mov)** — open or download from the repo to play (QuickTime / VLC, etc.).
+
+Additional screenshots or clips can live in [`docs/Demo/Screenshots/`](docs/Demo/Screenshots/).
+
 ## Run locally
 
 You will need Node.js (LTS), npm, and a [Supabase](https://supabase.com) project. The quickest way to try the app is [Expo Go](https://expo.dev/go) on a phone; use Android Studio or Xcode if you want a full native build.
