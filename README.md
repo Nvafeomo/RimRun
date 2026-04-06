@@ -1,13 +1,13 @@
 # RimRun
 
-Cross-platform mobile app for discovering basketball courts on a map, managing a profile, and connecting with other players (friends, DMs, court chats). I built it to ship a real-world Expo + Supabase app with location, chat, and age-aware social rules.
+A mobile app for finding pickup basketball: browse courts on a map, save the spots you care about, and coordinate with other players through DMs and court chats. I built RimRun to practice shipping a full product on real devices, not just tutorials. That meant wiring up auth, maps, chat, and a Postgres backend with row-level security, plus age-based rules so social features stay consistent from the database down to the UI.
 
-## Features
+## What it does
 
-- **Courts** — Map discovery, search, subscriptions, user-submitted courts (address / location by age rules)
-- **Profile** — Username, photo (with privacy settings), date of birth for age-based rules
-- **Social** — Friends, direct messages, group chats, court-associated threads (DM rules vs court visibility differ)
-- **Auth** — Email/password and Google sign-in (Supabase); password reset via deep link
+- **Courts:** Map and search, subscribe to courts, and add new ones (address-only vs location flows depend on age, matching how the product handles minors.)
+- **Profile:** Username, optional photo, privacy toggles, and date of birth so age rules can be enforced server-side.
+- **Social:** Friends, direct messages, group chats, and threads tied to a court. Direct chats and court threads follow different visibility rules on purpose.
+- **Auth:** Email and password, Google sign-in through Supabase, and password reset via deep link.
 
 ## Stack
 
@@ -15,52 +15,40 @@ Cross-platform mobile app for discovering basketball courts on a map, managing a
 
 ## Run locally
 
-**Requirements:** Node.js (LTS), npm, and a [Supabase](https://supabase.com) project. [Expo Go](https://expo.dev/go) is the fastest way to test on a device; use Android Studio / Xcode for native builds if you prefer.
+You will need Node.js (LTS), npm, and a [Supabase](https://supabase.com) project. The quickest way to try the app is [Expo Go](https://expo.dev/go) on a phone; use Android Studio or Xcode if you want a full native build.
 
 ```bash
 npm install --legacy-peer-deps
 ```
 
-Create `.env` in the project root (do not commit real keys):
+Add a `.env` in the project root with your Supabase values (keep real keys out of git):
 
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Restart the dev server after changing env vars.
+Restart the dev server after editing env vars.
 
 ```bash
 npm start
 ```
 
-Press `a` / `i` / `w` for Android, iOS, or web, or scan the QR code with Expo Go.
+Then press `a` / `i` / `w` for Android, iOS, or web, or scan the QR code in Expo Go.
 
-**If Expo Go on Android shows `Failed to download remote update`:** the device can’t reach Metro. Try `npm run start:tunnel`, use the same Wi‑Fi as your PC (avoid VPN if possible), or allow Node through the firewall on port **8081**. Match Expo Go’s version to **SDK 54**.
+**Android tip:** If you see `Failed to download remote update`, the phone cannot reach Metro on your machine. Try `npm run start:tunnel`, use the same Wi‑Fi as your computer (VPN off if possible), or allow Node through the firewall on port **8081**. Match Expo Go to **SDK 54**.
 
 Native dev builds: `npm run android` · `npm run ios` · `npm run web`
 
-## Deploy (e.g. EAS + stores)
+## Backend notes
 
-Ship **release builds** with a production Supabase project (or a clearly designated prod environment). Use **EAS** (`eas build`) and set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in **EAS secrets** (or your CI env)—not by committing `.env` to git. Local `.env` stays gitignored for development.
+The app talks to **Supabase** (Postgres with RLS). Migration-style SQL lives under `scripts/` (policies, RPCs, triggers). You will need to apply whatever subset matches how you run the project: for example, friend and DM age checks, and how messages show up in court threads versus private chat. The client mirrors part of that logic in `lib/agePolicy.ts` and should stay in sync with what you deploy.
 
-Configure **Supabase Auth** redirect URLs and **Google OAuth** for production (`rimrun://` scheme, Play/App signing SHA, bundle ID)—see `docs/auth-deployment-checklist.md`. Submit binaries through **App Store Connect** and **Google Play** with your Privacy Policy and Terms URLs.
+Only the **anon** key belongs in the client. Never ship the **service role** key in an app build. Using different Supabase projects or keys for dev and production helps avoid accidents.
 
-## Backend & Supabase
+## Future features
 
-Data lives in **Supabase** (Postgres + RLS), not in the repo. SQL under `scripts/` defines policies, RPCs, and triggers—**apply the migrations your project needs** to match the app (age rules for friends/DMs, message visibility for court threads, etc.). Client checks in `lib/agePolicy.ts` should stay aligned with the SQL functions you deploy.
-
-The **anon** key is expected in the client bundle; protect **service role** keys and never embed them in the app. Use separate Supabase projects or keys for dev vs production when possible.
-
-## Docs
-
-- **Privacy policy:** `docs/privacy/privacy-policy.md` → run `npm run sync-privacy-policy` to regenerate `constants/privacyPolicyMarkdown.ts` for the in-app screen. Store-ready HTML: `docs/privacy/privacy-policy.html`.
-- **Auth & deep links:** `docs/auth-deployment-checklist.md`
-- **Implementation / policy notes:** `docs/personal/` (e.g. age & chat policy drafts)
-
-## Ideas
-
-Auth-hardening, richer moderation/reporting, charts/analytics, tests, separate dev Supabase after prod launch.
+Stronger moderation and reporting, analytics or charts for usage, automated tests, and a dedicated dev Supabase once a production instance is live.
 
 ## Author
 
@@ -68,4 +56,4 @@ Auth-hardening, richer moderation/reporting, charts/analytics, tests, separate d
 
 ## License
 
-Proprietary — [all rights reserved](LICENSE). Not licensed for copying or redistribution without written permission. Update the copyright line in `LICENSE` to your legal name if you use one.
+Proprietary. [All rights reserved](LICENSE). Not licensed for copying or redistribution without written permission. Update the copyright line in `LICENSE` to your legal name if you use one.
