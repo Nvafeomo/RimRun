@@ -53,7 +53,9 @@ Stronger moderation and reporting, analytics or charts for usage, automated test
 ## Author
 
 **Nvafeomo K. Konneh**
-
+**nvafeomo05@gmail.com**
+**267-461-8268**
+**https://www.linkedin.com/in/nvafeomo-konneh-a6a1a9367**
 ## License
 
 Proprietary. [All rights reserved](LICENSE). Not licensed for copying or redistribution without written permission. Update the copyright line in `LICENSE` to your legal name if you use one.
