@@ -15,11 +15,10 @@ A mobile app for finding pickup basketball: browse courts on a map, save the spo
 
 ## Demo
 
-Screen recording of the app in use:
+Court search, adding a court, and chat (GIF):
 
-- **[rimrundemo.mov](docs/Demo/Screenshots/rimrundemo.mov)** — open or download from the repo to play (QuickTime / VLC, etc.).
+![RimRun demo: court search, add court, and chat](docs/Demo/Screenshots/RimRunDemo1.gif)
 
-Additional screenshots or clips can live in [`docs/Demo/Screenshots/`](docs/Demo/Screenshots/).
 
 ## Run locally
 
