@@ -1,6 +1,6 @@
 # RimRun
 
-A mobile app for finding pickup basketball: browse courts on a map, save the spots you care about, and coordinate with other players through DMs and court chats. I built RimRun to practice shipping a full product on real devices, not just tutorials. That meant wiring up auth, maps, chat, and a Postgres backend with row-level security, plus age-based rules so social features stay consistent from the database down to the UI.
+A mobile app for finding pickup basketball: browse courts on a map, save the spots you care about, and coordinate with other players through DMs and court chats. I built RimRun mostly because I play basketball in my free time. I keep shoes and a ball in the trunk in case I stop by a court during the week. The app helps me and other users find nearby courts and communities, and it gave me a reason to practice shipping a full product on real devices, not just tutorials. Along the way I wired up auth, maps, chat, and a Postgres backend with row-level security, plus age-based rules so social features stay consistent from the database down to the UI.
 
 ## What it does
 
@@ -53,6 +53,10 @@ Stronger moderation and reporting, analytics or charts for usage, automated test
 ## Author
 
 **Nvafeomo K. Konneh**
+
+- **Email:** [nvafeomo05@gmail.com](mailto:nvafeomo05@gmail.com)
+- **Phone:** 267-461-8268
+- **LinkedIn:** [Nvafeomo Konneh](https://www.linkedin.com/in/nvafeomo-konneh-a6a1a9367)
 
 ## License
 
