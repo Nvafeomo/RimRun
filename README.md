@@ -62,7 +62,7 @@ Only the **anon** key belongs in the client. Never ship the **service role** key
 
 ## Future features
 
-Stronger moderation and reporting, analytics or charts for usage, automated tests, and a dedicated dev Supabase once a production instance is live.
+Personal roadmap notes are kept in `future-features.tex` under a local personal folder (not tracked in this repo).
 
 ## Author
 

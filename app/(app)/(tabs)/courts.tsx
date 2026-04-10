@@ -49,7 +49,14 @@ const DEFAULT_RADIUS_MILES = 15;
 /** If the last load was centered on the user, refetch when GPS moves farther than this (miles). */
 const REFETCH_MOVE_MILES = 8;
 
-const FETCH_ROW_CAP = 50_000;
+/** Max courts shown on map / list after distance sort (keeps RN Maps responsive). */
+const MAX_COURTS_SHOWN = 300;
+
+/**
+ * Bbox fallback only (when RPC is missing): max rows from PostgREST before radius filter.
+ * Not “nearest N”—arbitrary subset of bbox—so keep RPC deployed; see scripts/courts-within-radius-rpc.sql.
+ */
+const FETCH_ROW_CAP = 3_000;
 
 const REVEAL_MARKERS_PER_FRAME = 36;
 
@@ -607,7 +614,7 @@ export default function CourtsScreen() {
           haversineMiles(centerLat, centerLng, b.latitude, b.longitude)
       );
 
-      setSortedCourts(inRadius);
+      setSortedCourts(inRadius.slice(0, MAX_COURTS_SHOWN));
       setCourtsLoading(false);
       return true;
     },
