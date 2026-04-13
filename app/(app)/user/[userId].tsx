@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -16,6 +17,7 @@ import { colors, spacing, borderRadius } from "../../../constants/theme";
 import { supabase } from "../../../lib/supabase";
 import { blockUser, unblockUser } from "../../../lib/blocking";
 import { AvatarImage } from "../../../components/AvatarImage";
+import { ReportUserModal } from "../../../components/ReportUserModal";
 
 type FriendshipStatus =
   | "self"
@@ -98,7 +100,7 @@ async function fetchPublicProfileFallback(
   targetId: string,
 ): Promise<PublicProfileSummary | null> {
   const SELECT_WITH_PRIVACY =
-    "username, profile_image_url, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added, messages_only_from_friends";
+    "username, profile_image_url, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added";
   let profRes = await supabase
     .from("profiles")
     .select(SELECT_WITH_PRIVACY)
@@ -121,10 +123,8 @@ async function fetchPublicProfileFallback(
 
   const showAdded =
     (prof as { profile_public_show_courts_added?: boolean }).profile_public_show_courts_added ?? true;
-  const messagesOnly =
-    (prof as { messages_only_from_friends?: boolean }).messages_only_from_friends ?? false;
 
-  const [friendEdge, outReq, inReq, myParts] = await Promise.all([
+  const [friendEdge, outReq, inReq] = await Promise.all([
     supabase
       .from("friendships")
       .select("user_id")
@@ -145,7 +145,6 @@ async function fetchPublicProfileFallback(
       .eq("receiver_id", viewerId)
       .eq("status", "pending")
       .maybeSingle(),
-    supabase.from("conversation_participants").select("conversation_id").eq("user_id", viewerId),
   ]);
 
   const isFriend = !!friendEdge.data;
@@ -154,27 +153,8 @@ async function fetchPublicProfileFallback(
   else if (outReq.data) friendship_status = "pending_outgoing";
   else if (inReq.data) friendship_status = "pending_incoming";
 
-  const convIds = (myParts.data ?? []).map((r) => r.conversation_id);
-  let hasDm = false;
-  if (convIds.length > 0) {
-    const { data: dms } = await supabase
-      .from("conversations")
-      .select("id")
-      .eq("type", "dm")
-      .in("id", convIds);
-    const dmIds = (dms ?? []).map((d) => d.id);
-    if (dmIds.length > 0) {
-      const { data: otherPart } = await supabase
-        .from("conversation_participants")
-        .select("conversation_id")
-        .in("conversation_id", dmIds)
-        .eq("user_id", targetId)
-        .limit(1);
-      hasDm = (otherPart ?? []).length > 0;
-    }
-  }
-
-  const can_open_dm = hasDm || isFriend || !messagesOnly;
+  /** DM/group messaging requires friendship; court chat is separate. */
+  const can_open_dm = isFriend;
 
   let addedCount: number | null = null;
   if (showAdded) {
@@ -209,6 +189,7 @@ export default function PublicUserProfileScreen() {
   const [actioning, setActioning] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const [blockedByMe, setBlockedByMe] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id || !userId) {
@@ -347,12 +328,19 @@ export default function PublicUserProfileScreen() {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={() => router.back()} style={styles.headerSide}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerTitleCenter} numberOfLines={1}>
+            Profile
+          </Text>
+          <View style={styles.headerSide} />
         </View>
+        <View style={styles.heroAccent} />
         <View style={styles.centered}>
+          <View style={styles.unavailableIconWrap}>
+            <Ionicons name="person-off-outline" size={40} color={colors.textMuted} />
+          </View>
           <Text style={styles.unavailableTitle}>Profile unavailable</Text>
           <Text style={styles.unavailableText}>
             This profile isn&apos;t available. The user may have blocked you or the
@@ -369,26 +357,51 @@ export default function PublicUserProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={() => router.back()} style={styles.headerSide}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitleCenter} numberOfLines={1}>
+          Profile
+        </Text>
+        <View style={styles.headerSide} />
       </View>
+      <View style={styles.heroAccent} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <AvatarImage
-            userId={summary.user_id}
-            username={summary.username}
-            profileImageUrl={summary.profile_image_url}
-            size={96}
-          />
+          <View style={styles.avatarRing}>
+            <AvatarImage
+              userId={summary.user_id}
+              username={summary.username}
+              profileImageUrl={summary.profile_image_url}
+              size={108}
+            />
+          </View>
           <Text style={styles.name}>{displayName}</Text>
+          {st === "friends" && (
+            <View style={styles.friendChip}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+              <Text style={styles.friendChipText}>Friends</Text>
+            </View>
+          )}
+          {st === "pending_outgoing" && (
+            <View style={styles.pendingChip}>
+              <Ionicons name="time-outline" size={16} color={colors.primaryLight} />
+              <Text style={styles.pendingChipText}>Request sent</Text>
+            </View>
+          )}
+          {st === "pending_incoming" && (
+            <View style={styles.pendingChip}>
+              <Ionicons name="mail-unread-outline" size={16} color={colors.primaryLight} />
+              <Text style={styles.pendingChipText}>Wants to connect</Text>
+            </View>
+          )}
 
-          <View style={styles.statsRow}>
+          <View style={styles.statsPanel}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
                 {summary.friends_count === null ? "—" : summary.friends_count}
@@ -403,7 +416,7 @@ export default function PublicUserProfileScreen() {
                   : summary.courts_joined_count}
               </Text>
               <Text style={styles.statLabel} numberOfLines={2}>
-                Courts joined
+                Joined
               </Text>
             </View>
             <View style={styles.statDivider} />
@@ -414,25 +427,25 @@ export default function PublicUserProfileScreen() {
                   : summary.courts_added_count}
               </Text>
               <Text style={styles.statLabel} numberOfLines={2}>
-                Courts added
+                Added
               </Text>
             </View>
           </View>
         </View>
 
-        {st === "pending_outgoing" && (
-          <Text style={styles.statusNote}>Friend request sent</Text>
-        )}
         {st === "pending_incoming" && (
           <Text style={styles.statusNote}>
-            This person sent you a friend request — open Friends to respond.
+            Open <Text style={styles.statusNoteEm}>Friends</Text> to accept or decline.
           </Text>
         )}
 
         {blockedByMe ? (
-          <Text style={styles.blockedNote}>
-            You blocked this person. Unblock to message or add them as a friend.
-          </Text>
+          <View style={styles.blockedBanner}>
+            <Ionicons name="ban-outline" size={18} color={colors.textSecondary} />
+            <Text style={styles.blockedBannerText}>
+              You blocked this person. Unblock to message or add them as a friend.
+            </Text>
+          </View>
         ) : null}
 
         <View style={styles.actions}>
@@ -488,8 +501,8 @@ export default function PublicUserProfileScreen() {
           </Pressable>
           {!summary.can_open_dm && st !== "friends" && !blockedByMe && (
             <Text style={styles.dmHint}>
-              This user only accepts messages from people on their friends list.
-              Send a friend request first.
+              Direct messages are only with friends. Send a friend request first,
+              or talk at a court you both follow.
             </Text>
           )}
 
@@ -513,23 +526,50 @@ export default function PublicUserProfileScreen() {
               )}
             </Pressable>
           ) : (
-            <Pressable
-              style={[styles.blockBtn, blocking && styles.blockBtnDisabled]}
-              onPress={promptBlock}
-              disabled={actioning || blocking}
-            >
-              {blocking ? (
-                <ActivityIndicator color={colors.text} size="small" />
-              ) : (
-                <Text style={styles.blockBtnText}>Block</Text>
-              )}
-            </Pressable>
+            <View style={styles.dangerRow}>
+              <Pressable
+                style={[styles.reportBtn, actioning && styles.blockBtnDisabled]}
+                onPress={() => setReportOpen(true)}
+                disabled={actioning}
+              >
+                <Ionicons name="flag-outline" size={18} color={colors.textSecondary} />
+                <Text style={styles.reportBtnText}>Report</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.blockBtn, blocking && styles.blockBtnDisabled]}
+                onPress={promptBlock}
+                disabled={actioning || blocking}
+              >
+                {blocking ? (
+                  <ActivityIndicator color={colors.text} size="small" />
+                ) : (
+                  <Text style={styles.blockBtnText}>Block</Text>
+                )}
+              </Pressable>
+            </View>
           )}
         </View>
       </ScrollView>
+
+      <ReportUserModal
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        reportedUserId={userId}
+        contextLabel={`Reporting @${displayName}`}
+      />
     </SafeAreaView>
   );
 }
+
+const cardShadow =
+  Platform.OS === "ios"
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+      }
+    : { elevation: 6 };
 
 const styles = StyleSheet.create({
   container: {
@@ -545,71 +585,155 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.xs,
   },
-  backButton: {
-    padding: spacing.xs,
+  headerSide: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  headerTitle: {
-    fontSize: 20,
+  headerTitleCenter: {
+    flex: 1,
+    fontSize: 17,
     fontWeight: "700",
     color: colors.text,
+    textAlign: "center",
+    letterSpacing: -0.2,
+  },
+  heroAccent: {
+    height: 3,
+    backgroundColor: colors.primary,
+    borderRadius: 2,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    opacity: 0.9,
   },
   scrollContent: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl * 2,
   },
   card: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.lg,
+    ...cardShadow,
+  },
+  avatarRing: {
+    borderWidth: 3,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.full,
+    padding: 3,
+    backgroundColor: colors.background,
   },
   name: {
     color: colors.text,
     fontSize: 22,
-    fontWeight: "600",
+    fontWeight: "700",
     marginTop: spacing.md,
+    letterSpacing: -0.2,
   },
-  statsRow: {
+  friendChip: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+    marginTop: spacing.sm,
+    backgroundColor: "rgba(34, 197, 94, 0.12)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: "rgba(34, 197, 94, 0.35)",
+  },
+  friendChipText: {
+    color: colors.success,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  pendingChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pendingChipText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  statsPanel: {
+    flexDirection: "row",
+    alignItems: "stretch",
     marginTop: spacing.lg,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
     width: "100%",
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   statItem: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "center",
   },
   statValue: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
-    marginBottom: spacing.xs,
+    marginBottom: 4,
   },
   statLabel: {
-    color: colors.textSecondary,
-    fontSize: 11,
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "600",
     textAlign: "center",
   },
   statDivider: {
-    width: 1,
-    height: 36,
+    width: StyleSheet.hairlineWidth,
+    alignSelf: "stretch",
     backgroundColor: colors.border,
   },
   statusNote: {
     color: colors.textSecondary,
     fontSize: 14,
+    lineHeight: 20,
     marginBottom: spacing.md,
     textAlign: "center",
+    paddingHorizontal: spacing.sm,
+  },
+  statusNoteEm: {
+    color: colors.primaryLight,
+    fontWeight: "700",
+  },
+  blockedBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  blockedBannerText: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
   },
   actions: {
     gap: spacing.md,
@@ -620,8 +744,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.sm,
     backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md + 2,
     borderRadius: borderRadius.md,
+    ...cardShadow,
   },
   primaryBtnText: {
     color: "#fff",
@@ -633,14 +758,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
-    backgroundColor: colors.surfaceElevated,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md + 2,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
   },
   secondaryBtnDisabled: {
-    opacity: 0.7,
+    opacity: 0.65,
   },
   secondaryBtnText: {
     color: colors.primary,
@@ -653,37 +778,17 @@ const styles = StyleSheet.create({
   dmHint: {
     color: colors.textSecondary,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
     textAlign: "center",
+    paddingHorizontal: spacing.xs,
   },
-  blockedNote: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.sm,
+  dangerRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
-  /** Matches `profile.tsx` deleteAccountButton / deleteAccountText */
-  blockBtn: {
-    backgroundColor: colors.error,
-    borderWidth: 1.5,
-    borderColor: colors.text,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-    alignItems: "center",
-    marginTop: spacing.sm,
-  },
-  blockBtnDisabled: {
-    opacity: 0.7,
-  },
-  blockBtnText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  unblockBtn: {
+  reportBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -692,7 +797,41 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.surface,
+  },
+  reportBtnText: {
+    color: colors.textSecondary,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  blockBtn: {
+    flex: 1,
+    backgroundColor: colors.error,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  blockBtnDisabled: {
+    opacity: 0.7,
+  },
+  blockBtnText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  unblockBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.md + 2,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
   },
   unblockBtnText: {
     fontSize: 16,
@@ -703,6 +842,18 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: spacing.lg,
     justifyContent: "center",
+  },
+  unavailableIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   unavailableTitle: {
     color: colors.text,

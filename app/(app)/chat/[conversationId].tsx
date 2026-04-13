@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useLocalSearchParams, router } from "expo-router";
+import { useState, useEffect, useCallback } from "react";
+import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   View,
@@ -15,9 +15,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { ChatScreen } from "../../../components/ChatScreen";
 import { AddMemberToChatModal } from "../../../components/AddMemberToChatModal";
+import { ReportUserModal } from "../../../components/ReportUserModal";
 import { supabase } from "../../../lib/supabase";
 import { clearConversationAndLeave } from "../../../lib/chatDeletion";
 import { useAuth } from "../../../context/AuthContext";
+import { useProfile } from "../../../context/ProfileContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
 
@@ -29,6 +31,7 @@ export default function ChatRouteScreen() {
     courtName?: string;
   }>();
   const { user } = useAuth();
+  const { refreshProfile } = useProfile();
   const { getDisplayName, refresh } = useCourtAliases();
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -38,6 +41,13 @@ export default function ChatRouteScreen() {
   /** Other participant in a 1:1 DM (for profile link in header). */
   const [dmOtherUserId, setDmOtherUserId] = useState<string | null>(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshProfile();
+    }, [refreshProfile]),
+  );
   const displayTitle = title ?? "Chat";
   const resolvedCourtId = courtId ?? "";
   const resolvedCourtName = courtName ?? "Court";
@@ -206,6 +216,16 @@ export default function ChatRouteScreen() {
               {displayTitle}
             </Text>
           )}
+          {(!!dmOtherUserId || isCourtChat) && (
+            <Pressable
+              hitSlop={12}
+              onPress={() => setReportOpen(true)}
+              style={styles.headerIconButton}
+              accessibilityLabel="Report"
+            >
+              <Ionicons name="flag-outline" size={22} color={colors.textMuted} />
+            </Pressable>
+          )}
           {isCourtChat && (
             <Pressable
               hitSlop={12}
@@ -294,6 +314,19 @@ export default function ChatRouteScreen() {
           </KeyboardAvoidingView>
         </Pressable>
       </Modal>
+
+      <ReportUserModal
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        reportedUserId={dmOtherUserId}
+        conversationId={conversationId}
+        courtId={resolvedCourtId || null}
+        contextLabel={
+          isCourtChat
+            ? `Court chat: ${displayTitle}`
+            : `Direct chat with ${displayTitle}`
+        }
+      />
 
       {showDmGroupActions && chatKind && (
         <AddMemberToChatModal

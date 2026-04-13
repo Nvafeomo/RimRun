@@ -18,7 +18,7 @@ import { useAuth } from './AuthContext';
 const PROFILE_SELECT_BASE =
   'profile_image_url, date_of_birth, username, email' as const;
 const PROFILE_SELECT_WITH_PRIVACY =
-  `${PROFILE_SELECT_BASE}, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added, messages_only_from_friends` as const;
+  `${PROFILE_SELECT_BASE}, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added, messages_only_from_friends, username_searchable, chat_suspended_until, auto_suspension_count` as const;
 
 function isUndefinedColumnError(err: unknown): boolean {
   if (err && typeof err === 'object' && 'code' in err) {
@@ -63,6 +63,10 @@ export type ProfileDbRow = {
   profile_public_show_courts_joined?: boolean;
   profile_public_show_courts_added?: boolean;
   messages_only_from_friends?: boolean;
+  /** When false, user does not appear in Add friends username search. Minors default false (DB + trigger). */
+  username_searchable?: boolean;
+  chat_suspended_until?: string | null;
+  auto_suspension_count?: number;
 };
 
 export type Profile = {
@@ -78,6 +82,11 @@ export type Profile = {
   profile_public_show_courts_added?: boolean;
   /** When true, only friends can start a new DM with you. Default false. */
   messages_only_from_friends?: boolean;
+  /** When true, you may appear in Add friends search by username. Default false for under 18. */
+  username_searchable?: boolean;
+  /** When in the future, server blocks sending chat messages (RLS). */
+  chat_suspended_until?: string | null;
+  auto_suspension_count?: number;
 } | null;
 
 type ProfileContextValue = {

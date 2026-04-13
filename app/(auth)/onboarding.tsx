@@ -33,6 +33,7 @@ import {
     USERNAME_RULES_USER_HINT,
     mapProfileUsernameError,
   } from '../../lib/usernameRules';
+  import { defaultUsernameSearchableForDob } from '../../lib/usernameSearchPolicy';
 
   function validateEmail(value: string): string | null {
     if (!value.trim()) return 'Email is required';
@@ -209,12 +210,14 @@ import {
             }
 
             if (!hasProfileRow) {
+                const dobTrim = dateOfBirth.trim();
                 const { error: insertErr } = await supabase.from('profiles').insert({
                     id: user.id,
                     username: normalizedUsername!,
                     email: resolvedEmail,
-                    date_of_birth: dateOfBirth.trim(),
+                    date_of_birth: dobTrim,
                     profile_image_url: avatarUrl,
+                    username_searchable: defaultUsernameSearchableForDob(dobTrim),
                 });
                 if (insertErr?.code === '23505') {
                     setError('Username is already taken');

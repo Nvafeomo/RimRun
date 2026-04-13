@@ -17,6 +17,7 @@ import { supabase } from "../lib/supabase";
 import { AvatarImage } from "./AvatarImage";
 import { removeFriendship } from "../lib/friendshipActions";
 import { blockUser, unblockUser } from "../lib/blocking";
+import { ReportUserModal } from "./ReportUserModal";
 import { useAuth } from "../context/AuthContext";
 import { colors, spacing, borderRadius } from "../constants/theme";
 
@@ -61,6 +62,8 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [blockedUsers, setBlockedUsers] = useState<ProfileRow[]>([]);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportUserId, setReportUserId] = useState<string | null>(null);
 
   const incomingCount = useMemo(
     () => requests.filter((r) => r.direction === "incoming").length,
@@ -483,14 +486,27 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
             </View>
           )}
           {(relation === "none" || relation === "outgoing") && (
-            <Pressable
-              style={styles.blockMiniBtn}
-              onPress={() => promptBlockUser(profile)}
-              disabled={isLoading}
-              hitSlop={6}
-            >
-              <Text style={styles.blockMiniBtnText}>Block</Text>
-            </Pressable>
+            <>
+              <Pressable
+                style={styles.reportMiniBtn}
+                onPress={() => {
+                  setReportUserId(profile.id);
+                  setReportOpen(true);
+                }}
+                disabled={isLoading}
+                hitSlop={6}
+              >
+                <Text style={styles.reportMiniBtnText}>Report</Text>
+              </Pressable>
+              <Pressable
+                style={styles.blockMiniBtn}
+                onPress={() => promptBlockUser(profile)}
+                disabled={isLoading}
+                hitSlop={6}
+              >
+                <Text style={styles.blockMiniBtnText}>Block</Text>
+              </Pressable>
+            </>
           )}
         </View>
       </View>
@@ -539,6 +555,18 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
           ) : (
             <Ionicons name="person-remove-outline" size={22} color={colors.textMuted} />
           )}
+        </Pressable>
+        <Pressable
+          style={styles.friendReportBtn}
+          onPress={() => {
+            setReportUserId(item.friend.id);
+            setReportOpen(true);
+          }}
+          disabled={busy}
+          hitSlop={8}
+          accessibilityLabel="Report user"
+        >
+          <Ionicons name="flag-outline" size={22} color={colors.textMuted} />
         </Pressable>
         <Pressable
           style={styles.friendBlockBtn}
@@ -836,6 +864,18 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
           }
         />
       )}
+
+      <ReportUserModal
+        visible={reportOpen}
+        onClose={() => {
+          setReportOpen(false);
+          setReportUserId(null);
+        }}
+        reportedUserId={reportUserId}
+        contextLabel={
+          reportUserId ? "Report this user to the RimRun team" : undefined
+        }
+      />
     </View>
   );
 }
@@ -1013,6 +1053,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md,
+  },
+  friendReportBtn: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  reportMiniBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginRight: spacing.xs,
+  },
+  reportMiniBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textMuted,
   },
   blockMiniBtn: {
     paddingHorizontal: spacing.sm,

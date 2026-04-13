@@ -16,6 +16,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useProfile } from "../../context/ProfileContext";
 import { colors, spacing, borderRadius } from "../../constants/theme";
 import { supabase } from "../../lib/supabase";
+import { ageInFullYears } from "../../lib/agePolicy";
 
 export default function PrivacySettingsScreen() {
   const router = useRouter();
@@ -26,7 +27,14 @@ export default function PrivacySettingsScreen() {
   const [showCourtsJoined, setShowCourtsJoined] = useState(true);
   const [showCourtsAdded, setShowCourtsAdded] = useState(true);
   const [messagesFriendsOnly, setMessagesFriendsOnly] = useState(false);
+  const [usernameSearchable, setUsernameSearchable] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const age =
+    profile?.date_of_birth != null
+      ? ageInFullYears(profile.date_of_birth)
+      : null;
+  const isMinor = age !== null && age < 18;
 
   useEffect(() => {
     if (!profile) return;
@@ -34,6 +42,7 @@ export default function PrivacySettingsScreen() {
     setShowCourtsJoined(profile.profile_public_show_courts_joined ?? true);
     setShowCourtsAdded(profile.profile_public_show_courts_added ?? true);
     setMessagesFriendsOnly(profile.messages_only_from_friends ?? false);
+    setUsernameSearchable(profile.username_searchable ?? true);
   }, [profile]);
 
   const persist = useCallback(
@@ -42,6 +51,7 @@ export default function PrivacySettingsScreen() {
       profile_public_show_courts_joined?: boolean;
       profile_public_show_courts_added?: boolean;
       messages_only_from_friends?: boolean;
+      username_searchable?: boolean;
     }) => {
       if (!user?.id) return;
       setSaving(true);
@@ -82,7 +92,8 @@ export default function PrivacySettingsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.intro}>
-          Control what others see on your public profile and who can message you.
+          Control what others see on your public profile, who can reach you in
+          DMs, and whether you appear in friend discovery search.
         </Text>
 
         <Text style={styles.sectionLabel}>Public profile</Text>
@@ -145,14 +156,22 @@ export default function PrivacySettingsScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>Messages</Text>
+        <Text style={styles.sectionLabel}>Messaging &amp; discovery</Text>
+        <Text style={styles.sectionBlurb}>
+          Two separate controls: one is who can open a{" "}
+          <Text style={styles.sectionBlurbEm}>new private chat</Text> with you. The
+          other is whether you appear when someone searches by username to send a{" "}
+          <Text style={styles.sectionBlurbEm}>friend request</Text>. Someone could
+          still request you if they meet you elsewhere (e.g. a court chat); search
+          only affects the Add friends lookup.
+        </Text>
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Only accept DMs from friends</Text>
+              <Text style={styles.rowTitle}>New DMs from friends only</Text>
               <Text style={styles.rowHint}>
-                People who aren&apos;t on your friends list can&apos;t start a new
-                chat with you. Existing conversations still work.
+                Strangers can&apos;t start a new DM with you. Existing chats are
+                unchanged.
               </Text>
             </View>
             <Switch
@@ -164,6 +183,28 @@ export default function PrivacySettingsScreen() {
               disabled={saving}
               trackColor={{ false: colors.border, true: colors.primaryDark }}
               thumbColor={messagesFriendsOnly ? colors.primary : colors.textMuted}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.rowText}>
+              <Text style={styles.rowTitle}>Show up in Add friends search</Text>
+              <Text style={styles.rowHint}>
+                Lets people find you by username under Chats → Friends → Add.
+                {isMinor
+                  ? " Off by default under 18; turn on if you want to be discoverable."
+                  : " Turn off to rely on meeting people in-app instead of lookup."}
+              </Text>
+            </View>
+            <Switch
+              value={usernameSearchable}
+              onValueChange={(v) => {
+                setUsernameSearchable(v);
+                void persist({ username_searchable: v });
+              }}
+              disabled={saving}
+              trackColor={{ false: colors.border, true: colors.primaryDark }}
+              thumbColor={usernameSearchable ? colors.primary : colors.textMuted}
             />
           </View>
         </View>
@@ -215,6 +256,16 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: spacing.sm,
+  },
+  sectionBlurb: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  sectionBlurbEm: {
+    fontWeight: "600",
+    color: colors.text,
   },
   card: {
     backgroundColor: colors.surface,

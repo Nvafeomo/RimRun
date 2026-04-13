@@ -179,6 +179,15 @@ export function useConversationChat(conversationId: string | undefined) {
       const trimmed = content.trim();
       if (!trimmed || !conversationId || !user?.id) return;
 
+      const until = profile?.chat_suspended_until;
+      if (until && new Date(until).getTime() > Date.now()) {
+        Alert.alert(
+          'Messaging paused',
+          'Your account cannot send messages right now. If you think this is a mistake, contact support.',
+        );
+        return;
+      }
+
       setSending(true);
       const { error } = await supabase.from('messages').insert({
         conversation_id: conversationId,
@@ -188,14 +197,19 @@ export function useConversationChat(conversationId: string | undefined) {
 
       if (error) {
         console.error('Error sending message:', error);
+        const msg = error.message || '';
+        const looksSuspended =
+          /row-level security|violates|policy|permission denied/i.test(msg);
         Alert.alert(
           'Message not sent',
-          error.message || 'Could not send your message. Check your connection and try again.'
+          looksSuspended
+            ? 'You may not be able to send messages right now (for example during a safety review).'
+            : msg || 'Could not send your message. Check your connection and try again.',
         );
       }
       setSending(false);
     },
-    [conversationId, user?.id]
+    [conversationId, user?.id, profile?.chat_suspended_until]
   );
 
   const sendTyping = useCallback(

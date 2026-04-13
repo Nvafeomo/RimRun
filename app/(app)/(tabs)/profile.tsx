@@ -8,13 +8,15 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../context/AuthContext';
 import { useProfile } from '../../../context/ProfileContext';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
+import { AvatarImage } from '../../../components/AvatarImage';
 
 /** Edge Functions return JSON `{ error: string }` on failure; `FunctionsHttpError` hides it unless we read `response`. */
 async function messageFromEdgeFunctionFailure(
@@ -161,48 +163,48 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Profile</Text>
-        <Text style={styles.subtitle}>Your profile and settings</Text>
+        <View style={styles.heroAccent} />
 
-        {/* Profile card */}
+        <Text style={styles.title}>Profile</Text>
+        <Text style={styles.subtitle}>Your account and preferences</Text>
+
         <View style={styles.profileCard}>
           <TouchableOpacity
-            style={styles.avatarWrapper}
+            style={styles.avatarOuter}
             onPress={updateProfilePicture}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            {profile?.profile_image_url ? (
-              <Image
-                key={profile.profile_image_url}
-                source={{ uri: profile.profile_image_url }}
-                style={styles.avatar}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarPlaceholderText}>
-                  {displayName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <View style={styles.avatarRing}>
+              {user?.id ? (
+                <AvatarImage
+                  userId={user.id}
+                  username={profile?.username}
+                  profileImageUrl={profile?.profile_image_url}
+                  size={108}
+                />
+              ) : null}
+            </View>
             <View style={styles.editBadge}>
-              <Text style={styles.editBadgeText}>Edit</Text>
+              <Ionicons name="camera" size={14} color={colors.text} />
+              <Text style={styles.editBadgeText}>Photo</Text>
             </View>
           </TouchableOpacity>
 
           <Text style={styles.name}>{displayName}</Text>
           {displayEmail ? (
-            <Text style={styles.email}>{displayEmail}</Text>
+            <Text style={styles.email} numberOfLines={1}>
+              {displayEmail}
+            </Text>
           ) : null}
 
-          <View style={styles.statsRow}>
+          <View style={styles.statsPanel}>
             <TouchableOpacity
               style={styles.statItem}
               onPress={() => router.push('/(app)/friends')}
               activeOpacity={0.7}
             >
               <Text style={styles.statValue}>
-                {friendsCount !== null ? friendsCount : '...'}
+                {friendsCount !== null ? friendsCount : '—'}
               </Text>
               <Text style={styles.statLabel}>Friends</Text>
             </TouchableOpacity>
@@ -218,53 +220,65 @@ export default function ProfileScreen() {
               activeOpacity={0.7}
             >
               <Text style={styles.statValue}>
-                {courtsJoinedCount !== null ? courtsJoinedCount : '...'}
+                {courtsJoinedCount !== null ? courtsJoinedCount : '—'}
               </Text>
               <Text style={styles.statLabel} numberOfLines={2}>
-                Courts joined
+                Joined
               </Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
-                {courtsAddedCount !== null ? courtsAddedCount : '...'}
+                {courtsAddedCount !== null ? courtsAddedCount : '—'}
               </Text>
               <Text style={styles.statLabel} numberOfLines={2}>
-                Courts added
+                Added
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Settings */}
+        <Text style={styles.sectionHeading}>Settings</Text>
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Settings</Text>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => router.push('/(app)/account')}
           >
-            <Text style={styles.actionButtonText}>Account</Text>
-            <Text style={styles.actionChevron}>›</Text>
+            <View style={styles.actionLeft}>
+              <View style={styles.actionIconWrap}>
+                <Ionicons name="person-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.actionButtonText}>Account</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => router.push('/(app)/privacy-settings')}
           >
-            <Text style={styles.actionButtonText}>Privacy Settings</Text>
-            <Text style={styles.actionChevron}>›</Text>
+            <View style={styles.actionLeft}>
+              <View style={styles.actionIconWrap}>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.actionButtonText}>Privacy</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={[styles.actionButton, styles.actionButtonLast]}
             onPress={() => router.push('/(app)/privacy-policy')}
             accessibilityRole="button"
             accessibilityLabel="Privacy policy"
           >
-            <Text style={styles.actionButtonText}>Privacy Policy</Text>
-            <Text style={styles.actionChevron}>›</Text>
+            <View style={styles.actionLeft}>
+              <View style={styles.actionIconWrap}>
+                <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.actionButtonText}>Privacy policy</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
-
-        <View style={styles.spacer} />
 
         <TouchableOpacity
           onPress={handleSignOut}
@@ -272,13 +286,14 @@ export default function ProfileScreen() {
           style={styles.signOutButton}
         >
           {signingOut ? (
-            <ActivityIndicator color={colors.text} size="small" />
+            <ActivityIndicator color={colors.primary} size="small" />
           ) : (
-            <Text style={styles.signOutText}>Sign Out</Text>
+            <>
+              <Ionicons name="log-out-outline" size={20} color={colors.primary} />
+              <Text style={styles.signOutText}>Sign out</Text>
+            </>
           )}
         </TouchableOpacity>
-
-        <View style={styles.spacer} />
 
         <TouchableOpacity
           onPress={handleDeleteAccountPress}
@@ -288,13 +303,26 @@ export default function ProfileScreen() {
           {deletingAccount ? (
             <ActivityIndicator color={colors.text} size="small" />
           ) : (
-            <Text style={styles.deleteAccountText}>Delete Account</Text>
+            <>
+              <Ionicons name="trash-outline" size={18} color={colors.text} />
+              <Text style={styles.deleteAccountText}>Delete account</Text>
+            </>
           )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const cardShadow =
+  Platform.OS === 'ios'
+    ? {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+      }
+    : { elevation: 6 };
 
 const styles = StyleSheet.create({
   container: {
@@ -311,13 +339,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl * 2,
+  },
+  heroAccent: {
+    height: 3,
+    backgroundColor: colors.primary,
+    borderRadius: 2,
+    marginHorizontal: -spacing.lg,
+    marginBottom: spacing.md,
+    opacity: 0.9,
   },
   title: {
     color: colors.text,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
+    letterSpacing: -0.3,
   },
   subtitle: {
     color: colors.textSecondary,
@@ -328,46 +365,36 @@ const styles = StyleSheet.create({
   profileCard: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
     borderWidth: 1,
     borderColor: colors.border,
+    ...cardShadow,
   },
-  avatarWrapper: {
+  avatarOuter: {
     position: 'relative',
     marginBottom: spacing.md,
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: borderRadius.full,
-    borderWidth: 2,
+  avatarRing: {
+    borderWidth: 3,
     borderColor: colors.primary,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPlaceholderText: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: colors.textSecondary,
+    padding: 3,
+    backgroundColor: colors.background,
   },
   editBadge: {
     position: 'absolute',
-    bottom: -4,
-    right: -4,
+    bottom: -2,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: colors.primary,
     borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
   },
   editBadgeText: {
     fontSize: 12,
@@ -377,44 +404,57 @@ const styles = StyleSheet.create({
   name: {
     color: colors.text,
     fontSize: 22,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: spacing.xs,
+    letterSpacing: -0.2,
   },
   email: {
     color: colors.textSecondary,
-    fontSize: 15,
-    marginBottom: spacing.xs,
+    fontSize: 14,
+    marginBottom: spacing.md,
+    maxWidth: '100%',
   },
-  statsRow: {
+  statsPanel: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    alignItems: 'stretch',
     width: '100%',
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   statValue: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: spacing.xs,
+    marginBottom: 4,
   },
   statLabel: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '500',
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
     paddingHorizontal: 2,
   },
   statDivider: {
-    width: 1,
-    height: 32,
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
     backgroundColor: colors.border,
+  },
+  sectionHeading: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: spacing.sm,
+    marginLeft: 2,
   },
   actionsSection: {
     backgroundColor: colors.surface,
@@ -423,16 +463,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  sectionTitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    ...cardShadow,
   },
   actionButton: {
     flexDirection: 'row',
@@ -440,31 +471,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  actionButtonLast: {
+    borderBottomWidth: 0,
+  },
+  actionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
+  },
+  actionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButtonText: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: '500',
-  },
-  actionChevron: {
-    color: colors.textMuted,
-    fontSize: 20,
-    fontWeight: '300',
-  },
-  spacer: {
-    flex: 1,
-    minHeight: spacing.lg,
+    fontWeight: '600',
   },
   signOutButton: {
-    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.primary,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,
-    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   signOutText: {
     color: colors.primary,
@@ -472,18 +515,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   deleteAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     backgroundColor: colors.error,
-    borderWidth: 1.5,
-    borderColor: colors.text,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,
-    alignItems: 'center',
-    marginTop: spacing.sm,
   },
   deleteAccountText: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
 });

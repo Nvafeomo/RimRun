@@ -15,6 +15,7 @@ import {
   isLikelyAuthCallback,
 } from '../lib/supabaseAuthDeepLink';
 import { mapProfileUsernameError } from '../lib/usernameRules';
+import { defaultUsernameSearchableForDob } from '../lib/usernameSearchPolicy';
 
 type AuthContextValue = {
     user: User | null;
@@ -170,7 +171,12 @@ type AuthContextValue = {
       if (existingProfile) {
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({ date_of_birth: dateOfBirthIso, username, email })
+          .update({
+            date_of_birth: dateOfBirthIso,
+            username,
+            email,
+            username_searchable: defaultUsernameSearchableForDob(dateOfBirthIso),
+          })
           .eq('id', uid);
         if (profileError) {
           throw new Error(mapProfileUsernameError(profileError));
@@ -181,11 +187,17 @@ type AuthContextValue = {
           username,
           email,
           date_of_birth: dateOfBirthIso,
+          username_searchable: defaultUsernameSearchableForDob(dateOfBirthIso),
         });
         if (insertErr?.code === '23505') {
           const { error: retryErr } = await supabase
             .from('profiles')
-            .update({ date_of_birth: dateOfBirthIso, username, email })
+            .update({
+              date_of_birth: dateOfBirthIso,
+              username,
+              email,
+              username_searchable: defaultUsernameSearchableForDob(dateOfBirthIso),
+            })
             .eq('id', uid);
           if (retryErr) {
             throw new Error(mapProfileUsernameError(retryErr));

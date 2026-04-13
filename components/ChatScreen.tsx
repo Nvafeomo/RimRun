@@ -78,6 +78,10 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
     .map(([, name]) => name)
     .join(", ");
 
+  const chatSuspended =
+    !!profile?.chat_suspended_until &&
+    new Date(profile.chat_suspended_until).getTime() > Date.now();
+
   const renderAvatar = (avatarUrl: string | null, placeholderLetter: string) => {
     if (avatarUrl) {
       return (
@@ -191,6 +195,15 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
         </View>
       ) : null}
 
+      {chatSuspended ? (
+        <View style={styles.suspensionBanner}>
+          <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
+          <Text style={styles.suspensionBannerText}>
+            Sending messages is temporarily limited on your account.
+          </Text>
+        </View>
+      ) : null}
+
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -217,16 +230,16 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
           onChangeText={handleChangeText}
           multiline
           maxLength={2000}
-          editable={!sending}
+          editable={!sending && !chatSuspended}
         />
         <Pressable
           onPress={handleSend}
           style={({ pressed }) => [
             styles.sendButton,
-            (!inputText.trim() || sending) && styles.sendButtonDisabled,
+            (!inputText.trim() || sending || chatSuspended) && styles.sendButtonDisabled,
             pressed && styles.sendButtonPressed,
           ]}
-          disabled={!inputText.trim() || sending}
+          disabled={!inputText.trim() || sending || chatSuspended}
         >
           {sending ? (
             <ActivityIndicator size="small" color={colors.text} />
@@ -259,6 +272,22 @@ const styles = StyleSheet.create({
   typingText: {
     fontSize: 13,
     color: colors.textMuted,
+  },
+  suspensionBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  suspensionBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
   },
   messageList: {
     flexGrow: 1,
