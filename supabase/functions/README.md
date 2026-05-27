@@ -75,6 +75,65 @@ supabase functions list
 4. **“Wrong URL” sanity check**  
    Point a dev build at a **fake** project URL (or typo the ref) and invoke delete — the call should **fail** (network error or 4xx), not succeed. Confirms you are not accidentally hitting a different environment.
 
+---
+
+## ban-user
+
+Allows **admins** to platform-ban a user account. Inserts into `public.user_bans` via `ban_user()` RPC, optionally marks a `content_reports` row as `action_taken`, and signs the target user out globally.
+
+### Setup (one-time)
+
+1. Run **`scripts/user-bans-migration.sql`** in the Supabase SQL editor.
+2. Promote your account:
+
+   ```sql
+   UPDATE public.profiles SET role = 'admin' WHERE id = 'YOUR-AUTH-USER-UUID';
+   ```
+
+   Or set Edge secret **`ADMIN_USER_IDS`** to a comma-separated list of admin UUIDs (fallback if `profiles.role` is not `admin`).
+
+3. Deploy secrets + function (same **`SERVICE_ROLE_KEY`** as delete-account):
+
+   ```bash
+   npx supabase secrets set SERVICE_ROLE_KEY=paste_service_role_key_here
+   npx supabase functions deploy ban-user
+   ```
+
+4. Optional: run **`scripts/admin-report-queue-view.sql`** and open **`admin_report_queue`** in Supabase Studio to triage reports.
+
+5. For **in-app moderation** (Profile → Moderation), also run **`scripts/admin-moderation-app-rpc.sql`**.
+
+### Request body (POST JSON)
+
+| Field | Required | Notes |
+|--------|----------|--------|
+| `user_id` | yes | Target `auth.users` UUID |
+| `reason` | no | Internal admin note stored on `user_bans.reason` |
+| `expires_at` | no | ISO timestamp for temporary ban; omit for permanent |
+| `report_id` | no | If set, updates that report to `action_taken` |
+
+### curl example
+
+```bash
+curl -sS -X POST "https://YOUR_PROJECT_REF.supabase.co/functions/v1/ban-user" \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "apikey: YOUR_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"TARGET-USER-UUID","reason":"Repeated harassment reports","report_id":"REPORT-UUID-OPTIONAL"}'
+```
+
+Expect `{"success":true}`. The banned user is signed out on next app open (or immediately if online) and sees the **Account suspended** screen.
+
+### Lift a ban (SQL editor, service role)
+
+```sql
+SELECT public.lift_user_ban('USER-UUID-HERE');
+```
+
+---
+
+### Verify delete-account (production)
+
 ### Troubleshooting (non-2xx from the app)
 
 The app now surfaces the JSON `error` string from the function (not only “Edge Function returned a non-2xx status code”).

@@ -12,7 +12,7 @@ const stackScreenOptions = {
 };
 
 export default function AppLayout() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, banBlocked } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
 
   if (authLoading || (user && profileLoading)) {
@@ -21,6 +21,9 @@ export default function AppLayout() {
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
+  }
+  if (banBlocked) {
+    return <Redirect href="/(banned)" />;
   }
   if (!user) {
     return <Redirect href="/(auth)/login" />;
@@ -40,6 +43,7 @@ export default function AppLayout() {
       <Stack.Screen name="privacy-settings" />
       <Stack.Screen name="privacy-policy" />
       <Stack.Screen name="user/[userId]" />
+      <Stack.Screen name="admin/moderation" />
     </Stack>
   );
 }

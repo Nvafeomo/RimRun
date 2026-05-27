@@ -16,11 +16,16 @@ import {
 } from '../lib/supabaseAuthDeepLink';
 import { mapProfileUsernameError } from '../lib/usernameRules';
 import { defaultUsernameSearchableForDob } from '../lib/usernameSearchPolicy';
+import { fetchBanAppealStatus, fetchIsUserBanned, submitBanAppeal } from '../lib/bans';
 
 type AuthContextValue = {
     user: User | null;
     session: Session | null;
     loading: boolean;
+    /** True when the signed-in account has an active platform ban. */
+    banBlocked: boolean;
+    /** True when a ban appeal is pending review. */
+    banAppealPending: boolean;
     signIn: (emailOrUsername: string, password: string) => Promise<void>;
     signUp: (
       email: string,
@@ -30,6 +35,11 @@ type AuthContextValue = {
     ) => Promise<void>;
     signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
+    clearBanBlocked: () => void;
+    submitBanAppeal: (
+      message: string,
+    ) => Promise<{ ok: boolean; reason?: string; error?: string }>;
+    refreshBanAppealStatus: () => Promise<void>;
   };
   
   const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -42,6 +52,61 @@ type AuthContextValue = {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
+    const [banBlocked, setBanBlocked] = useState(false);
+    const [banAppealPending, setBanAppealPending] = useState(false);
+
+    async function refreshBanAppealStatus() {
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
+      const uid = currentSession?.user?.id;
+      if (!uid) {
+        setBanAppealPending(false);
+        return;
+      }
+      const banned = await fetchIsUserBanned(uid);
+      setBanBlocked(banned);
+      if (!banned) {
+        setBanAppealPending(false);
+        return;
+      }
+      const status = await fetchBanAppealStatus();
+      setBanAppealPending(status.pending);
+    }
+
+    async function applySession(nextSession: Session | null) {
+      if (!nextSession?.user?.id) {
+        setSession(null);
+        setUser(null);
+        setBanBlocked(false);
+        setBanAppealPending(false);
+        return;
+      }
+
+      const banned = await fetchIsUserBanned(nextSession.user.id);
+      setSession(nextSession);
+      setUser(nextSession.user);
+      setBanBlocked(banned);
+
+      if (banned) {
+        const status = await fetchBanAppealStatus();
+        setBanAppealPending(status.pending);
+      } else {
+        setBanAppealPending(false);
+      }
+    }
+
+    async function handleSubmitBanAppeal(message: string) {
+      const result = await submitBanAppeal(message);
+      if (result.ok) {
+        setBanAppealPending(true);
+        return { ok: true as const };
+      }
+      if ('reason' in result && result.reason) {
+        return { ok: false as const, reason: result.reason };
+      }
+      return { ok: false as const, error: result.error ?? 'Could not submit appeal' };
+    }
   
     // Initial session load + auth state listener
     useEffect(() => {
@@ -56,8 +121,11 @@ type AuthContextValue = {
         data: authListener,
       } = supabase.auth.onAuthStateChange((_event, session) => {
         if (!isMounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
+        void applySession(session).finally(() => {
+          if (isMounted) {
+            setLoading(false);
+          }
+        });
       });
 
       async function initAuth() {
@@ -81,17 +149,19 @@ type AuthContextValue = {
             console.error('Error getting session', error);
             // Invalid refresh token: clear bad session from storage
             await supabase.auth.signOut({ scope: 'local' });
+            if (!isMounted) return;
             setSession(null);
             setUser(null);
+            setBanBlocked(false);
           } else {
-            setSession(session);
-            setUser(session?.user ?? null);
+            await applySession(session);
           }
         } catch (err) {
           if (isMounted) {
             console.error('Auth init error', err);
             setSession(null);
             setUser(null);
+            setBanBlocked(false);
           }
         } finally {
           if (isMounted) {
@@ -214,6 +284,8 @@ type AuthContextValue = {
 
     async function signOut() {
       await clearPendingPasswordRecovery();
+      setBanBlocked(false);
+      setBanAppealPending(false);
       const { error } = await supabase.auth.signOut();
       if (error) {
         // Invalid token etc: clear local session anyway
@@ -224,15 +296,25 @@ type AuthContextValue = {
       }
       // Listener will clear user/session.
     }
+
+    function clearBanBlocked() {
+      setBanBlocked(false);
+      setBanAppealPending(false);
+    }
   
     const value: AuthContextValue = {
       user,
       session,
       loading,
+      banBlocked,
+      banAppealPending,
       signIn,
       signUp,
       signInWithGoogle,
       signOut,
+      clearBanBlocked,
+      submitBanAppeal: handleSubmitBanAppeal,
+      refreshBanAppealStatus,
     };
   
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

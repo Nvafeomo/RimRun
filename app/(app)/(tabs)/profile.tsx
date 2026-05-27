@@ -17,31 +17,8 @@ import { useProfile } from '../../../context/ProfileContext';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
 import { AvatarImage } from '../../../components/AvatarImage';
-
-/** Edge Functions return JSON `{ error: string }` on failure; `FunctionsHttpError` hides it unless we read `response`. */
-async function messageFromEdgeFunctionFailure(
-  error: unknown,
-  response?: Response,
-): Promise<string> {
-  if (response) {
-    try {
-      const ct = response.headers.get('Content-Type') ?? '';
-      if (ct.includes('application/json')) {
-        const j = (await response.clone().json()) as { error?: string };
-        if (typeof j?.error === 'string' && j.error.trim()) {
-          return j.error;
-        }
-      }
-      const text = (await response.clone().text()).trim();
-      if (text) return text.slice(0, 400);
-    } catch {
-      /* ignore parse errors */
-    }
-    return `Request failed (HTTP ${response.status}).`;
-  }
-  if (error instanceof Error) return error.message;
-  return 'Unknown error';
-}
+import { isAdminRole } from '../../../lib/moderation';
+import { messageFromEdgeFunctionFailure } from '../../../lib/edgeFunctions';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -240,6 +217,20 @@ export default function ProfileScreen() {
 
         <Text style={styles.sectionHeading}>Settings</Text>
         <View style={styles.actionsSection}>
+          {isAdminRole(profile?.role) ? (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => router.push('/(app)/admin/moderation')}
+            >
+              <View style={styles.actionLeft}>
+                <View style={[styles.actionIconWrap, styles.adminIconWrap]}>
+                  <Ionicons name="shield-checkmark-outline" size={20} color={colors.text} />
+                </View>
+                <Text style={styles.actionButtonText}>Moderation</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => router.push('/(app)/account')}
@@ -490,6 +481,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  adminIconWrap: {
+    backgroundColor: colors.primary,
   },
   actionButtonText: {
     color: colors.text,

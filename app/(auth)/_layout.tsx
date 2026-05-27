@@ -5,7 +5,7 @@ import { View, ActivityIndicator, Text } from 'react-native';
 import { colors } from '../../constants/theme';
 
 export default function AuthLayout() {
-  const { user, loading } = useAuth();
+  const { user, loading, banBlocked } = useAuth();
   const segments = useSegments();
 
   if (loading) {
@@ -15,6 +15,10 @@ export default function AuthLayout() {
         <Text style={{ marginTop: 12, color: colors.textSecondary, fontSize: 16 }}>Loading...</Text>
       </View>
     );
+  }
+
+  if (banBlocked) {
+    return <Redirect href="/(banned)" />;
   }
 
   // Router guard: if user is logged in and on login/signup/reset-password, redirect to app

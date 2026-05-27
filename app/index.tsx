@@ -6,7 +6,7 @@ import { colors } from '../constants/theme';
 import { hasPendingPasswordRecovery } from '../lib/supabaseAuthDeepLink';
 
 export default function Index() {
-  const { user, loading } = useAuth();
+  const { user, loading, banBlocked } = useAuth();
   const [recoveryPending, setRecoveryPending] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -35,6 +35,10 @@ export default function Index() {
         <Text style={{ marginTop: 12, color: colors.textSecondary, fontSize: 16 }}>Loading...</Text>
       </View>
     );
+  }
+
+  if (banBlocked) {
+    return <Redirect href="/(banned)" />;
   }
 
   if (user && recoveryPending) {

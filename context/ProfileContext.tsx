@@ -18,7 +18,7 @@ import { useAuth } from './AuthContext';
 const PROFILE_SELECT_BASE =
   'profile_image_url, date_of_birth, username, email' as const;
 const PROFILE_SELECT_WITH_PRIVACY =
-  `${PROFILE_SELECT_BASE}, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added, messages_only_from_friends, username_searchable, chat_suspended_until, auto_suspension_count` as const;
+  `${PROFILE_SELECT_BASE}, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added, messages_only_from_friends, username_searchable, chat_suspended_until, auto_suspension_count, role` as const;
 
 function isUndefinedColumnError(err: unknown): boolean {
   if (err && typeof err === 'object' && 'code' in err) {
@@ -67,6 +67,7 @@ export type ProfileDbRow = {
   username_searchable?: boolean;
   chat_suspended_until?: string | null;
   auto_suspension_count?: number;
+  role?: string | null;
 };
 
 export type Profile = {
@@ -87,6 +88,8 @@ export type Profile = {
   /** When in the future, server blocks sending chat messages (RLS). */
   chat_suspended_until?: string | null;
   auto_suspension_count?: number;
+  /** user | admin — from user-bans migration */
+  role?: string | null;
 } | null;
 
 type ProfileContextValue = {
