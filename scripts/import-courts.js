@@ -57,6 +57,15 @@ function parseIsPrivate(access) {
   return privateValues.includes(String(access).toLowerCase());
 }
 
+/** OSM `indoor=*` and common covered-court tags. */
+function parseIsIndoor(props) {
+  if (!props) return false;
+  const indoor = String(props.indoor ?? '').toLowerCase();
+  if (indoor === 'yes' || indoor === 'room') return true;
+  if (String(props.covered ?? '').toLowerCase() === 'yes') return true;
+  return false;
+}
+
 function parseHoops(hoops) {
   if (hoops == null) return null;
   const n = parseInt(String(hoops), 10);
@@ -89,6 +98,7 @@ function geojsonToCourt(feature) {
     longitude: lng,
     hoops: parseHoops(p.hoops ?? p.courts),
     is_private: parseIsPrivate(p.access),
+    is_indoor: parseIsIndoor(p),
     source: 'osm',
     confidence: 1.0,
   };

@@ -92,28 +92,58 @@ export function maxBirthDateForMinAge(reference: Date = new Date()): Date {
 }
 
 /**
- * One-way check: does `viewerAge` policy allow interacting with someone aged `partnerAge`?
+ * One-way check: does `viewerAge`'s policy allow interacting with `partnerAge`?
  * Assumes both users are app-eligible (>= 13). Mutual consent = both directions must pass.
  *
- * **DMs and non-court social only** — not for court-associated thread visibility; see policy doc Section 5.
+ * **DMs, friendships, non-court group chats** — and the same pairwise logic informs
+ * court thread visibility (`court_pair_message_visible` in Postgres). Details:
+ * `docs/personal/rimrun-age-safety-brackets.tex` (golden rule + verified professionals).
  *
- * Matches `docs/personal/rimrun-age-safety-brackets.tex` Section 2 (mutual rule):
- * - viewer 13–17: partner in [max(13, viewer−3), viewer+3]
- * - viewer 18+: partner >= 16
+ * Rules (viewer perspective):
+ * - Both 13–17: partner in [max(13, viewer−3), viewer+3].
+ * - Minor viewer + adult partner: partner must be a verified professional (coach/trainer/mentor).
+ * - Adult viewer + minor partner: viewer must be a verified professional.
+ * - Adult + adult (18+): allowed.
  *
- * Replicate the same predicates in database RLS or RPCs when enforcing server-side.
+ * `verifiedProfessional` defaults to false — server field `profiles.verified_professional`
+ * gates adult–minor contact.
  */
-export function allowsPartnerAge(viewerAge: number, partnerAge: number): boolean {
+export function allowsPartnerAge(
+  viewerAge: number,
+  partnerAge: number,
+  viewerVerifiedProfessional = false,
+  partnerVerifiedProfessional = false,
+): boolean {
   if (viewerAge < MIN_ACCOUNT_AGE || partnerAge < MIN_ACCOUNT_AGE) return false;
 
-  if (viewerAge <= 17) {
+  const viewerMinor = viewerAge <= 17;
+  const partnerMinor = partnerAge <= 17;
+
+  if (viewerMinor && partnerMinor) {
     const low = Math.max(MIN_ACCOUNT_AGE, viewerAge - 3);
     const high = viewerAge + 3;
     return partnerAge >= low && partnerAge <= high;
   }
-  return partnerAge >= 16;
+
+  if (viewerMinor && !partnerMinor) {
+    return partnerVerifiedProfessional;
+  }
+
+  if (!viewerMinor && partnerMinor) {
+    return viewerVerifiedProfessional;
+  }
+
+  return true;
 }
 
-export function mutualInteractionAllowed(ageA: number, ageB: number): boolean {
-  return allowsPartnerAge(ageA, ageB) && allowsPartnerAge(ageB, ageA);
+export function mutualInteractionAllowed(
+  ageA: number,
+  ageB: number,
+  verifiedProfessionalA = false,
+  verifiedProfessionalB = false,
+): boolean {
+  return (
+    allowsPartnerAge(ageA, ageB, verifiedProfessionalA, verifiedProfessionalB) &&
+    allowsPartnerAge(ageB, ageA, verifiedProfessionalB, verifiedProfessionalA)
+  );
 }

@@ -20,6 +20,10 @@ import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
+import {
+  CourtDetailTags,
+  buildCoreCourtDetailTags,
+} from "../../../components/CourtDetailTags";
 
 type Court = {
   id: string;
@@ -29,6 +33,8 @@ type Court = {
   longitude: number;
   hoops: number | null;
   is_private: boolean | null;
+  is_indoor: boolean | null;
+  source: string | null;
   created_by: string | null;
 };
 
@@ -61,7 +67,7 @@ export default function CourtDetailScreen() {
       const [courtRes, subRes] = await Promise.all([
         supabase
           .from("courts")
-          .select("id, name, address, latitude, longitude, hoops, is_private, created_by")
+          .select("id, name, address, latitude, longitude, hoops, is_private, is_indoor, source, created_by")
           .eq("id", courtId)
           .single(),
         fetchSubscription(),
@@ -250,12 +256,6 @@ export default function CourtDetailScreen() {
               <Text style={styles.detailText}>{court.address}</Text>
             </View>
           )}
-          {court.is_private && (
-            <View style={styles.detailRow}>
-              <Ionicons name="lock-closed" size={20} color={colors.primary} />
-              <Text style={styles.detailText}>Private court</Text>
-            </View>
-          )}
           <Pressable
             onPress={handleOpenInMaps}
             style={styles.openInMapsButton}
@@ -264,6 +264,8 @@ export default function CourtDetailScreen() {
             <Text style={styles.openInMapsText}>Open in Maps</Text>
           </Pressable>
         </View>
+
+        <CourtDetailTags tags={buildCoreCourtDetailTags(court)} />
 
         <Pressable
           onPress={handleSubscribe}

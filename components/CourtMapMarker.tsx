@@ -3,6 +3,7 @@ import {
   View,
   Image,
   Text,
+  StyleSheet,
   StyleProp,
   TextStyle,
   ViewStyle,
@@ -10,6 +11,7 @@ import {
 } from "react-native";
 import { Marker, Callout } from "react-native-maps";
 import { router } from "expo-router";
+import { colors, spacing, borderRadius } from "../constants/theme";
 
 export type CourtMapMarkerCourt = {
   id: string;
@@ -19,6 +21,7 @@ export type CourtMapMarkerCourt = {
   longitude: number;
   hoops: number | null;
   is_private: boolean | null;
+  is_indoor: boolean | null;
 };
 
 type BubbleStyles = {
@@ -32,6 +35,16 @@ type BubbleProps = BubbleStyles & {
   court: CourtMapMarkerCourt;
   getDisplayName: (id: string, fallback: string) => string;
 };
+
+function CourtCalloutVenueTag({ isIndoor }: { isIndoor: boolean }) {
+  return (
+    <View style={calloutTagStyles.pill}>
+      <Text style={calloutTagStyles.pillText}>
+        {isIndoor ? "Indoor" : "Outdoor"}
+      </Text>
+    </View>
+  );
+}
 
 /** Shared copy for iOS Map Callout and Android floating card (native InfoWindow is unreliable on Android). */
 export function CourtCalloutBubbleContent({
@@ -55,6 +68,7 @@ export function CourtCalloutBubbleContent({
         : {})}
     >
       <Text style={calloutTitle}>{displayName}</Text>
+      <CourtCalloutVenueTag isIndoor={Boolean(court.is_indoor)} />
       {court.hoops != null && (
         <Text style={calloutText}>
           {court.hoops} hoop{court.hoops !== 1 ? "s" : ""}
@@ -65,7 +79,9 @@ export function CourtCalloutBubbleContent({
           {court.address}
         </Text>
       )}
-      {court.is_private && <Text style={calloutText}>Private</Text>}
+      {court.is_private ? (
+        <Text style={calloutText}>Private</Text>
+      ) : null}
       <Text style={calloutHint}>Tap to view court →</Text>
     </View>
   );
@@ -164,3 +180,27 @@ function CourtMapMarkerInner({
 }
 
 export default memo(CourtMapMarkerInner);
+
+const calloutTagStyles = StyleSheet.create({
+  pill: {
+    alignSelf: "flex-start",
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+    minWidth: 68,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary,
+    borderWidth: 1.5,
+    borderColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.text,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+});

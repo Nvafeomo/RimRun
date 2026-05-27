@@ -99,6 +99,7 @@ export default function AddCourtScreen() {
   const [address, setAddress] = useState("");
   const [hoopsRaw, setHoopsRaw] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isIndoor, setIsIndoor] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
 
@@ -276,6 +277,7 @@ export default function AddCourtScreen() {
         longitude: coords.longitude,
         hoops,
         is_private: isPrivate,
+        is_indoor: isIndoor,
         osm_id: null,
         osm_type: null,
         source: "user",
@@ -406,6 +408,16 @@ export default function AddCourtScreen() {
             placeholderTextColor={colors.textMuted}
             keyboardType="number-pad"
           />
+
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Indoor court</Text>
+            <Switch
+              value={isIndoor}
+              onValueChange={setIsIndoor}
+              trackColor={{ false: colors.border, true: colors.primaryDark }}
+              thumbColor={colors.text}
+            />
+          </View>
 
           <View style={styles.switchRow}>
             <Text style={styles.label}>Private / restricted access</Text>

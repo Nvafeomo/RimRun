@@ -175,6 +175,7 @@ type Court = {
   longitude: number;
   hoops: number | null;
   is_private: boolean | null;
+  is_indoor: boolean | null;
 };
 
 const styles = StyleSheet.create({
@@ -578,7 +579,7 @@ export default function CourtsScreen() {
 
         const { data, error } = await supabase
           .from("courts")
-          .select("id, name, address, latitude, longitude, hoops, is_private")
+          .select("id, name, address, latitude, longitude, hoops, is_private, is_indoor")
           .gte("latitude", minLat)
           .lte("latitude", maxLat)
           .gte("longitude", minLng)
