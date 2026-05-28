@@ -40,6 +40,7 @@ Add a `.env` in the project root with your Supabase values (keep real keys out o
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY=your-google-maps-android-api-key
 ```
 
 Restart the dev server after editing env vars.
@@ -68,7 +69,7 @@ Personal roadmap notes are kept in `future-features.tex` under a local personal 
 
 **Nvafeomo K. Konneh**
 
-- **Email:** [nvafeomo05@gmail.com](mailto:nvafeomo05@gmail.com)
+- **Email:** [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com)
 - **Phone:** 267-461-8268
 - **LinkedIn:** [Nvafeomo Konneh](https://www.linkedin.com/in/nvafeomo-konneh-a6a1a9367)
 

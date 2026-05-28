@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from "react";
+import React, { memo, useCallback, useRef, useState } from "react";
 import {
   View,
   Image,
@@ -22,6 +22,8 @@ export type CourtMapMarkerCourt = {
   hoops: number | null;
   is_private: boolean | null;
   is_indoor: boolean | null;
+  verified?: boolean;
+  flagged_for_review?: boolean;
 };
 
 type BubbleStyles = {
@@ -68,7 +70,18 @@ export function CourtCalloutBubbleContent({
         : {})}
     >
       <Text style={calloutTitle}>{displayName}</Text>
-      <CourtCalloutVenueTag isIndoor={Boolean(court.is_indoor)} />
+      <View style={calloutTagStyles.tagRow}>
+        <CourtCalloutVenueTag isIndoor={Boolean(court.is_indoor)} />
+        {court.flagged_for_review ? (
+          <View style={[calloutTagStyles.pill, calloutTagStyles.pillFlagged]}>
+            <Text style={calloutTagStyles.pillTextDark}>Flagged</Text>
+          </View>
+        ) : court.verified ? (
+          <View style={[calloutTagStyles.pill, calloutTagStyles.pillVerified]}>
+            <Text style={calloutTagStyles.pillTextDark}>Verified</Text>
+          </View>
+        ) : null}
+      </View>
       {court.hoops != null && (
         <Text style={calloutText}>
           {court.hoops} hoop{court.hoops !== 1 ? "s" : ""}
@@ -109,21 +122,26 @@ function CourtMapMarkerInner({
 }: Props) {
   /**
    * Android Google Maps rasterizes custom marker views once; with `tracksViewChanges={false}`
-   * it often snapshots before the Image paints → invisible pins. iOS is fine with false.
+   * it often snapshots before the Image paints → invisible pins. Flip true for one frame on load.
    */
-  const [tracksViewChanges, setTracksViewChanges] = useState(
-    () => Platform.OS === "android",
-  );
+  const [tracksViewChanges, setTracksViewChanges] = useState(false);
 
-  useEffect(() => {
+  const handleImageLoad = useCallback(() => {
     if (Platform.OS !== "android") return;
-    const t = setTimeout(() => setTracksViewChanges(false), 800);
-    return () => clearTimeout(t);
+    setTracksViewChanges(true);
+    requestAnimationFrame(() => setTracksViewChanges(false));
   }, []);
 
-  const goToCourt = () => {
+  const navigatingRef = useRef(false);
+
+  const goToCourt = useCallback(() => {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
     router.push(`/(app)/court/${court.id}`);
-  };
+    setTimeout(() => {
+      navigatingRef.current = false;
+    }, 600);
+  }, [court.id]);
 
   const bubbleProps: BubbleProps = {
     court,
@@ -149,9 +167,7 @@ function CourtMapMarkerInner({
           source={require("../assets/rimrun-logo.png")}
           style={{ width: pinWidth, height: pinHeight }}
           resizeMode="contain"
-          onLoad={() => {
-            setTimeout(() => setTracksViewChanges(false), 120);
-          }}
+          onLoad={handleImageLoad}
         />
       </Marker>
     );
@@ -164,8 +180,7 @@ function CourtMapMarkerInner({
         longitude: court.longitude,
       }}
       anchor={{ x: 0.5, y: 1 }}
-      tracksViewChanges={tracksViewChanges}
-      onCalloutPress={goToCourt}
+      tracksViewChanges={false}
     >
       <Image
         source={require("../assets/rimrun-logo.png")}
@@ -182,10 +197,15 @@ function CourtMapMarkerInner({
 export default memo(CourtMapMarkerInner);
 
 const calloutTagStyles = StyleSheet.create({
-  pill: {
-    alignSelf: "flex-start",
+  tagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
     marginTop: spacing.xs,
     marginBottom: spacing.xs,
+  },
+  pill: {
+    alignSelf: "flex-start",
     minWidth: 68,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: spacing.xs + 2,
@@ -196,7 +216,22 @@ const calloutTagStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  pillVerified: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  pillFlagged: {
+    backgroundColor: colors.error,
+    borderColor: colors.error,
+  },
   pillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.text,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  pillTextDark: {
     fontSize: 11,
     fontWeight: "700",
     color: colors.text,

@@ -5,6 +5,7 @@ export type CourtDetailTagVariant =
   | "default"
   | "positive"
   | "warning"
+  | "danger"
   | "muted"
   | "primary";
 
@@ -36,6 +37,11 @@ const variantStyles: Record<
     bg: "rgba(232, 93, 4, 0.12)",
     border: "rgba(232, 93, 4, 0.35)",
     text: colors.primaryLight,
+  },
+  danger: {
+    bg: "rgba(239, 68, 68, 0.14)",
+    border: "rgba(239, 68, 68, 0.45)",
+    text: colors.error,
   },
   muted: {
     bg: colors.surface,
@@ -78,34 +84,40 @@ export function CourtDetailTags({ tags }: Props) {
   );
 }
 
-/** Until `courts.is_verified` exists, treat OSM/import rows as verified; user submissions as not. */
-export function courtIsVerified(source: string | null | undefined): boolean {
-  return (source ?? "osm") !== "user";
-}
-
+/** Tags from community `verified` / `flagged_for_review` columns on courts. */
 export function buildCoreCourtDetailTags(court: {
+  verified?: boolean | null;
+  flagged_for_review?: boolean | null;
   is_private: boolean | null;
   is_indoor: boolean | null;
-  source?: string | null;
 }): CourtDetailTagItem[] {
-  const verified = courtIsVerified(court.source);
-  return [
+  const tags: CourtDetailTagItem[] = [
     {
-      key: "verified",
-      label: verified ? "Verified" : "Unverified",
-      variant: verified ? "positive" : "warning",
+      key: 'verified',
+      label: court.verified ? 'Verified' : 'Unverified',
+      variant: court.verified ? 'positive' : 'warning',
     },
     {
-      key: "access",
-      label: court.is_private ? "Private" : "Public",
-      variant: court.is_private ? "warning" : "default",
+      key: 'access',
+      label: court.is_private ? 'Private' : 'Public',
+      variant: court.is_private ? 'warning' : 'default',
     },
     {
-      key: "indoor",
-      label: court.is_indoor ? "Indoor" : "Outdoor",
-      variant: court.is_indoor ? "default" : "primary",
+      key: 'indoor',
+      label: court.is_indoor ? 'Indoor' : 'Outdoor',
+      variant: court.is_indoor ? 'default' : 'primary',
     },
   ];
+
+  if (court.flagged_for_review) {
+    tags.push({
+      key: 'flagged',
+      label: 'Flagged',
+      variant: 'danger',
+    });
+  }
+
+  return tags;
 }
 
 const styles = StyleSheet.create({
@@ -113,17 +125,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
-    marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
   chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
     borderRadius: borderRadius.full,
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
   chipText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
+    letterSpacing: 0.2,
   },
 });

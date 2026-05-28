@@ -78,6 +78,6 @@ We may update this Privacy Policy from time to time. We will post the updated po
 
 ## Contact us
 
-If you have questions about this Privacy Policy or our practices, **please email:** [nvafeomo05@gmail.com](mailto:nvafeomo05@gmail.com).
+If you have questions about this Privacy Policy or our practices, **please email:** [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com).
 
 **Mailing address:** Upper Darby, PA, United States.

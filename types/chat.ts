@@ -14,6 +14,8 @@ export type Message = {
   sender_id: string;
   content: string;
   created_at: string;
+  edited_at?: string | null;
+  deleted_at?: string | null;
   sender?: {
     username: string | null;
     profile_image_url: string | null;

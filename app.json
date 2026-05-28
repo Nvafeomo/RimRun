@@ -52,8 +52,15 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "CAMERA",
-        "READ_MEDIA_IMAGES"
+        "READ_MEDIA_IMAGES",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ],
+      "config": {
+        "googleMaps": {
+          "apiKey": ""
+        }
+      },
       "package": "com.nvafeomo.RimRun"
     },
     "web": {

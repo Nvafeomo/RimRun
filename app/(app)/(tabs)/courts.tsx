@@ -47,7 +47,16 @@ const MAP_DELTA_NEAR_USER = 0.52;
 const DEFAULT_RADIUS_MILES = 15;
 
 /** If the last load was centered on the user, refetch when GPS moves farther than this (miles). */
-const REFETCH_MOVE_MILES = 8;
+const REFETCH_MOVE_MILES = 10;
+
+/** Skip refetch when anchor moved less than this since last successful load (miles). */
+const MIN_ANCHOR_SHIFT_MILES = 1.5;
+
+/** Minimum time between court fetches (ms). */
+const MIN_REFETCH_INTERVAL_MS = 2500;
+
+/** Debounce GPS-driven refetch checks (ms). */
+const GPS_REFETCH_DEBOUNCE_MS = 3000;
 
 /** Max courts shown on map / list after distance sort (keeps RN Maps responsive). */
 const MAX_COURTS_SHOWN = 300;
@@ -56,9 +65,11 @@ const MAX_COURTS_SHOWN = 300;
  * Bbox fallback only (when RPC is missing): max rows from PostgREST before radius filter.
  * Not “nearest N”—arbitrary subset of bbox—so keep RPC deployed; see scripts/courts-within-radius-rpc.sql.
  */
-const FETCH_ROW_CAP = 3_000;
+const FETCH_ROW_CAP = 500;
 
-const REVEAL_MARKERS_PER_FRAME = 36;
+/** Instant pin paint for typical loads; stagger only for very large result sets. */
+const INSTANT_MARKER_REVEAL_MAX = 120;
+const REVEAL_MARKERS_PER_FRAME = 80;
 
 const PIN_WIDTH = 36;
 const PIN_HEIGHT = 44;
@@ -176,6 +187,8 @@ type Court = {
   hoops: number | null;
   is_private: boolean | null;
   is_indoor: boolean | null;
+  verified?: boolean;
+  flagged_for_review?: boolean;
 };
 
 const styles = StyleSheet.create({
@@ -508,6 +521,7 @@ export default function CourtsScreen() {
   } | null>(null);
   const mapSlotLayoutRef = useRef({ width: 0, height: 0 });
   const androidSelectedCourtRef = useRef<Court | null>(null);
+  const openingCourtFromMapRef = useRef(false);
 
   const [locationQuery, setLocationQuery] = useState("");
   const [milesInput, setMilesInput] = useState(String(DEFAULT_RADIUS_MILES));
@@ -532,6 +546,16 @@ export default function CourtsScreen() {
   );
   const lastFetchWasUserAnchoredRef = useRef(false);
   const moveRefetchInFlightRef = useRef(false);
+  const lastFetchMetaRef = useRef({
+    at: 0,
+    lat: 0,
+    lng: 0,
+    radius: 0,
+  });
+  const gpsRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingGpsRef = useRef<{ latitude: number; longitude: number } | null>(
+    null,
+  );
 
   const loadCourtsAtAnchor = useCallback(
     async (
@@ -543,8 +567,7 @@ export default function CourtsScreen() {
       radiusMilesRef.current = radiusMiles;
 
       setCourtsLoading(true);
-      setSortedCourts([]);
-      setVisibleCourts([]);
+      // Keep existing pins visible while fetching (stale-while-revalidate).
 
       const { data: rpcData, error: rpcError } = await supabase.rpc(
         "courts_within_radius_miles",
@@ -559,17 +582,20 @@ export default function CourtsScreen() {
         return false;
       }
 
-      let rows: Court[] = [];
-
       if (!rpcError && Array.isArray(rpcData)) {
-        rows = rpcData as Court[];
-      } else {
-        if (rpcError) {
-          console.warn(
-            "courts_within_radius_miles unavailable (run scripts/courts-within-radius-rpc.sql); using bbox fallback:",
-            rpcError.message
-          );
-        }
+        setSortedCourts((rpcData as Court[]).slice(0, MAX_COURTS_SHOWN));
+        setCourtsLoading(false);
+        return true;
+      }
+
+      if (rpcError) {
+        console.warn(
+          "courts_within_radius_miles unavailable (run scripts/courts-within-radius-rpc.sql); using bbox fallback:",
+          rpcError.message
+        );
+      }
+
+      {
         const { minLat, maxLat, minLng, maxLng } = boundingBoxForRadiusMiles(
           centerLat,
           centerLng,
@@ -579,7 +605,7 @@ export default function CourtsScreen() {
 
         const { data, error } = await supabase
           .from("courts")
-          .select("id, name, address, latitude, longitude, hoops, is_private, is_indoor")
+          .select("id, name, address, latitude, longitude, hoops, is_private, is_indoor, verified, flagged_for_review")
           .gte("latitude", minLat)
           .lte("latitude", maxLat)
           .gte("longitude", minLng)
@@ -596,28 +622,20 @@ export default function CourtsScreen() {
           return false;
         }
 
-        rows = (data ?? []) as Court[];
+        const rows = (data ?? []) as Court[];
+        const withDist = rows.map((c) => ({
+          c,
+          d: haversineMiles(centerLat, centerLng, c.latitude, c.longitude),
+        }));
+        withDist.sort((a, b) => a.d - b.d);
+        const inRadius = withDist
+          .filter(({ d }) => d <= radiusMiles)
+          .map(({ c }) => c);
+
+        setSortedCourts(inRadius.slice(0, MAX_COURTS_SHOWN));
+        setCourtsLoading(false);
+        return true;
       }
-
-      const inRadius = rows.filter((c) => {
-        const d = haversineMiles(
-          centerLat,
-          centerLng,
-          c.latitude,
-          c.longitude
-        );
-        return d <= radiusMiles;
-      });
-
-      inRadius.sort(
-        (a, b) =>
-          haversineMiles(centerLat, centerLng, a.latitude, a.longitude) -
-          haversineMiles(centerLat, centerLng, b.latitude, b.longitude)
-      );
-
-      setSortedCourts(inRadius.slice(0, MAX_COURTS_SHOWN));
-      setCourtsLoading(false);
-      return true;
     },
     []
   );
@@ -629,7 +647,24 @@ export default function CourtsScreen() {
       radiusMiles: number;
       userAnchored: boolean;
       animateMap: boolean;
+      force?: boolean;
     }) => {
+      const last = lastFetchMetaRef.current;
+      const now = Date.now();
+      if (!opts.force) {
+        if (now - last.at < MIN_REFETCH_INTERVAL_MS) {
+          return;
+        }
+        if (
+          last.at > 0 &&
+          last.radius === opts.radiusMiles &&
+          haversineMiles(opts.anchorLat, opts.anchorLng, last.lat, last.lng) <
+            MIN_ANCHOR_SHIFT_MILES
+        ) {
+          return;
+        }
+      }
+
       const requestId = ++fetchRequestIdRef.current;
       const ok = await loadCourtsAtAnchor(
         opts.anchorLat,
@@ -640,6 +675,12 @@ export default function CourtsScreen() {
       if (!ok) {
         return;
       }
+      lastFetchMetaRef.current = {
+        at: Date.now(),
+        lat: opts.anchorLat,
+        lng: opts.anchorLng,
+        radius: opts.radiusMiles,
+      };
       lastFetchAnchorRef.current = {
         lat: opts.anchorLat,
         lng: opts.anchorLng,
@@ -685,6 +726,7 @@ export default function CourtsScreen() {
       radiusMiles,
       userAnchored: true,
       animateMap: false,
+      force: true,
     });
     // Intentionally omit milesInput/userLocation: run once when map region is ready; GPS and region are set together when permission is granted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -696,13 +738,18 @@ export default function CourtsScreen() {
       return;
     }
 
+    if (sortedCourts.length <= INSTANT_MARKER_REVEAL_MAX) {
+      setVisibleCourts(sortedCourts);
+      return;
+    }
+
     let index = 0;
     let raf = 0;
 
     const tick = () => {
       index = Math.min(
         sortedCourts.length,
-        index + REVEAL_MARKERS_PER_FRAME
+        index + REVEAL_MARKERS_PER_FRAME,
       );
       setVisibleCourts(sortedCourts.slice(0, index));
       if (index < sortedCourts.length) {
@@ -710,8 +757,8 @@ export default function CourtsScreen() {
       }
     };
 
-    setVisibleCourts([]);
-    index = 0;
+    index = REVEAL_MARKERS_PER_FRAME;
+    setVisibleCourts(sortedCourts.slice(0, index));
     raf = requestAnimationFrame(tick);
 
     return () => {
@@ -757,41 +804,56 @@ export default function CourtsScreen() {
           const latitude = loc.coords.latitude;
           const longitude = loc.coords.longitude;
           setUserLocation({ latitude, longitude });
+          pendingGpsRef.current = { latitude, longitude };
 
-          const anchor = lastFetchAnchorRef.current;
-          if (
-            !lastFetchWasUserAnchoredRef.current ||
-            !anchor ||
-            moveRefetchInFlightRef.current
-          ) {
-            return;
+          if (gpsRefetchTimerRef.current) {
+            clearTimeout(gpsRefetchTimerRef.current);
           }
-          const dist = haversineMiles(
-            latitude,
-            longitude,
-            anchor.lat,
-            anchor.lng
-          );
-          if (dist < REFETCH_MOVE_MILES) {
-            return;
-          }
-          moveRefetchInFlightRef.current = true;
-          const r = radiusMilesRef.current;
-          void runCourtsSearchRef
-            .current({
-              anchorLat: latitude,
-              anchorLng: longitude,
-              radiusMiles: r,
-              userAnchored: true,
-              animateMap: false,
-            })
-            .finally(() => {
-              moveRefetchInFlightRef.current = false;
-            });
+          gpsRefetchTimerRef.current = setTimeout(() => {
+            gpsRefetchTimerRef.current = null;
+            const pending = pendingGpsRef.current;
+            if (!pending) return;
+
+            const anchor = lastFetchAnchorRef.current;
+            if (
+              !lastFetchWasUserAnchoredRef.current ||
+              !anchor ||
+              moveRefetchInFlightRef.current
+            ) {
+              return;
+            }
+            const dist = haversineMiles(
+              pending.latitude,
+              pending.longitude,
+              anchor.lat,
+              anchor.lng
+            );
+            if (dist < REFETCH_MOVE_MILES) {
+              return;
+            }
+            moveRefetchInFlightRef.current = true;
+            const r = radiusMilesRef.current;
+            void runCourtsSearchRef
+              .current({
+                anchorLat: pending.latitude,
+                anchorLng: pending.longitude,
+                radiusMiles: r,
+                userAnchored: true,
+                animateMap: false,
+              })
+              .finally(() => {
+                moveRefetchInFlightRef.current = false;
+              });
+          }, GPS_REFETCH_DEBOUNCE_MS);
         }
       );
     })();
-    return () => locationSubRef.current?.remove();
+    return () => {
+      locationSubRef.current?.remove();
+      if (gpsRefetchTimerRef.current) {
+        clearTimeout(gpsRefetchTimerRef.current);
+      }
+    };
   }, []);
 
   const handleCourtsSearch = useCallback(async () => {
@@ -812,6 +874,7 @@ export default function CourtsScreen() {
         radiusMiles,
         userAnchored: true,
         animateMap: true,
+        force: true,
       });
       return;
     }
@@ -825,6 +888,7 @@ export default function CourtsScreen() {
         radiusMiles,
         userAnchored: false,
         animateMap: true,
+        force: true,
       });
       return;
     }
@@ -850,6 +914,7 @@ export default function CourtsScreen() {
           radiusMiles,
           userAnchored: false,
           animateMap: true,
+          force: true,
         });
         return;
       }
@@ -878,6 +943,7 @@ export default function CourtsScreen() {
         radiusMiles,
         userAnchored: false,
         animateMap: true,
+        force: true,
       });
     },
     [milesInput, runCourtsSearch]
@@ -893,6 +959,19 @@ export default function CourtsScreen() {
 
   const clearAndroidCourtSelection = useCallback(() => {
     setAndroidSelectedCourt(null);
+  }, []);
+
+  const openCourtFromMap = useCallback((court: Court) => {
+    if (openingCourtFromMapRef.current) return;
+    openingCourtFromMapRef.current = true;
+    setAndroidSelectedCourt(null);
+    router.push({
+      pathname: "/(app)/court/[courtId]",
+      params: { courtId: court.id },
+    });
+    setTimeout(() => {
+      openingCourtFromMapRef.current = false;
+    }, 600);
   }, []);
 
   const updateAndroidBubblePosition = useCallback(async () => {
@@ -990,6 +1069,7 @@ export default function CourtsScreen() {
         radiusMiles,
         userAnchored: true,
         animateMap: false,
+        force: true,
       });
     };
 
@@ -1195,9 +1275,7 @@ export default function CourtsScreen() {
             >
               <View style={styles.androidCourtBubbleCard}>
                 <Pressable
-                  onPress={() =>
-                    router.push(`/(app)/court/${androidSelectedCourt.id}`)
-                  }
+                  onPress={() => openCourtFromMap(androidSelectedCourt)}
                   accessibilityRole="button"
                   accessibilityLabel="Open court details"
                 >

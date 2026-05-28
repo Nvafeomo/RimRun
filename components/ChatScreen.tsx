@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,8 @@ import { useAuth } from "../hooks/useAuth";
 import { useProfile } from "../context/ProfileContext";
 import { AvatarImage } from "./AvatarImage";
 import { colors, spacing, borderRadius } from "../constants/theme";
+import { checkMessageClient } from "../lib/chatModeration";
+import { canEditMessage, canUnsendMessage } from "../lib/chatMessageActions";
 import type { Message } from "../types/chat";
 
 type ChatScreenProps = {
@@ -41,26 +44,115 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
   const router = useRouter();
   const { user } = useAuth();
   const { profile } = useProfile();
-  const { messages, loading, sending, typingUsers, sendMessage, sendTyping } =
-    useConversationChat(conversationId);
+  const {
+    messages,
+    loading,
+    sending,
+    typingUsers,
+    sendMessage,
+    editMessage,
+    unsendMessage,
+    sendTyping,
+  } = useConversationChat(conversationId);
   const [inputText, setInputText] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }
-  }, [messages.length]);
+  const cancelEditing = () => {
+    setEditingMessage(null);
+    setInputText("");
+    setSendError(null);
+  };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = inputText.trim();
     if (!trimmed || sending) return;
-    sendMessage(trimmed);
+
+    setSendError(null);
+
+    const clientCheck = checkMessageClient(trimmed);
+    if (clientCheck.blocked) {
+      setSendError(clientCheck.reason);
+      return;
+    }
+
+    if (editingMessage) {
+      const result = await editMessage(editingMessage.id, trimmed);
+      if (!result.ok) {
+        setSendError(
+          result.blocked
+            ? result.reason ?? "Message blocked."
+            : result.error ?? "Could not edit message.",
+        );
+        return;
+      }
+      cancelEditing();
+      return;
+    }
+
+    const result = await sendMessage(trimmed);
+    if (!result.ok) {
+      setSendError(
+        result.blocked
+          ? result.reason
+          : result.error ?? "Could not send message.",
+      );
+      return;
+    }
+
     setInputText("");
+    setSendError(null);
+  };
+
+  const openMessageActions = (message: Message) => {
+    if (message.sender_id !== user?.id || message.deleted_at) return;
+
+    const buttons: {
+      text: string;
+      onPress?: () => void;
+      style?: "cancel" | "destructive" | "default";
+    }[] = [];
+
+    if (canEditMessage(message)) {
+      buttons.push({
+        text: "Edit",
+        onPress: () => {
+          setEditingMessage(message);
+          setInputText(message.content);
+          setSendError(null);
+        },
+      });
+    }
+
+    if (canUnsendMessage(message)) {
+      buttons.push({
+        text: "Unsend",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            const result = await unsendMessage(message.id);
+            if (!result.ok) {
+              setSendError(result.error ?? "Could not unsend message.");
+            }
+            if (editingMessage?.id === message.id) {
+              cancelEditing();
+            }
+          })();
+        },
+      });
+    }
+
+    buttons.push({ text: "Cancel", style: "cancel" });
+
+    Alert.alert("Message", undefined, buttons);
   };
 
   const handleChangeText = (text: string) => {
     setInputText(text);
+    if (sendError) {
+      setSendError(null);
+    }
     sendTyping();
   };
 
@@ -99,6 +191,60 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
     );
   };
 
+  const renderMessageBubble = (
+    item: Message,
+    isOwn: boolean,
+  ) => {
+    if (item.deleted_at) {
+      return (
+        <View
+          style={[
+            styles.bubble,
+            isOwn ? styles.bubbleOwn : styles.bubbleOther,
+            styles.bubbleDeleted,
+          ]}
+        >
+          <Ionicons name="trash-outline" size={13} color={colors.textMuted} />
+          <Text style={styles.deletedText}>Message deleted</Text>
+        </View>
+      );
+    }
+
+    return (
+      <Pressable
+        onLongPress={() => isOwn && openMessageActions(item)}
+        delayLongPress={350}
+        disabled={!isOwn}
+      >
+        <View
+          style={[
+            styles.bubble,
+            isOwn ? styles.bubbleOwn : styles.bubbleOther,
+          ]}
+        >
+          <Text
+            style={[
+              styles.messageText,
+              isOwn ? styles.messageTextOwn : styles.messageTextOther,
+            ]}
+          >
+            {item.content}
+          </Text>
+          {item.edited_at ? (
+            <Text
+              style={[
+                styles.editedTag,
+                isOwn ? styles.editedTagOwn : styles.editedTagOther,
+              ]}
+            >
+              (edited)
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+    );
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isOwn = item.sender_id === user?.id;
     const displayName = isOwn
@@ -119,11 +265,7 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
                 {displayName}
               </Text>
             </Pressable>
-            <View style={[styles.bubble, styles.bubbleOwn]}>
-              <Text style={[styles.messageText, styles.messageTextOwn]}>
-                {item.content}
-              </Text>
-            </View>
+            {renderMessageBubble(item, true)}
           </View>
           <Pressable
             style={styles.avatarColumn}
@@ -163,11 +305,7 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
           />
         </Pressable>
         <View style={[styles.messageContent, styles.messageContentOther]}>
-          <View style={[styles.bubble, styles.bubbleOther]}>
-            <Text style={[styles.messageText, styles.messageTextOther]}>
-              {item.content}
-            </Text>
-          </View>
+          {renderMessageBubble(item, false)}
         </View>
       </View>
     );
@@ -215,38 +353,76 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
-            <Text style={styles.emptyText}>No messages yet. Say hi!</Text>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons
+                name="chatbubbles-outline"
+                size={40}
+                color={colors.textMuted}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>Start the conversation</Text>
+            <Text style={styles.emptyText}>
+              Say hi — messages appear here for everyone in this chat.
+            </Text>
           </View>
         }
       />
 
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message..."
-          placeholderTextColor={colors.textMuted}
-          value={inputText}
-          onChangeText={handleChangeText}
-          multiline
-          maxLength={2000}
-          editable={!sending && !chatSuspended}
-        />
-        <Pressable
-          onPress={handleSend}
-          style={({ pressed }) => [
-            styles.sendButton,
-            (!inputText.trim() || sending || chatSuspended) && styles.sendButtonDisabled,
-            pressed && styles.sendButtonPressed,
-          ]}
-          disabled={!inputText.trim() || sending || chatSuspended}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color={colors.text} />
-          ) : (
-            <Ionicons name="send" size={22} color={colors.text} />
-          )}
-        </Pressable>
+      {sendError ? (
+        <View style={styles.sendErrorBar}>
+          <Ionicons name="alert-circle" size={16} color={colors.error} />
+          <Text style={styles.sendErrorText}>{sendError}</Text>
+          <Pressable onPress={() => setSendError(null)} hitSlop={8}>
+            <Ionicons name="close" size={16} color={colors.error} />
+          </Pressable>
+        </View>
+      ) : null}
+
+      {editingMessage ? (
+        <View style={styles.editingBar}>
+          <Ionicons name="pencil" size={16} color={colors.primary} />
+          <Text style={styles.editingBarText} numberOfLines={1}>
+            Editing: {editingMessage.content}
+          </Text>
+          <Pressable onPress={cancelEditing} hitSlop={8}>
+            <Ionicons name="close" size={16} color={colors.textMuted} />
+          </Pressable>
+        </View>
+      ) : null}
+
+      <View style={styles.inputBar}>
+        <View style={styles.composer}>
+          <TextInput
+            style={styles.input}
+            placeholder={editingMessage ? "Edit message..." : "Message…"}
+            placeholderTextColor={colors.textMuted}
+            value={inputText}
+            onChangeText={handleChangeText}
+            multiline
+            maxLength={2000}
+            editable={!sending && !chatSuspended}
+          />
+          <Pressable
+            onPress={handleSend}
+            style={({ pressed }) => [
+              styles.sendButton,
+              (!inputText.trim() || sending || chatSuspended) &&
+                styles.sendButtonDisabled,
+              pressed && styles.sendButtonPressed,
+            ]}
+            disabled={!inputText.trim() || sending || chatSuspended}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <Ionicons
+                name={editingMessage ? "checkmark" : "send"}
+                size={20}
+                color={colors.text}
+              />
+            )}
+          </Pressable>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -296,7 +472,7 @@ const styles = StyleSheet.create({
   messageRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm + 2,
   },
   messageRowOwn: {
     justifyContent: "flex-end",
@@ -355,20 +531,47 @@ const styles = StyleSheet.create({
   },
   bubble: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     borderRadius: borderRadius.lg,
     maxWidth: "100%",
   },
   bubbleOwn: {
     backgroundColor: colors.primary,
+    borderBottomRightRadius: borderRadius.sm,
   },
   bubbleOther: {
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.border,
+    borderBottomLeftRadius: borderRadius.sm,
+  },
+  bubbleDeleted: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    borderStyle: "dashed",
+    opacity: 0.85,
+  },
+  deletedText: {
+    fontSize: 13,
+    fontStyle: "italic",
+    color: colors.textMuted,
+  },
+  editedTag: {
+    fontSize: 11,
+    marginTop: 4,
+    alignSelf: "flex-end",
+  },
+  editedTagOwn: {
+    color: "rgba(255,255,255,0.75)",
+  },
+  editedTagOther: {
+    color: colors.textMuted,
   },
   messageText: {
     fontSize: 15,
+    lineHeight: 21,
   },
   messageTextOwn: {
     color: colors.text,
@@ -381,39 +584,101 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: spacing.xl * 2,
+    paddingHorizontal: spacing.xl,
+  },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    marginTop: spacing.lg,
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.text,
   },
   emptyText: {
-    marginTop: spacing.md,
-    fontSize: 16,
+    marginTop: spacing.sm,
+    fontSize: 15,
     color: colors.textMuted,
+    textAlign: "center",
+    lineHeight: 22,
   },
-  inputRow: {
+  sendErrorBar: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    padding: spacing.md,
+    alignItems: "center",
+    gap: spacing.xs,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.28)",
+  },
+  sendErrorText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.error,
+    lineHeight: 18,
+  },
+  editingBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  editingBarText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  inputBar: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.lg,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    gap: spacing.sm,
+  },
+  composer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.xs,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   input: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 40,
     maxHeight: 120,
-    backgroundColor: colors.inputBg,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 0,
     paddingVertical: spacing.sm,
     fontSize: 16,
     color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.md,
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.full,
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",

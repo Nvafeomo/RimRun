@@ -21,7 +21,7 @@ import { clearConversationAndLeave } from "../../../lib/chatDeletion";
 import { useAuth } from "../../../context/AuthContext";
 import { useProfile } from "../../../context/ProfileContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
-import { colors, spacing, borderRadius } from "../../../constants/theme";
+import { colors, spacing, borderRadius, shadows } from "../../../constants/theme";
 
 export default function ChatRouteScreen() {
   const { conversationId, title, courtId, courtName } = useLocalSearchParams<{
@@ -198,73 +198,118 @@ export default function ChatRouteScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
-        <View style={styles.headerTitleRow}>
-          {dmOtherUserId ? (
-            <Pressable
-              onPress={openDmPartnerProfile}
-              style={styles.headerTitlePressable}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Open profile"
-            >
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {displayTitle}
-              </Text>
-            </Pressable>
-          ) : (
+
+        {isCourtChat ? (
+          <Pressable
+            onPress={goToCourt}
+            style={styles.headerTitleBlock}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open court details"
+          >
             <Text style={styles.headerTitle} numberOfLines={1}>
               {displayTitle}
             </Text>
-          )}
+            <View style={styles.headerSubtitleRow}>
+              <Ionicons name="basketball" size={12} color={colors.primary} />
+              <Text style={styles.headerSubtitle}>Court chat</Text>
+            </View>
+          </Pressable>
+        ) : dmOtherUserId ? (
+          <Pressable
+            onPress={openDmPartnerProfile}
+            style={styles.headerTitleBlock}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+          >
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {displayTitle}
+            </Text>
+          </Pressable>
+        ) : (
+          <View style={styles.headerTitleBlock}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {displayTitle}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.headerActions}>
           {(!!dmOtherUserId || isCourtChat) && (
             <Pressable
-              hitSlop={12}
+              hitSlop={10}
               onPress={() => setReportOpen(true)}
               style={styles.headerIconButton}
               accessibilityLabel="Report"
             >
-              <Ionicons name="flag-outline" size={22} color={colors.textMuted} />
+              <Ionicons name="flag-outline" size={20} color={colors.textMuted} />
             </Pressable>
           )}
           {isCourtChat && (
             <Pressable
-              hitSlop={12}
+              hitSlop={10}
               onPress={goToCourt}
               style={styles.headerIconButton}
+              accessibilityLabel="Court details"
             >
-              <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+              <Ionicons
+                name="information-circle-outline"
+                size={22}
+                color={colors.primary}
+              />
             </Pressable>
           )}
           {canRename && (
             <Pressable
-              hitSlop={12}
+              hitSlop={10}
               onPress={openRename}
-              style={styles.headerEditButton}
+              style={styles.headerIconButton}
+              accessibilityLabel="Rename court chat"
             >
-              <Ionicons name="pencil" size={18} color={colors.textMuted} />
+              <Ionicons name="pencil-outline" size={20} color={colors.textMuted} />
             </Pressable>
           )}
           {showDmGroupActions && (
             <Pressable
-              hitSlop={12}
+              hitSlop={10}
+              onPress={() => setAddMemberOpen(true)}
+              style={styles.headerIconButton}
+              accessibilityLabel="Add member"
+            >
+              <Ionicons name="person-add-outline" size={20} color={colors.primary} />
+            </Pressable>
+          )}
+          {showDmGroupActions && (
+            <Pressable
+              hitSlop={10}
               onPress={handleDeleteConversation}
               style={styles.headerIconButton}
               accessibilityLabel="Delete conversation"
             >
-              <Ionicons name="trash-outline" size={22} color={colors.textMuted} />
-            </Pressable>
-          )}
-          {showDmGroupActions && (
-            <Pressable
-              hitSlop={12}
-              onPress={() => setAddMemberOpen(true)}
-              style={styles.headerIconButton}
-            >
-              <Ionicons name="person-add-outline" size={22} color={colors.primary} />
+              <Ionicons name="trash-outline" size={20} color={colors.textMuted} />
             </Pressable>
           )}
         </View>
       </View>
+
+      {isCourtChat ? (
+        <Pressable
+          style={styles.courtChatStrip}
+          onPress={goToCourt}
+          accessibilityRole="button"
+          accessibilityLabel="Open court details"
+        >
+          <View style={styles.courtChatStripIcon}>
+            <Ionicons name="basketball" size={16} color={colors.primary} />
+          </View>
+          <Text style={styles.courtChatStripText} numberOfLines={1}>
+            Group chat for court subscribers
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+
       <ChatScreen conversationId={conversationId} title={displayTitle} />
 
       <Modal
@@ -359,37 +404,76 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+    gap: spacing.xs,
   },
   backButton: {
     padding: spacing.sm,
-    marginRight: spacing.sm,
   },
-  headerTitleRow: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    minWidth: 0,
-    gap: spacing.xs,
-  },
-  headerTitlePressable: {
+  headerTitleBlock: {
     flex: 1,
     minWidth: 0,
+    justifyContent: "center",
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "600",
     color: colors.text,
   },
-  headerIconButton: {
-    padding: spacing.xs,
+  headerSubtitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
   },
-  headerEditButton: {
-    padding: spacing.xs,
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.primaryLight,
+    letterSpacing: 0.2,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  headerIconButton: {
+    padding: spacing.sm,
+  },
+  courtChatStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.soft,
+  },
+  courtChatStripIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  courtChatStripText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "500",
+    color: colors.textSecondary,
   },
   modalOverlay: {
     flex: 1,

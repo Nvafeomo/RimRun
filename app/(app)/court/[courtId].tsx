@@ -19,11 +19,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
-import { colors, spacing, borderRadius } from "../../../constants/theme";
+import { colors, spacing, borderRadius, shadows, typography } from "../../../constants/theme";
 import {
   CourtDetailTags,
   buildCoreCourtDetailTags,
 } from "../../../components/CourtDetailTags";
+import { CourtVotingPanel } from "../../../components/CourtVotingPanel";
+import {
+  fetchCourtVoteState,
+  castCourtVote,
+  buildCourtVoteState,
+  type CourtVoteState,
+  type VoteType,
+} from "../../../lib/courtVoting";
 
 type Court = {
   id: string;
@@ -36,6 +44,10 @@ type Court = {
   is_indoor: boolean | null;
   source: string | null;
   created_by: string | null;
+  verified: boolean;
+  flagged_for_review: boolean;
+  verify_count: number;
+  flag_count: number;
 };
 
 export default function CourtDetailScreen() {
@@ -49,6 +61,27 @@ export default function CourtDetailScreen() {
   const [subscribing, setSubscribing] = useState(false);
   const [joiningChat, setJoiningChat] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [voteState, setVoteState] = useState<CourtVoteState | null>(null);
+  const [voting, setVoting] = useState(false);
+
+  const loadVoteState = useCallback(async () => {
+    if (!courtId) return;
+    const state = await fetchCourtVoteState(courtId, user?.id);
+    setVoteState(state);
+    if (state) {
+      setCourt((prev) =>
+        prev
+          ? {
+              ...prev,
+              verified: state.verified,
+              flagged_for_review: state.flaggedForReview,
+              verify_count: state.verifyCount,
+              flag_count: state.flagCount,
+            }
+          : prev,
+      );
+    }
+  }, [courtId, user?.id]);
 
   const fetchSubscription = useCallback(async () => {
     if (!courtId || !user?.id) return false;
@@ -64,25 +97,96 @@ export default function CourtDetailScreen() {
   useEffect(() => {
     if (!courtId) return;
     const load = async () => {
-      const [courtRes, subRes] = await Promise.all([
+      setLoading(true);
+      const [courtRes, subRes, myVoteRes, subCountRes] = await Promise.all([
         supabase
           .from("courts")
-          .select("id, name, address, latitude, longitude, hoops, is_private, is_indoor, source, created_by")
+          .select(
+            "id, name, address, latitude, longitude, hoops, is_private, is_indoor, source, created_by, verified, flagged_for_review, verify_count, flag_count",
+          )
           .eq("id", courtId)
           .single(),
         fetchSubscription(),
+        user?.id
+          ? supabase
+              .from("court_votes")
+              .select("vote_type")
+              .eq("court_id", courtId)
+              .eq("user_id", user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        supabase
+          .from("court_subscriptions")
+          .select("court_id", { count: "exact", head: true })
+          .eq("court_id", courtId),
       ]);
+
       if (courtRes.error) {
         console.error("Error fetching court:", courtRes.error);
         setCourt(null);
+        setVoteState(null);
       } else {
         setCourt(courtRes.data);
+        const subscribers = subCountRes.count ?? 0;
+        setVoteState(
+          buildCourtVoteState({
+            verified: courtRes.data.verified,
+            flagged_for_review: courtRes.data.flagged_for_review,
+            verify_count: courtRes.data.verify_count,
+            flag_count: courtRes.data.flag_count,
+            subscriberCount: subscribers,
+            myVote: (myVoteRes.data?.vote_type as VoteType) ?? null,
+          }),
+        );
       }
       setSubscribed(subRes);
       setLoading(false);
     };
     load();
-  }, [courtId, fetchSubscription]);
+  }, [courtId, fetchSubscription, user?.id]);
+
+  const submitVote = async (newVote: VoteType) => {
+    if (!courtId) return;
+    setVoting(true);
+    const result = await castCourtVote(courtId, newVote);
+    if (!result.ok) {
+      Alert.alert("Could not vote", result.reason ?? "Try again.");
+    } else {
+      await loadVoteState();
+    }
+    setVoting(false);
+  };
+
+  const handleVote = async (type: "verify" | "flag") => {
+    if (!subscribed) {
+      Alert.alert(
+        "Subscribe first",
+        "You need to be subscribed to this court to vote on it.",
+      );
+      return;
+    }
+    if (voting) return;
+
+    const newVote = voteState?.myVote === type ? null : type;
+
+    if (type === "flag" && newVote === "flag") {
+      Alert.alert(
+        "Flag this court?",
+        "This means you believe the court no longer exists or has incorrect information. If enough subscribers agree, it will be reviewed for removal.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Flag it",
+            style: "destructive",
+            onPress: () => void submitVote(newVote),
+          },
+        ],
+      );
+      return;
+    }
+
+    await submitVote(newVote);
+  };
 
   const handleSubscribe = async () => {
     if (!courtId || !user?.id || subscribing) return;
@@ -102,6 +206,7 @@ export default function CourtDetailScreen() {
         });
         setSubscribed(true);
       }
+      await loadVoteState();
     } catch (err) {
       console.error("Error toggling subscription:", err);
     } finally {
@@ -240,11 +345,13 @@ export default function CourtDetailScreen() {
           ]}
           keyboardShouldPersistTaps="handled"
         >
-        <View style={styles.section}>
+        <View style={styles.detailsCard}>
           <Text style={styles.sectionTitle}>Details</Text>
           {court.hoops != null && (
             <View style={styles.detailRow}>
-              <Ionicons name="basketball" size={20} color={colors.primary} />
+              <View style={styles.detailIconWrap}>
+                <Ionicons name="basketball" size={18} color={colors.primary} />
+              </View>
               <Text style={styles.detailText}>
                 {court.hoops} hoop{court.hoops !== 1 ? "s" : ""}
               </Text>
@@ -252,21 +359,46 @@ export default function CourtDetailScreen() {
           )}
           {court.address && (
             <View style={styles.detailRow}>
-              <Ionicons name="location" size={20} color={colors.primary} />
+              <View style={styles.detailIconWrap}>
+                <Ionicons name="location" size={18} color={colors.primary} />
+              </View>
               <Text style={styles.detailText}>{court.address}</Text>
             </View>
           )}
           <Pressable
             onPress={handleOpenInMaps}
-            style={styles.openInMapsButton}
+            style={({ pressed }) => [
+              styles.openInMapsButton,
+              pressed && styles.openInMapsButtonPressed,
+            ]}
           >
-            <Ionicons name="map" size={20} color={colors.primary} />
+            <Ionicons name="map" size={18} color={colors.primary} />
             <Text style={styles.openInMapsText}>Open in Maps</Text>
+            <Ionicons
+              name="open-outline"
+              size={16}
+              color={colors.primary}
+              style={styles.openInMapsChevron}
+            />
           </Pressable>
         </View>
 
         <CourtDetailTags tags={buildCoreCourtDetailTags(court)} />
 
+        {voteState && subscribed ? (
+          <CourtVotingPanel
+            voteState={voteState}
+            voting={voting}
+            onVerifyPress={() => void handleVote("verify")}
+            onFlagPress={() => void handleVote("flag")}
+          />
+        ) : subscribed === false ? (
+          <Text style={styles.votingHint}>
+            Subscribe to vote on community verification for this court.
+          </Text>
+        ) : null}
+
+        <Text style={styles.actionsLabel}>Actions</Text>
         <Pressable
           onPress={handleSubscribe}
           style={[styles.button, subscribed && styles.buttonSubscribed]}
@@ -372,35 +504,77 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: spacing.xl,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.text,
+  detailsCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
     marginBottom: spacing.md,
+    ...shadows.soft,
+  },
+  sectionTitle: {
+    ...typography.sectionTitle,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  actionsLabel: {
+    ...typography.sectionTitle,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  votingHint: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: spacing.lg,
+    lineHeight: 18,
   },
   detailRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.sm,
     marginBottom: spacing.sm,
+  },
+  detailIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
   },
   detailText: {
     flex: 1,
     fontSize: 15,
     color: colors.textSecondary,
+    lineHeight: 22,
+    paddingTop: 4,
   },
   openInMapsButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: 0,
     marginTop: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  openInMapsButtonPressed: {
+    opacity: 0.88,
   },
   openInMapsText: {
+    flex: 1,
     fontSize: 15,
     fontWeight: "600",
     color: colors.primary,
+  },
+  openInMapsChevron: {
+    opacity: 0.85,
   },
   button: {
     flexDirection: "row",
@@ -408,7 +582,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     borderWidth: 2,
     borderColor: colors.primary,
     marginBottom: spacing.md,
@@ -431,9 +605,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.primary,
     marginBottom: spacing.md,
+    ...shadows.soft,
   },
   buttonPrimaryText: {
     fontSize: 16,
@@ -446,7 +621,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.error,
     marginTop: spacing.sm,
     marginBottom: spacing.md,

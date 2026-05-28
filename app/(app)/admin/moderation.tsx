@@ -28,6 +28,12 @@ import {
   type AdminAppealRow,
   type AdminReportRow,
 } from '../../../lib/moderation';
+import {
+  adminDeleteCourt,
+  clearCourtFlag,
+  fetchFlaggedCourts,
+  type AdminFlaggedCourtRow,
+} from '../../../lib/courtVoting';
 
 function reasonLabel(value: string): string {
   return REPORT_REASONS.find((r) => r.value === value)?.label ?? value;
@@ -52,6 +58,7 @@ export default function AdminModerationScreen() {
   const { profile, loading: profileLoading } = useProfile();
   const [reports, setReports] = useState<AdminReportRow[]>([]);
   const [appeals, setAppeals] = useState<AdminAppealRow[]>([]);
+  const [flaggedCourts, setFlaggedCourts] = useState<AdminFlaggedCourtRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -60,6 +67,7 @@ export default function AdminModerationScreen() {
   const [banning, setBanning] = useState(false);
   const [actingReportId, setActingReportId] = useState<string | null>(null);
   const [actingAppealId, setActingAppealId] = useState<string | null>(null);
+  const [actingCourtId, setActingCourtId] = useState<string | null>(null);
 
   const loadModeration = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -68,9 +76,10 @@ export default function AdminModerationScreen() {
       setLoading(true);
     }
     setError('');
-    const [reportsResult, appealsResult] = await Promise.all([
+    const [reportsResult, appealsResult, courtsResult] = await Promise.all([
       fetchOpenReports(),
       fetchPendingAppeals(),
+      fetchFlaggedCourts(),
     ]);
     if (!reportsResult.ok) {
       setError(reportsResult.error);
@@ -87,6 +96,20 @@ export default function AdminModerationScreen() {
       setAppeals([]);
     } else {
       setAppeals(appealsResult.appeals);
+    }
+    if (!courtsResult.ok) {
+      if (!reportsResult.ok && !appealsResult.ok) {
+        setError(`${reportsResult.error}; ${appealsResult.error}; ${courtsResult.error}`);
+      } else if (!reportsResult.ok) {
+        setError(`${reportsResult.error}; ${courtsResult.error}`);
+      } else if (!appealsResult.ok) {
+        setError(`${appealsResult.error}; ${courtsResult.error}`);
+      } else {
+        setError(courtsResult.error);
+      }
+      setFlaggedCourts([]);
+    } else {
+      setFlaggedCourts(courtsResult.courts);
     }
     setLoading(false);
     setRefreshing(false);
@@ -202,6 +225,53 @@ export default function AdminModerationScreen() {
     );
   }
 
+  async function handleClearCourtFlag(court: AdminFlaggedCourtRow) {
+    Alert.alert(
+      'Clear flag',
+      `Remove the review flag from "${court.name ?? 'this court'}"? Vote counts stay; status is recomputed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear flag',
+          onPress: async () => {
+            setActingCourtId(court.id);
+            const result = await clearCourtFlag(court.id);
+            setActingCourtId(null);
+            if (!result.ok) {
+              Alert.alert('Could not clear flag', result.error);
+              return;
+            }
+            void loadModeration(true);
+          },
+        },
+      ],
+    );
+  }
+
+  async function handleDeleteFlaggedCourt(court: AdminFlaggedCourtRow) {
+    Alert.alert(
+      'Delete court',
+      `Permanently delete "${court.name ?? 'this court'}" for everyone? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setActingCourtId(court.id);
+            const result = await adminDeleteCourt(court.id);
+            setActingCourtId(null);
+            if (!result.ok) {
+              Alert.alert('Could not delete court', result.error);
+              return;
+            }
+            void loadModeration(true);
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -218,7 +288,7 @@ export default function AdminModerationScreen() {
       </View>
 
       <Text style={styles.subtitle}>
-        Review open reports and ban appeals.
+        Review open reports, ban appeals, and flagged courts.
       </Text>
 
       {loading ? (
@@ -293,12 +363,69 @@ export default function AdminModerationScreen() {
             })
           )}
 
+          <Text style={styles.sectionHeading}>Flagged courts</Text>
+          {flaggedCourts.length === 0 ? (
+            <Text style={styles.sectionEmpty}>No flagged courts</Text>
+          ) : (
+            flaggedCourts.map((court) => {
+              const busy = actingCourtId === court.id;
+              return (
+                <View key={court.id} style={[styles.card, styles.flaggedCourtCard]}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.reason} numberOfLines={1}>
+                      {court.name ?? 'Unnamed court'}
+                    </Text>
+                    <Text style={styles.when}>
+                      {court.flag_count} flag · {court.verify_count} verify
+                    </Text>
+                  </View>
+                  {court.address ? (
+                    <Text style={styles.details} numberOfLines={2}>
+                      {court.address}
+                    </Text>
+                  ) : null}
+                  <View style={styles.actions}>
+                    <Pressable
+                      style={styles.secondaryAction}
+                      onPress={() => router.push(`/(app)/court/${court.id}`)}
+                    >
+                      <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
+                      <Text style={styles.secondaryActionText}>View</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.secondaryAction}
+                      onPress={() => void handleClearCourtFlag(court)}
+                      disabled={busy}
+                    >
+                      {busy ? (
+                        <ActivityIndicator size="small" color={colors.textSecondary} />
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark-circle-outline" size={18} color={colors.textSecondary} />
+                          <Text style={styles.secondaryActionText}>Clear flag</Text>
+                        </>
+                      )}
+                    </Pressable>
+                    <Pressable
+                      style={styles.banAction}
+                      onPress={() => void handleDeleteFlaggedCourt(court)}
+                      disabled={busy}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.text} />
+                      <Text style={styles.banActionText}>Delete</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            })
+          )}
+
           <Text style={styles.sectionHeading}>Open reports</Text>
           {reports.length === 0 && !error ? (
             <Text style={styles.sectionEmpty}>No open reports</Text>
           ) : null}
 
-          {reports.length === 0 && !error && appeals.length === 0 ? (
+          {reports.length === 0 && !error && appeals.length === 0 && flaggedCourts.length === 0 ? (
             <View style={styles.emptyBox}>
               <Ionicons name="checkmark-circle-outline" size={40} color={colors.success} />
               <Text style={styles.emptyTitle}>All clear</Text>
@@ -539,6 +666,9 @@ const styles = StyleSheet.create({
   },
   appealCard: {
     borderColor: 'rgba(232, 93, 4, 0.35)',
+  },
+  flaggedCourtCard: {
+    borderColor: 'rgba(239, 68, 68, 0.35)',
   },
   card: {
     backgroundColor: colors.surface,

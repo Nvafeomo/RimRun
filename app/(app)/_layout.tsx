@@ -15,7 +15,7 @@ export default function AppLayout() {
   const { user, loading: authLoading, banBlocked } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
 
-  if (authLoading || (user && profileLoading)) {
+  if (authLoading || (user && profileLoading && !profile)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator size="large" color={colors.primary} />

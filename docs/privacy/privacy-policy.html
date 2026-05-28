@@ -213,6 +213,35 @@
     }
     .in-short strong { color: var(--court); }
 
+    /* Controls grid */
+    .controls-grid {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .control-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.85rem 1rem;
+    }
+    .control-icon {
+      flex-shrink: 0;
+      width: 1.5rem;
+      height: 1.5rem;
+      background: var(--accent-soft);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+    }
+    .control-label { font-weight: 600; color: var(--court); font-size: 0.9rem; }
+    .control-desc { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.15rem; }
+
     /* Table */
     .table-wrap {
       overflow-x: auto;
@@ -293,7 +322,7 @@
     <p class="brand">RimRun</p>
     <h1>Privacy policy</h1>
     <div class="hero-meta">
-      <span class="pill"><strong>Updated</strong> April 2, 2026</span>
+      <span class="pill"><strong>Updated</strong> May 27, 2026</span>
       <span class="pill">Basketball Courts &amp; Communities</span>
     </div>
    </div>
@@ -301,7 +330,7 @@
 
 <main class="wrap">
 
-  <p>This privacy notice for <strong>RimRun</strong> (“<strong>we</strong>,” “<strong>us</strong>,” or “<strong>our</strong>”) describes how and why we might access, collect, store, use, and/or share (“<strong>process</strong>”) your personal information when you use our services (“<strong>Services</strong>”), including when you:</p>
+  <p>This privacy notice for <strong>RimRun</strong> ("<strong>we</strong>," "<strong>us</strong>," or "<strong>our</strong>") describes how and why we might access, collect, store, use, and/or share ("<strong>process</strong>") your personal information when you use our services ("<strong>Services</strong>"), including when you:</p>
 
   <ul>
     <li>Download and use our mobile application (<strong>RimRun</strong>), or any other application of ours that links to this privacy notice</li>
@@ -309,7 +338,7 @@
     <li>Engage with us in other related ways, including any marketing or events</li>
   </ul>
 
-  <p><strong>Questions or concerns?</strong> Reading this notice will help you understand your privacy rights and choices. We are responsible for making decisions about how your personal information is processed. If you do not agree with our policies and practices, please do not use our Services. For questions, contact <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a>.</p>
+  <p><strong>Questions or concerns?</strong> Reading this notice will help you understand your privacy rights and choices. We are responsible for making decisions about how your personal information is processed. If you do not agree with our policies and practices, please do not use our Services. For questions, contact <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a>.</p>
 
   <div class="card summary-intro">
     <p class="toc-title" style="margin-bottom: 0.5rem;">At a glance</p>
@@ -318,11 +347,13 @@
 
   <p><strong>What personal information do we process?</strong> When you visit, use, or navigate our Services, we may process personal information depending on how you interact with us, the choices you make, and the features you use. See <a href="#personalinfo">personal information you disclose to us</a>.</p>
 
-  <p><strong>Do we process sensitive personal information?</strong> Some information may be considered “special” or “sensitive” in certain jurisdictions. We do not process sensitive personal information.</p>
+  <p><strong>Do we process sensitive personal information?</strong> We collect date of birth for age verification only. We do not process other categories of sensitive personal information.</p>
 
   <p><strong>Do we collect information from third parties?</strong> If you sign in with Google, we receive limited profile information from Google as part of that login. See <a href="#sociallogins">How we handle your social logins</a>.</p>
 
   <p><strong>How do we process your information?</strong> We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent. Learn more in <a href="#infouse">How we process your information</a>.</p>
+
+  <p><strong>Can you control your privacy?</strong> Yes. The app includes an in-app Privacy screen (Settings → Privacy) where you can control what others see on your profile, who can message you, and whether you appear in friend search. See <a href="#yourcontrols">Your in-app privacy controls</a>.</p>
 
   <p><strong>When do we share personal information?</strong> We may share information in specific situations and with specific third parties. See <a href="#whoshare">When and with whom we share your personal information</a>.</p>
 
@@ -330,7 +361,7 @@
 
   <p><strong>What are your rights?</strong> Depending on where you live, applicable law may give you rights regarding your personal information. See <a href="#privacyrights">Your privacy rights</a>.</p>
 
-  <p><strong>How do you exercise your rights?</strong> Email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a> or use the details in <a href="#contact">How to contact us</a>. We will respond in line with applicable data protection laws.</p>
+  <p><strong>How do you exercise your rights?</strong> Email <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a> or use the details in <a href="#contact">How to contact us</a>. We will respond in line with applicable data protection laws.</p>
 
   <p>Want the full picture? <a href="#toc">Browse the sections below</a>.</p>
 
@@ -339,10 +370,12 @@
     <ol class="toc">
       <li><a href="#infocollect">What information do we collect?</a></li>
       <li><a href="#infouse">How do we process your information?</a></li>
+      <li><a href="#yourcontrols">Your in-app privacy controls</a></li>
       <li><a href="#whoshare">When and with whom do we share your personal information?</a></li>
       <li><a href="#sociallogins">How do we handle your social logins?</a></li>
       <li><a href="#inforetain">How long do we keep your information?</a></li>
       <li><a href="#infosafe">How do we keep your information safe?</a></li>
+      <li><a href="#minors">Children's privacy</a></li>
       <li><a href="#privacyrights">What are your privacy rights?</a></li>
       <li><a href="#DNT">Controls for Do-Not-Track features</a></li>
       <li><a href="#uslaws">U.S. resident privacy rights</a></li>
@@ -361,21 +394,22 @@
 
   <p><strong>Personal information provided by you.</strong> The personal information we collect depends on the context of your interactions with us and the Services, the choices you make, and the products and features you use. It may include:</p>
   <ul>
-    <li>names</li>
-    <li>email addresses</li>
-    <li>usernames</li>
-    <li>passwords</li>
-    <li>phone numbers</li>
+    <li><strong>Account details:</strong> Email address and username when you create or update your account.</li>
+    <li><strong>Profile information:</strong> Profile photo (optional), and any other details you choose to add to your profile.</li>
+    <li><strong>Date of birth:</strong> Required during onboarding for age verification purposes only. We use this to apply age-appropriate defaults (for example, certain privacy settings default to more restrictive values for users under 18).</li>
+    <li><strong>Chat messages:</strong> Content you send in direct messages, group chats, and court chats. Messages are stored to deliver real-time and historical chat functionality.</li>
+    <li><strong>Court contributions:</strong> Courts you submit, edit, or vote on (verify/flag), and courts you subscribe to.</li>
+    <li><strong>Content reports:</strong> If you report another user or piece of content, we store the report details to allow moderation review.</li>
   </ul>
 
-  <p id="sensitiveinfo"><strong>Sensitive information.</strong> We do not process sensitive information.</p>
+  <p id="sensitiveinfo"><strong>Sensitive information.</strong> We collect date of birth solely for age verification. We do not process other sensitive categories of personal information (such as financial data, biometric identifiers, or health information).</p>
 
   <p><strong>Social login data.</strong> You may register using a third-party account (for example, Google). If you do, we collect certain profile information as described in <a href="#sociallogins">How do we handle your social logins?</a></p>
 
   <p><strong>Application data.</strong> If you use our application(s), we may collect the following if you grant access or permission:</p>
   <ul>
-    <li><em>Geolocation.</em> We may request location from your device while you use our app to provide location-based services. You can change this in your device settings.</li>
-    <li><em>Push notifications.</em> We may request permission to send notifications about your account or features. You can turn these off in your device settings.</li>
+    <li><em>Geolocation.</em> We may request location from your device while you use our app to show nearby basketball courts on the map and to support location-based search. You can change this in your device settings at any time.</li>
+    <li><em>Push notifications.</em> We may request permission to send notifications about your account or app features. You can turn these off in your device settings.</li>
   </ul>
   <p>This information helps us operate and secure our application(s), troubleshoot, and run internal analytics and reporting.</p>
 
@@ -385,63 +419,122 @@
   <p>Our use of information received from Google APIs follows the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the <a href="https://developers.google.com/terms/api-services-user-data-policy#limited-use" target="_blank" rel="noopener noreferrer">Limited Use requirements</a>.</p>
 
   <h2 id="infouse">2. How do we process your information?</h2>
-  <div class="in-short"><strong>In short:</strong> <em>We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent.</em></div>
+  <div class="in-short"><strong>In short:</strong> <em>We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law.</em></div>
 
   <p><strong>We may process your personal information to:</strong></p>
   <ul>
     <li><strong>Facilitate account creation and authentication</strong> and manage user accounts.</li>
-    <li><strong>Deliver services</strong> you request.</li>
+    <li><strong>Deliver services</strong> you request, including real-time chat, court discovery, and map features.</li>
+    <li><strong>Apply age-appropriate defaults</strong> using date of birth during onboarding (for example, restricting discoverability for users under 18).</li>
     <li><strong>Respond to inquiries</strong> and offer support.</li>
-    <li><strong>Enable user-to-user communications</strong> when you use those features.</li>
+    <li><strong>Enable user-to-user communications</strong> — direct messages, group chats, and court community chats.</li>
+    <li><strong>Moderate content and enforce community standards</strong> — reviewing reports, applying suspensions, and protecting users from abuse.</li>
     <li><strong>Request feedback</strong> about our Services.</li>
     <li><strong>Evaluate and improve</strong> our Services, products, marketing, and your experience.</li>
     <li><strong>Comply with legal obligations</strong>, respond to legal requests, and protect our rights.</li>
   </ul>
 
-  <h2 id="whoshare">3. When and with whom do we share your personal information?</h2>
-  <div class="in-short"><strong>In short:</strong> <em>We may share information in specific situations described in this section and/or with certain third parties.</em></div>
+  <h2 id="yourcontrols">3. Your in-app privacy controls</h2>
+  <div class="in-short"><strong>In short:</strong> <em>You have direct control over key privacy settings inside the app. These take effect immediately when you change them.</em></div>
+
+  <p>You can access these settings in the app under <strong>Profile → Privacy</strong>. Each toggle saves instantly.</p>
+
+  <p><strong>Public profile</strong></p>
+  <div class="controls-grid">
+    <div class="control-row">
+      <div class="control-icon">👥</div>
+      <div>
+        <div class="control-label">Show friends count</div>
+        <div class="control-desc">When off, other users cannot see how many friends you have on your profile.</div>
+      </div>
+    </div>
+    <div class="control-row">
+      <div class="control-icon">🏀</div>
+      <div>
+        <div class="control-label">Show courts joined</div>
+        <div class="control-desc">When off, other users cannot see how many courts you follow.</div>
+      </div>
+    </div>
+    <div class="control-row">
+      <div class="control-icon">📍</div>
+      <div>
+        <div class="control-label">Show courts added</div>
+        <div class="control-desc">When off, other users cannot see how many courts you have submitted to the app.</div>
+      </div>
+    </div>
+  </div>
+
+  <p><strong>Messaging &amp; discovery</strong></p>
+  <div class="controls-grid">
+    <div class="control-row">
+      <div class="control-icon">💬</div>
+      <div>
+        <div class="control-label">New DMs from friends only</div>
+        <div class="control-desc">When on, only people you are already friends with can start a new direct message conversation with you. Existing chats are not affected.</div>
+      </div>
+    </div>
+    <div class="control-row">
+      <div class="control-icon">🔍</div>
+      <div>
+        <div class="control-label">Show up in Add friends search</div>
+        <div class="control-desc">Controls whether other users can find you by username using the Add friends search (Chats → Friends → Add). Users under 18 have this off by default. Turning it off means people can only connect with you through in-app interactions such as court chats.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="whoshare">4. When and with whom do we share your personal information?</h2>
+  <div class="in-short"><strong>In short:</strong> <em>We do not sell your personal information. We may share information in specific situations described in this section and/or with certain third parties.</em></div>
 
   <p>We may need to share your personal information in situations such as:</p>
   <ul>
+    <li><strong>Service providers.</strong> We use <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase</a> as our hosted backend, authentication, and database provider. Supabase processes data on our behalf according to their privacy policy.</li>
+    <li><strong>Other users.</strong> Information you share publicly (for example, chat messages in a court chat, or your public profile) is visible to other users of the app. Messages you send in group or court chats are visible to all participants of that conversation.</li>
     <li><strong>Business transfers.</strong> We may share or transfer your information in connection with a merger, sale of assets, financing, or acquisition.</li>
-    <li><strong>Other users.</strong> When you share information publicly (for example, comments or contributions), it may be visible to other users and may remain available outside the Services.</li>
+    <li><strong>Legal requirements.</strong> We may disclose information if required by law, legal process, or to protect the rights, safety, and security of our users, the app, or others.</li>
   </ul>
 
-  <h2 id="sociallogins">4. How do we handle your social logins?</h2>
+  <h2 id="sociallogins">5. How do we handle your social logins?</h2>
   <div class="in-short"><strong>In short:</strong> <em>If you log in with a third-party account (such as Google), we may receive certain information about you from that provider.</em></div>
 
   <p>You may register and log in using your Google account. We receive profile information from Google, which may include your name, email address, and profile picture, and other information you make available on that platform.</p>
 
-  <p>We use that information only for the purposes described in this notice. We do not control Google’s other uses of your data. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google’s Privacy Policy</a>.</p>
+  <p>We use that information only for the purposes described in this notice. We do not control Google's other uses of your data. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google's Privacy Policy</a> and the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>.</p>
 
-  <h2 id="inforetain">5. How long do we keep your information?</h2>
+  <h2 id="inforetain">6. How long do we keep your information?</h2>
   <div class="in-short"><strong>In short:</strong> <em>We keep your information as long as necessary to fulfill the purposes in this notice unless the law requires otherwise.</em></div>
 
   <p>We retain personal information only as long as needed for the purposes in this notice, unless a longer period is required or permitted by law. No purpose in this notice requires keeping your personal information longer than while you have an account with us.</p>
 
   <p>When we no longer have a legitimate need to process your information, we delete or anonymize it, or securely isolate it (for example, in backups) until deletion is possible.</p>
 
-  <h2 id="infosafe">6. How do we keep your information safe?</h2>
+  <h2 id="infosafe">7. How do we keep your information safe?</h2>
   <div class="in-short"><strong>In short:</strong> <em>We use organizational and technical measures to protect your personal information.</em></div>
 
-  <p>We implement reasonable technical and organizational safeguards. No electronic transmission or storage is completely secure; we cannot guarantee that unauthorized parties will never defeat our security. Use the Services at your own risk and in a secure environment.</p>
+  <p>We implement reasonable technical and organizational safeguards, including row-level security policies on our database to restrict data access by role, and role-based access controls for administrative data. No electronic transmission or storage is completely secure; we cannot guarantee that unauthorized parties will never defeat our security. Use the Services at your own risk and in a secure environment.</p>
 
-  <h2 id="privacyrights">7. What are your privacy rights?</h2>
+  <h2 id="minors">8. Children's privacy</h2>
+  <div class="in-short"><strong>In short:</strong> <em>The app is not directed at children under 13. Users under 18 receive more restrictive privacy defaults.</em></div>
+
+  <p>The App is not directed at children under 13, and we do not knowingly collect personal information from children under 13. If you believe we have collected such information, please contact us using the email below and we will take appropriate steps to remove it.</p>
+
+  <p>Users who are 13–17 years old may use the App. We apply more restrictive privacy defaults for users under 18, including turning off username discoverability in friend search by default. Users under 18 can adjust these defaults in <strong>Profile → Privacy</strong>.</p>
+
+  <h2 id="privacyrights">9. What are your privacy rights?</h2>
   <div class="in-short"><strong>In short:</strong> <em>You may review, change, or terminate your account depending on where you live.</em></div>
 
   <p id="withdrawconsent"><strong>Withdrawing consent.</strong> If we rely on your consent to process your personal information, you may withdraw it at any time by contacting us as described in <a href="#contact">How to contact us</a>. Withdrawal does not affect lawfulness of processing before withdrawal where the law allows.</p>
 
   <h3>Account information</h3>
-  <p>To review, change, or delete your account, you can log in and update your account settings.</p>
+  <p>To review, change, or delete your account, you can log in and update your account settings in the app (Profile → Account).</p>
   <p>When you ask us to delete your account, we deactivate or delete it from active databases. We may retain some information as needed for fraud prevention, troubleshooting, investigations, enforcing our terms, or legal compliance.</p>
 
-  <p>Questions about privacy rights? Email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a>.</p>
+  <p>Questions about privacy rights? Email <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a>.</p>
 
-  <h2 id="DNT">8. Controls for Do-Not-Track features</h2>
+  <h2 id="DNT">10. Controls for Do-Not-Track features</h2>
   <p>Some browsers and devices offer a Do-Not-Track (DNT) setting. There is no uniform standard for DNT yet, so we do not currently respond to DNT signals. If standards change, we will update this notice.</p>
   <p>California law requires us to state that we do not respond to DNT signals at this time because no industry or legal standard for honoring them exists yet.</p>
 
-  <h2 id="uslaws">9. Do United States residents have specific privacy rights?</h2>
+  <h2 id="uslaws">11. Do United States residents have specific privacy rights?</h2>
   <div class="in-short"><strong>In short:</strong> <em>Residents of certain states may have additional rights under state privacy laws.</em></div>
 
   <p>If you are a resident of California, Colorado, Connecticut, Delaware, Florida, Indiana, Iowa, Kentucky, Maryland, Minnesota, Montana, Nebraska, New Hampshire, New Jersey, Oregon, Rhode Island, Tennessee, Texas, Utah, or Virginia, you may have rights to access, correct, delete, or obtain copies of your personal information, among others, subject to limitations in applicable law.</p>
@@ -461,17 +554,17 @@
       <tbody>
         <tr>
           <td>A. Identifiers</td>
-          <td>Contact details, name, alias, postal address, phone, online identifiers, IP address, email, account name</td>
+          <td>Email address, username, account name, online identifiers, IP address</td>
           <td class="center"><span class="tag tag-yes">YES</span></td>
         </tr>
         <tr>
           <td>B. California Customer Records</td>
-          <td>Name, contact information, education, employment, employment history, financial information</td>
+          <td>Name, contact information</td>
           <td class="center"><span class="tag tag-yes">YES</span></td>
         </tr>
         <tr>
           <td>C. Protected classifications</td>
-          <td>Gender, age, date of birth, race and ethnicity, national origin, marital status, demographic data</td>
+          <td>Age, date of birth (for age verification only)</td>
           <td class="center"><span class="tag tag-yes">YES</span></td>
         </tr>
         <tr>
@@ -491,7 +584,7 @@
         </tr>
         <tr>
           <td>G. Geolocation data</td>
-          <td>Device location</td>
+          <td>Device location (when location permission is granted)</td>
           <td class="center"><span class="tag tag-yes">YES</span></td>
         </tr>
         <tr>
@@ -501,7 +594,7 @@
         </tr>
         <tr>
           <td>I. Professional or employment</td>
-          <td>Business contacts, job title, work history, qualifications if you apply for a job</td>
+          <td>Business contacts, job title, work history</td>
           <td class="center"><span class="tag tag-no">NO</span></td>
         </tr>
         <tr>
@@ -516,8 +609,8 @@
         </tr>
         <tr>
           <td>L. Sensitive personal information</td>
-          <td>—</td>
-          <td class="center"><span class="tag tag-no">NO</span></td>
+          <td>Date of birth (age verification only)</td>
+          <td class="center"><span class="tag tag-yes">YES</span></td>
         </tr>
       </tbody>
     </table>
@@ -525,7 +618,7 @@
 
   <p>We may also collect other personal information when you contact us for support, take surveys, or when we deliver Services.</p>
 
-  <p>We retain categories as needed to provide the Services, including: Categories A, B, C, and G — for as long as you have an account with us.</p>
+  <p>We retain categories as needed to provide the Services, including: Categories A, B, C, G, and L — for as long as you have an account with us.</p>
 
   <h3>Sources of personal information</h3>
   <p>See <a href="#infocollect">What information do we collect?</a></p>
@@ -533,7 +626,7 @@
   <h3>How we use and share personal information</h3>
   <p>See <a href="#infouse">How do we process your information?</a> and <a href="#whoshare">When and with whom do we share your personal information?</a></p>
 
-  <p>We may use personal information for internal research and product improvement; that is not a “sale” of your personal information. We have not sold or shared personal information for commercial purposes in the preceding twelve (12) months and do not plan to sell or share it in that manner.</p>
+  <p>We may use personal information for internal research and product improvement; that is not a "sale" of your personal information. We have not sold or shared personal information for commercial purposes in the preceding twelve (12) months and do not plan to sell or share it in that manner.</p>
 
   <h3>Your rights</h3>
   <p>You have rights under certain US state data protection laws. These rights are not absolute, and we may decline requests where permitted by law. They include:</p>
@@ -544,48 +637,38 @@
     <li><strong>Right to request deletion</strong> of your personal data</li>
     <li><strong>Right to obtain a copy</strong> of personal data you previously shared with us</li>
     <li><strong>Right to non-discrimination</strong> for exercising your rights</li>
-    <li><strong>Right to opt out</strong> of processing for targeted advertising (or “sharing” under California law), sale of personal data, or profiling that produces legal or similarly significant effects</li>
-  </ul>
-  <p>Depending on your state, you may also have rights such as:</p>
-  <ul>
-    <li>Access to categories of personal data being processed (including under Minnesota law)</li>
-    <li>A list of categories of third parties to which we have disclosed personal data (including under California, Delaware, and Maryland law)</li>
-    <li>A list of specific third parties to which we have disclosed personal data (including under Minnesota and Oregon law)</li>
-    <li>A list of third parties to which we have sold personal data (including under Connecticut law)</li>
-    <li>Review and correction of profiling (including under Connecticut and Minnesota law)</li>
-    <li>Limiting use of sensitive personal data (including under California law)</li>
-    <li>Opting out of collection via voice or facial recognition features (including under Florida law)</li>
+    <li><strong>Right to opt out</strong> of processing for targeted advertising, sale of personal data, or profiling that produces legal or similarly significant effects</li>
   </ul>
 
   <h3>How to exercise your rights</h3>
-  <p>Email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a> or use the contact section below. Authorized agents may submit requests with proof of authorization where required.</p>
+  <p>Email <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a> or use the contact section below. Authorized agents may submit requests with proof of authorization where required.</p>
 
   <h3>Request verification</h3>
   <p>We may verify your identity before fulfilling a request. If we cannot verify you from information we already have, we may ask for additional information for security and fraud prevention.</p>
 
   <h3>Appeals</h3>
-  <p>If we deny your request, you may appeal by emailing <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a>. If an appeal is denied, you may contact your state attorney general where applicable.</p>
+  <p>If we deny your request, you may appeal by emailing <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a>. If an appeal is denied, you may contact your state attorney general where applicable.</p>
 
-  <h2 id="policyupdates">10. Do we make updates to this notice?</h2>
+  <h2 id="policyupdates">12. Do we make updates to this notice?</h2>
   <div class="in-short"><strong>In short:</strong> <em>Yes. We update this notice when needed to stay compliant with applicable laws.</em></div>
 
-  <p>We may update this privacy notice from time to time. The “Last updated” date at the top shows when it was last revised. For material changes, we may post a notice or notify you directly. Please review this notice periodically.</p>
+  <p>We may update this privacy notice from time to time. The "Last updated" date at the top shows when it was last revised. For material changes, we may post a notice or notify you directly. Please review this notice periodically.</p>
 
-  <h2 id="contact">11. How can you contact us?</h2>
-  <p>Questions about this notice? Email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a> or write to:</p>
+  <h2 id="contact">13. How can you contact us?</h2>
+  <p>Questions about this notice? Email <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a> or write to:</p>
   <div class="contact-block">
     <strong>RimRun</strong>
     Upper Darby, PA<br />
     United States
   </div>
 
-  <h2 id="request">12. How can you review, update, or delete your data?</h2>
-  <p>Depending on applicable law, you may request access, correction, deletion, or other rights regarding your personal information. To request to review, update, or delete your personal information, please email <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a>.</p>
+  <h2 id="request">14. How can you review, update, or delete your data?</h2>
+  <p>Depending on applicable law, you may request access, correction, deletion, or other rights regarding your personal information. You can update most account details directly in the app under <strong>Profile → Account</strong>. To request full deletion of your personal information, please email <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a>.</p>
 
 </main>
 
 <footer class="site-footer">
-  <p><strong>RimRun</strong> · Privacy policy · <a href="mailto:nvafeomo05@gmail.com">nvafeomo05@gmail.com</a></p>
+  <p><strong>RimRun</strong> · Privacy policy · <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a></p>
 </footer>
 
 </body>

@@ -14,7 +14,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
-import { colors, spacing, borderRadius } from "../../../constants/theme";
+import { colors, spacing, borderRadius, shadows, typography } from "../../../constants/theme";
+import { formatChatListTime } from "../../../lib/formatRelativeTime";
+import { fetchLastMessagesByConversation } from "../../../lib/chatLastMessages";
 import { clearConversationAndLeave } from "../../../lib/chatDeletion";
 import { FriendsPanel } from "../../../components/FriendsPanel";
 import { NewGroupChatModal } from "../../../components/NewGroupChatModal";
@@ -62,6 +64,38 @@ export default function ChatsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [threadDeletingId, setThreadDeletingId] = useState<string | null>(null);
+  const [openingCourtId, setOpeningCourtId] = useState<string | null>(null);
+
+  const sortCourtChats = useCallback((items: CourtChatItem[]) => {
+    return [...items].sort(
+      (a, b) =>
+        new Date(b.lastMessageAt ?? 0).getTime() -
+        new Date(a.lastMessageAt ?? 0).getTime(),
+    );
+  }, []);
+
+  const applyLastMessagePreviews = useCallback(
+    async (items: CourtChatItem[]): Promise<CourtChatItem[]> => {
+      const convIds = items
+        .map((row) => row.conversationId)
+        .filter((id): id is string => !!id);
+      if (convIds.length === 0) return items;
+
+      const lastByConv = await fetchLastMessagesByConversation(convIds);
+
+      return items.map((row) => {
+        if (!row.conversationId) return row;
+        const last = lastByConv.get(row.conversationId);
+        if (!last) return row;
+        return {
+          ...row,
+          lastMessage: last.content,
+          lastMessageAt: last.created_at,
+        };
+      });
+    },
+    [],
+  );
 
   const tabFromParams =
     typeof tabParam === "string"
@@ -76,85 +110,70 @@ export default function ChatsScreen() {
     else if (tabFromParams === "friends") setActiveTab("friends");
   }, [tabFromParams]);
 
-  const fetchCourtChats = useCallback(async () => {
-    if (!user?.id) {
-      setCourtChats([]);
-      return;
-    }
-    try {
-      const { data: subs, error: subsError } = await supabase
-        .from("court_subscriptions")
-        .select("court_id")
-        .eq("user_id", user.id);
-
-      if (subsError || !subs?.length) {
+  const fetchCourtChats = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!user?.id) {
         setCourtChats([]);
         return;
       }
+      try {
+        const { data: subs, error: subsError } = await supabase
+          .from("court_subscriptions")
+          .select("court_id")
+          .eq("user_id", user.id);
 
-      const courtIds = subs.map((s) => s.court_id);
+        if (subsError || !subs?.length) {
+          setCourtChats([]);
+          return;
+        }
 
-      const { data: courts, error: courtsError } = await supabase
-        .from("courts")
-        .select("id, name")
-        .in("id", courtIds);
+        const courtIds = subs.map((s) => s.court_id);
 
-      if (courtsError || !courts?.length) {
-        setCourtChats([]);
-        return;
+        const { data: courts, error: courtsError } = await supabase
+          .from("courts")
+          .select("id, name")
+          .in("id", courtIds);
+
+        if (courtsError || !courts?.length) {
+          setCourtChats([]);
+          return;
+        }
+
+        const { data: convs, error: convsError } = await supabase
+          .from("conversations")
+          .select("id, court_id")
+          .eq("type", "court")
+          .in("court_id", courtIds);
+
+        if (convsError) {
+          setCourtChats([]);
+          return;
+        }
+
+        const convByCourt = Object.fromEntries(
+          (convs ?? []).map((c) => [c.court_id, c.id]),
+        );
+
+        const items: CourtChatItem[] = courts.map((court) => ({
+          courtId: court.id,
+          courtName: court.name ?? "Court",
+          conversationId: convByCourt[court.id] ?? "",
+        }));
+
+        // Paint the list immediately; hydrate previews in one batched query.
+        setCourtChats(sortCourtChats(items));
+
+        const withPreviews = await applyLastMessagePreviews(items);
+        setCourtChats(sortCourtChats(withPreviews));
+      } catch (err) {
+        console.error("Error fetching court chats:", err);
+        if (!opts?.silent) {
+          setCourtChats([]);
+        }
       }
-
-      const { data: convs, error: convsError } = await supabase
-        .from("conversations")
-        .select("id, court_id")
-        .eq("type", "court")
-        .in("court_id", courtIds);
-
-      if (convsError) {
-        setCourtChats([]);
-        return;
-      }
-
-      const convByCourt = Object.fromEntries(
-        (convs ?? []).map((c) => [c.court_id, c.id])
-      );
-
-      const items: CourtChatItem[] = courts.map((court) => ({
-        courtId: court.id,
-        courtName: court.name ?? "Court",
-        conversationId: convByCourt[court.id] ?? "",
-      }));
-
-      await Promise.all(
-        items.map(async (row) => {
-          if (row.conversationId) {
-            const { data: lastMsg } = await supabase
-              .from("messages")
-              .select("content, created_at")
-              .eq("conversation_id", row.conversationId)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (lastMsg) {
-              row.lastMessage = lastMsg.content;
-              row.lastMessageAt = lastMsg.created_at;
-            }
-          } else {
-            const { data: newConvId } = await supabase.rpc(
-              "get_or_create_court_conversation",
-              { p_court_id: row.courtId }
-            );
-            if (newConvId) row.conversationId = newConvId;
-          }
-        })
-      );
-
-      setCourtChats([...items]);
-    } catch (err) {
-      console.error("Error fetching court chats:", err);
-      setCourtChats([]);
-    }
-  }, [user?.id]);
+    },
+    [user?.id, sortCourtChats, applyLastMessagePreviews],
+  );
 
   const fetchMessageThreads = useCallback(async () => {
     if (!user?.id) {
@@ -181,88 +200,83 @@ export default function ChatsScreen() {
 
       const groupConvs = (convRows ?? []).filter((c) => c.type === "group");
       const dmIds = (convRows ?? []).filter((c) => c.type === "dm").map((c) => c.id);
+      const groupConvIds = groupConvs.map((c) => c.id);
+      const groupConvIdSet = new Set(groupConvIds);
+      const threadConvIds = [...groupConvIds, ...dmIds];
 
-      const groupItems: MessageThreadItem[] = await Promise.all(
-        groupConvs.map(async (c) => {
-          const { data: parts } = await supabase
-            .from("conversation_participants")
-            .select("user_id")
-            .eq("conversation_id", c.id);
-          const otherIds = (parts ?? [])
-            .map((p) => p.user_id)
-            .filter((id) => id !== user.id);
-          const { data: profs } = await supabase
-            .from("profiles")
-            .select("username")
-            .in("id", otherIds);
-          const names = (profs ?? [])
-            .map((p) => p.username ?? "?")
-            .sort()
-            .join(", ");
-          const title = c.name?.trim() || names || "Group chat";
-          const { data: lastMsg } = await supabase
-            .from("messages")
-            .select("content, created_at")
-            .eq("conversation_id", c.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          return {
-            kind: "group" as const,
-            conversationId: c.id,
-            title,
-            lastMessage: lastMsg?.content,
-            lastMessageAt: lastMsg?.created_at,
-          };
-        }),
+      const [lastByConv, partsResult] = await Promise.all([
+        fetchLastMessagesByConversation(threadConvIds),
+        threadConvIds.length > 0
+          ? supabase
+              .from("conversation_participants")
+              .select("conversation_id, user_id")
+              .in("conversation_id", threadConvIds)
+          : Promise.resolve({ data: [] as { conversation_id: string; user_id: string }[] }),
+      ]);
+
+      const allParts = partsResult.data ?? [];
+
+      const othersByGroupConv = new Map<string, string[]>();
+      for (const part of allParts) {
+        if (!groupConvIdSet.has(part.conversation_id) || part.user_id === user.id) {
+          continue;
+        }
+        const list = othersByGroupConv.get(part.conversation_id) ?? [];
+        list.push(part.user_id);
+        othersByGroupConv.set(part.conversation_id, list);
+      }
+
+      const groupMemberIds = [
+        ...new Set([...othersByGroupConv.values()].flat()),
+      ];
+      const otherByDmConv = new Map<string, string>();
+      for (const cid of dmIds) {
+        const other = allParts.find(
+          (p) => p.conversation_id === cid && p.user_id !== user.id,
+        );
+        if (other) otherByDmConv.set(cid, other.user_id);
+      }
+      const dmOtherIds = [...new Set([...otherByDmConv.values()])];
+      const profileIds = [...new Set([...groupMemberIds, ...dmOtherIds])];
+
+      const { data: profiles } =
+        profileIds.length > 0
+          ? await supabase
+              .from("profiles")
+              .select("id, username")
+              .in("id", profileIds)
+          : { data: [] as { id: string; username: string | null }[] };
+      const nameMap = Object.fromEntries(
+        (profiles ?? []).map((p) => [p.id, p.username ?? "?"]),
       );
 
+      const groupItems: MessageThreadItem[] = groupConvs.map((c) => {
+        const otherIds = othersByGroupConv.get(c.id) ?? [];
+        const names = otherIds.map((id) => nameMap[id] ?? "?").sort().join(", ");
+        const title = c.name?.trim() || names || "Group chat";
+        const last = lastByConv.get(c.id);
+        return {
+          kind: "group" as const,
+          conversationId: c.id,
+          title,
+          lastMessage: last?.content,
+          lastMessageAt: last?.created_at,
+        };
+      });
+
       const dmItems: MessageThreadItem[] = [];
-      if (dmIds.length) {
-        const { data: allDmParts } = await supabase
-          .from("conversation_participants")
-          .select("conversation_id, user_id")
-          .in("conversation_id", dmIds);
-
-        const otherByConv = new Map<string, string>();
-        for (const cid of dmIds) {
-          const parts = (allDmParts ?? []).filter(
-            (p) => p.conversation_id === cid,
-          );
-          const other = parts.find((p) => p.user_id !== user.id);
-          if (other) otherByConv.set(cid, other.user_id);
-        }
-        const otherIds = [...new Set([...otherByConv.values()])];
-        const { data: profiles } =
-          otherIds.length > 0
-            ? await supabase
-                .from("profiles")
-                .select("id, username")
-                .in("id", otherIds)
-            : { data: [] as { id: string; username: string | null }[] };
-        const nameMap = Object.fromEntries(
-          (profiles ?? []).map((p) => [p.id, p.username ?? "Unknown"]),
-        );
-
-        for (const cid of dmIds) {
-          const otherId = otherByConv.get(cid);
-          if (!otherId) continue;
-          const { data: lastMsg } = await supabase
-            .from("messages")
-            .select("content, created_at")
-            .eq("conversation_id", cid)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          dmItems.push({
-            kind: "dm",
-            conversationId: cid,
-            otherUserId: otherId,
-            otherUsername: nameMap[otherId] ?? "Unknown",
-            lastMessage: lastMsg?.content,
-            lastMessageAt: lastMsg?.created_at,
-          });
-        }
+      for (const cid of dmIds) {
+        const otherId = otherByDmConv.get(cid);
+        if (!otherId) continue;
+        const last = lastByConv.get(cid);
+        dmItems.push({
+          kind: "dm",
+          conversationId: cid,
+          otherUserId: otherId,
+          otherUsername: nameMap[otherId] ?? "Unknown",
+          lastMessage: last?.content,
+          lastMessageAt: last?.created_at,
+        });
       }
 
       const merged = [...dmItems, ...groupItems].sort(
@@ -295,11 +309,15 @@ export default function ChatsScreen() {
     if (activeTab === "messages") fetchMessageThreads();
   }, [activeTab, fetchMessageThreads]);
 
-  /** Refresh when returning from a chat or profile so new DMs appear in the list. */
+  /** Refresh when returning from a chat — only the active sub-tab. */
   useFocusEffect(
     useCallback(() => {
-      fetchMessageThreads();
-    }, [fetchMessageThreads]),
+      if (activeTab === "messages") {
+        void fetchMessageThreads();
+      } else if (activeTab === "courts") {
+        void fetchCourtChats({ silent: true });
+      }
+    }, [fetchMessageThreads, fetchCourtChats, activeTab]),
   );
 
   const onRefresh = async () => {
@@ -352,12 +370,35 @@ export default function ChatsScreen() {
     await fetchMessageThreads();
   };
 
-  const openCourtChat = (item: CourtChatItem) => {
-    if (!item.conversationId) return;
+  const openCourtChat = async (item: CourtChatItem) => {
+    let conversationId = item.conversationId;
+    if (!conversationId) {
+      setOpeningCourtId(item.courtId);
+      try {
+        const { data: newConvId, error } = await supabase.rpc(
+          "get_or_create_court_conversation",
+          { p_court_id: item.courtId },
+        );
+        if (error || !newConvId) {
+          Alert.alert("Could not open chat", "Try again in a moment.");
+          return;
+        }
+        conversationId = String(newConvId);
+        setCourtChats((prev) =>
+          sortCourtChats(
+            prev.map((row) =>
+              row.courtId === item.courtId ? { ...row, conversationId } : row,
+            ),
+          ),
+        );
+      } finally {
+        setOpeningCourtId(null);
+      }
+    }
     router.push({
       pathname: "/(app)/chat/[conversationId]",
       params: {
-        conversationId: item.conversationId,
+        conversationId,
         title: getDisplayName(item.courtId, item.courtName),
         courtId: item.courtId,
         courtName: item.courtName,
@@ -365,26 +406,66 @@ export default function ChatsScreen() {
     });
   };
 
-  const renderCourtChatItem = ({ item }: { item: CourtChatItem }) => (
-    <Pressable
-      style={styles.chatItem}
-      onPress={() => openCourtChat(item)}
-      android_ripple={{ color: colors.border }}
-    >
-      <View style={styles.chatItemIcon}>
-        <Ionicons name="basketball" size={24} color={colors.primary} />
-      </View>
-      <View style={styles.chatItemContent}>
-        <Text style={styles.chatItemTitle} numberOfLines={1}>
-          {getDisplayName(item.courtId, item.courtName)}
+  const renderCourtChatItem = ({
+    item,
+    isLast,
+  }: {
+    item: CourtChatItem;
+    isLast?: boolean;
+  }) => {
+    const opening = openingCourtId === item.courtId;
+    return (
+    <View style={[styles.courtChatRow, isLast && styles.courtChatRowLast]}>
+      <Pressable
+        style={styles.threadRowMain}
+        onPress={() => void openCourtChat(item)}
+        disabled={opening}
+        android_ripple={{ color: colors.border }}
+      >
+        <View style={styles.courtChatIconWrap}>
+          <Ionicons name="basketball" size={22} color={colors.primary} />
+        </View>
+        <View style={styles.chatItemContent}>
+          <View style={styles.chatItemHeader}>
+            <Text style={styles.chatItemTitle} numberOfLines={1}>
+              {getDisplayName(item.courtId, item.courtName)}
+            </Text>
+            {item.lastMessageAt ? (
+              <Text style={styles.chatItemTime}>
+                {formatChatListTime(item.lastMessageAt)}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.courtChatMetaRow}>
+            <View style={styles.courtChatPill}>
+              <Text style={styles.courtChatPillText}>Court chat</Text>
+            </View>
+          </View>
+          <Text
+            style={[
+              styles.chatItemPreview,
+              !item.lastMessage && styles.chatItemPreviewEmpty,
+            ]}
+            numberOfLines={2}
+          >
+            {item.lastMessage ?? "No messages yet — tap to say hi"}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </Pressable>
+    </View>
+    );
+  };
+
+  const courtChatsListHeader =
+    courtChats.length > 0 ? (
+      <View style={styles.courtsListHeader}>
+        <Text style={styles.listHeaderText}>
+          {courtChats.length} subscribed court
+          {courtChats.length !== 1 ? "s" : ""}
         </Text>
-        <Text style={styles.chatItemPreview} numberOfLines={1}>
-          {item.lastMessage ?? "No messages yet"}
-        </Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-    </Pressable>
-  );
+    ) : null;
 
   const renderMessageThreadItem = ({ item }: { item: MessageThreadItem }) => {
     const deleting = threadDeletingId === item.conversationId;
@@ -412,9 +493,16 @@ export default function ChatsScreen() {
             )}
           </View>
           <View style={styles.chatItemContent}>
-            <Text style={styles.chatItemTitle} numberOfLines={1}>
-              {item.kind === "dm" ? item.otherUsername : item.title}
-            </Text>
+            <View style={styles.chatItemHeader}>
+              <Text style={styles.chatItemTitle} numberOfLines={1}>
+                {item.kind === "dm" ? item.otherUsername : item.title}
+              </Text>
+              {item.lastMessageAt ? (
+                <Text style={styles.chatItemTime}>
+                  {formatChatListTime(item.lastMessageAt)}
+                </Text>
+              ) : null}
+            </View>
             <Text style={styles.chatItemPreview} numberOfLines={1}>
               {item.lastMessage ?? "No messages yet"}
             </Text>
@@ -443,6 +531,7 @@ export default function ChatsScreen() {
       <View style={styles.header}>
         <View style={styles.headerTextBlock}>
           <Text style={styles.title}>Chats</Text>
+          <View style={styles.titleAccent} />
           <Text style={styles.subtitle}>
             {activeTab === "courts"
               ? "Court chats for your subscribed courts"
@@ -526,7 +615,13 @@ export default function ChatsScreen() {
       {activeTab === "messages" ? (
         messageThreads.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
+            <View style={styles.emptyIconWrap}>
+              <Ionicons
+                name="chatbubbles-outline"
+                size={40}
+                color={colors.textMuted}
+              />
+            </View>
             <Text style={styles.emptyTitle}>No messages yet</Text>
             <Text style={styles.emptyText}>
               Tap + to start a group, or open Friends to message someone directly.
@@ -566,10 +661,18 @@ export default function ChatsScreen() {
         ) : (
           <FlatList
             data={courtChats}
-            renderItem={renderCourtChatItem}
+            renderItem={({ item, index }) =>
+              renderCourtChatItem({
+                item,
+                isLast: index === courtChats.length - 1,
+              })
+            }
             keyExtractor={(item) => item.courtId}
+            ListHeaderComponent={courtChatsListHeader}
             contentContainerStyle={
-              courtChats.length === 0 ? styles.emptyList : styles.list
+              courtChats.length === 0
+                ? styles.emptyList
+                : [styles.list, styles.courtsListBox]
             }
             refreshControl={
               <RefreshControl
@@ -580,15 +683,24 @@ export default function ChatsScreen() {
             }
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Ionicons
-                  name="basketball-outline"
-                  size={48}
-                  color={colors.textMuted}
-                />
+                <View style={styles.emptyIconWrap}>
+                  <Ionicons
+                    name="basketball-outline"
+                    size={40}
+                    color={colors.textMuted}
+                  />
+                </View>
                 <Text style={styles.emptyTitle}>No court chats yet</Text>
                 <Text style={styles.emptyText}>
-                  Subscribe to a court from the Courts tab to see its chat here.
+                  Subscribe to courts on the map to join their group chats here.
                 </Text>
+                <Pressable
+                  style={styles.addFriendsButton}
+                  onPress={() => router.push("/(app)/(tabs)/courts")}
+                >
+                  <Ionicons name="map" size={20} color="#fff" />
+                  <Text style={styles.addFriendsButtonText}>Browse courts</Text>
+                </Pressable>
               </View>
             }
           />
@@ -642,33 +754,42 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: 24,
-    fontWeight: "600",
+    ...typography.screenTitle,
+  },
+  titleAccent: {
+    width: 40,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
   subtitle: {
     color: colors.textSecondary,
     fontSize: 14,
-    marginTop: spacing.xs,
+    lineHeight: 20,
   },
   tabBar: {
     flexDirection: "row",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    padding: spacing.xs,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.lg,
+    gap: spacing.xs,
   },
   tab: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+    paddingVertical: spacing.sm + 2,
     borderRadius: borderRadius.md,
   },
   tabActive: {
     backgroundColor: colors.surface,
+    ...shadows.soft,
   },
   tabText: {
     fontSize: 15,
@@ -684,20 +805,61 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   list: {
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+  },
+  listHeader: {
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
+  courtsListHeader: {
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: spacing.sm,
+  },
+  courtsListBox: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    ...shadows.card,
+  },
+  listHeaderText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textMuted,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   emptyList: {
-    flex: 1,
+    flexGrow: 1,
   },
   threadRow: {
     flexDirection: "row",
     alignItems: "stretch",
     marginBottom: spacing.sm,
     backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+    ...shadows.soft,
+  },
+  courtChatRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: "hidden",
+  },
+  courtChatRowLast: {
+    marginBottom: 0,
   },
   threadRowMain: {
     flex: 1,
@@ -712,57 +874,126 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: spacing.md,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
+  },
+  courtChatIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.md,
+  },
+  courtChatMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  courtChatPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+    backgroundColor: "rgba(232, 93, 4, 0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(232, 93, 4, 0.35)",
+  },
+  courtChatPillText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.primaryLight,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  chatItemPreviewEmpty: {
+    fontStyle: "italic",
+    color: colors.textMuted,
   },
   chatItem: {
     flexDirection: "row",
     alignItems: "center",
     padding: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.soft,
+  },
+  chatItemPressed: {
+    opacity: 0.92,
   },
   chatItemIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.surfaceElevated,
     alignItems: "center",
     justifyContent: "center",
     marginRight: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   chatItemContent: {
     flex: 1,
     minWidth: 0,
   },
+  chatItemHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
   chatItemTitle: {
+    flex: 1,
     fontSize: 16,
     fontWeight: "600",
     color: colors.text,
+  },
+  chatItemTime: {
+    fontSize: 12,
+    color: colors.textMuted,
+    flexShrink: 0,
   },
   chatItemPreview: {
     fontSize: 14,
     color: colors.textMuted,
     marginTop: spacing.xs,
+    lineHeight: 19,
   },
   emptyState: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: colors.text,
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
   },
   emptyText: {
     fontSize: 15,
     color: colors.textMuted,
     marginTop: spacing.sm,
     textAlign: "center",
+    lineHeight: 22,
   },
   addFriendsButton: {
     flexDirection: "row",
@@ -772,7 +1003,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
+    ...shadows.soft,
   },
   addFriendsButtonText: {
     fontSize: 16,

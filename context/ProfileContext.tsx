@@ -114,13 +114,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = useCallback(async () => {
+  const fetchProfile = useCallback(async (options?: { silent?: boolean }) => {
     if (!user?.id) {
       setProfile(null);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!options?.silent) {
+      setLoading(true);
+    }
     try {
       const query = supabase
         .from('profiles')
@@ -293,7 +295,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const value: ProfileContextValue = {
     profile,
     loading,
-    refreshProfile: fetchProfile,
+    refreshProfile: () => fetchProfile({ silent: true }),
     updateProfilePicture,
   };
 
