@@ -371,15 +371,11 @@ export default function CourtDetailScreen() {
               styles.openInMapsButton,
               pressed && styles.openInMapsButtonPressed,
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Open in Maps"
           >
             <Ionicons name="map" size={18} color={colors.primary} />
             <Text style={styles.openInMapsText}>Open in Maps</Text>
-            <Ionicons
-              name="open-outline"
-              size={16}
-              color={colors.primary}
-              style={styles.openInMapsChevron}
-            />
           </Pressable>
         </View>
 
@@ -555,26 +551,25 @@ const styles = StyleSheet.create({
   openInMapsButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-    paddingVertical: spacing.sm + 2,
+    alignSelf: "flex-start",
+    gap: spacing.md,
+    marginTop: spacing.xs,
+    marginLeft: 32 + spacing.sm,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: "rgba(232, 93, 4, 0.12)",
+    borderRadius: borderRadius.full,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
   openInMapsButtonPressed: {
-    opacity: 0.88,
+    backgroundColor: "rgba(232, 93, 4, 0.22)",
   },
   openInMapsText: {
-    flex: 1,
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
     color: colors.primary,
-  },
-  openInMapsChevron: {
-    opacity: 0.85,
+    textDecorationLine: "underline",
   },
   button: {
     flexDirection: "row",

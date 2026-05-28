@@ -256,7 +256,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonLast]}
+            style={styles.actionButton}
             onPress={() => router.push('/(app)/privacy-policy')}
             accessibilityRole="button"
             accessibilityLabel="Privacy policy"
@@ -266,6 +266,20 @@ export default function ProfileScreen() {
                 <Ionicons name="document-text-outline" size={20} color={colors.primary} />
               </View>
               <Text style={styles.actionButtonText}>Privacy policy</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.actionButtonLast]}
+            onPress={() => router.push('/(app)/terms-of-service')}
+            accessibilityRole="button"
+            accessibilityLabel="Terms of service"
+          >
+            <View style={styles.actionLeft}>
+              <View style={styles.actionIconWrap}>
+                <Ionicons name="reader-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.actionButtonText}>Terms of service</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>

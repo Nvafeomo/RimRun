@@ -12,19 +12,16 @@ import {
   } from 'react-native';
   import { SafeAreaView } from 'react-native-safe-area-context';
   import { useRouter } from 'expo-router';
-  import { useState } from 'react';
+  import { useState, useCallback } from 'react';
   import { useAuth } from '../../context/AuthContext';
   import { useProfile } from '../../context/ProfileContext';
   import { colors, spacing, borderRadius } from '../../constants/theme';
-  import { router } from 'expo-router';
   import { Image } from 'expo-image';
-  import DateTimePicker from '@react-native-community/datetimepicker';
   import * as ImagePicker from 'expo-image-picker';
+  import { DateOfBirthPickerField } from '../../components/DateOfBirthPickerField';
   import { supabase } from '../../lib/supabase';
   import { reencodeJpegWithoutExif } from '../../lib/stripImageForUpload';
   import {
-    formatLocalIsoDate,
-    maxBirthDateForMinAge,
     validateDateOfBirthForSignup,
   } from '../../lib/agePolicy';
   import {
@@ -42,17 +39,9 @@ import {
     return null;
   }
 
-  const formatDateForDisplay = (isoDate: string) => {
-    const [y, m, d] = isoDate.split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
   export default function OnboardingScreen() {
-    const { user } = useAuth();
+    const router = useRouter();
+    const { user, signOut } = useAuth();
     const { profile, loading: profileLoading, refreshProfile } = useProfile();
     const [profilePicture, setProfilePicture] = useState<string | null>(null);
     /** Local file URI for upload (strip EXIF via re-encode before storage). */
@@ -60,7 +49,6 @@ import {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [dateOfBirth, setDateOfBirth] = useState('');
-    const [showDatePicker, setShowDatePicker] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
@@ -119,6 +107,15 @@ import {
     const needsEmail = !user?.email?.trim();
     const needsLegacyDob = !profile?.date_of_birth;
     const hasProfileRow = profile !== null;
+
+    const handleBack = useCallback(async () => {
+      if (router.canGoBack()) {
+        router.back();
+        return;
+      }
+      await signOut();
+      router.replace('/(auth)/login');
+    }, [router, signOut]);
 
     const handleCompleteProfile = async () => {
         if (!user?.id) {
@@ -279,7 +276,7 @@ import {
         >
             <TouchableOpacity
                 style={styles.backButton}
-                onPress={() => router.back()}
+                onPress={() => void handleBack()}
                 activeOpacity={0.7}
                 >
                 <Text style={styles.backButtonText}>← Back</Text>
@@ -339,37 +336,12 @@ import {
 
                     {needsLegacyDob ? (
                         <>
-                            <TouchableOpacity
-                                style={[styles.input, styles.inputFullWidth, styles.dobTouchable]}
-                                onPress={() => setShowDatePicker(true)}
-                            >
-                                <Text style={[styles.dobText, !dateOfBirth && styles.dobPlaceholder]}>
-                                    {dateOfBirth ? formatDateForDisplay(dateOfBirth) : 'Date of birth (13+ only)'}
-                                </Text>
-                            </TouchableOpacity>
-
-                            {showDatePicker ? (
-                                <DateTimePicker
-                                    value={
-                                        dateOfBirth
-                                            ? (() => {
-                                                const [y, m, d] = dateOfBirth.split('-').map(Number);
-                                                return new Date(y, m - 1, d);
-                                              })()
-                                            : maxBirthDateForMinAge()
-                                    }
-                                    mode="date"
-                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                    textColor={colors.textSecondary}
-                                    maximumDate={maxBirthDateForMinAge()}
-                                    onChange={(event, selectedDate) => {
-                                        setShowDatePicker(false);
-                                        if (event.type === 'set' && selectedDate) {
-                                            setDateOfBirth(formatLocalIsoDate(selectedDate));
-                                        }
-                                    }}
-                                />
-                            ) : null}
+                            <DateOfBirthPickerField
+                                value={dateOfBirth}
+                                onChange={setDateOfBirth}
+                                touchableStyle={[styles.input, styles.inputFullWidth, styles.dobTouchable]}
+                                textStyle={styles.dobText}
+                            />
                         </>
                     ) : null}
 

@@ -42,6 +42,7 @@ export default function AppLayout() {
       <Stack.Screen name="account" />
       <Stack.Screen name="privacy-settings" />
       <Stack.Screen name="privacy-policy" />
+      <Stack.Screen name="terms-of-service" />
       <Stack.Screen name="user/[userId]" />
       <Stack.Screen name="admin/moderation" />
     </Stack>

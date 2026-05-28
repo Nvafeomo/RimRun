@@ -13,16 +13,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { SocialAuthButtons } from '../../components/SocialAuthButtons';
-import {
-  formatLocalIsoDate,
-  maxBirthDateForMinAge,
-  validateDateOfBirthForSignup,
-} from '../../lib/agePolicy';
+import { DateOfBirthPickerField } from '../../components/DateOfBirthPickerField';
+import { validateDateOfBirthForSignup } from '../../lib/agePolicy';
 import {
   normalizeUsername,
   validateUsernameInput,
@@ -36,7 +32,6 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -61,15 +56,6 @@ export default function SignupScreen() {
     if (value !== password) return 'Passwords do not match';
     return null;
   }
-
-  const formatDateForDisplay = (isoDate: string) => {
-    const [y, m, d] = isoDate.split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
 
   async function handleSignUp() {
     setError('');
@@ -188,36 +174,12 @@ export default function SignupScreen() {
               onChangeText={setEmail}
             />
 
-            <TouchableOpacity
-              style={[styles.input, styles.dobTouchable]}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={[styles.dobText, !dateOfBirth && styles.dobPlaceholder]}>
-                {dateOfBirth ? formatDateForDisplay(dateOfBirth) : 'Date of birth (13+ only)'}
-              </Text>
-            </TouchableOpacity>
-            {showDatePicker ? (
-              <DateTimePicker
-                value={
-                  dateOfBirth
-                    ? (() => {
-                        const [y, m, d] = dateOfBirth.split('-').map(Number);
-                        return new Date(y, m - 1, d);
-                      })()
-                    : maxBirthDateForMinAge()
-                }
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                textColor={colors.textSecondary}
-                maximumDate={maxBirthDateForMinAge()}
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (event.type === 'set' && selectedDate) {
-                    setDateOfBirth(formatLocalIsoDate(selectedDate));
-                  }
-                }}
-              />
-            ) : null}
+            <DateOfBirthPickerField
+              value={dateOfBirth}
+              onChange={setDateOfBirth}
+              touchableStyle={[styles.input, styles.dobTouchable]}
+              textStyle={styles.dobText}
+            />
 
             <TextInput
               placeholder="Password"
@@ -360,9 +322,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: colors.text,
-  },
-  dobPlaceholder: {
-    color: colors.textMuted,
   },
   button: {
     width: '100%',
