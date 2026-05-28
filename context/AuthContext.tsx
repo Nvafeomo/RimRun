@@ -8,7 +8,7 @@ import {
 import { Linking } from 'react-native';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { signInWithGoogle as oauthGoogle } from '../lib/oauth';
+import { signInWithGoogle as oauthGoogle, signInWithApple as appleSignIn } from '../lib/oauth';
 import {
   applyAuthFromUrl,
   clearPendingPasswordRecovery,
@@ -34,6 +34,7 @@ type AuthContextValue = {
       dateOfBirthIso: string,
     ) => Promise<void>;
     signInWithGoogle: () => Promise<void>;
+    signInWithApple: () => Promise<void>;
     signOut: () => Promise<void>;
     clearBanBlocked: () => void;
     submitBanAppeal: (
@@ -282,6 +283,10 @@ type AuthContextValue = {
       await oauthGoogle();
     }
 
+    async function signInWithApple() {
+      await appleSignIn();
+    }
+
     async function signOut() {
       await clearPendingPasswordRecovery();
       setBanBlocked(false);
@@ -311,6 +316,7 @@ type AuthContextValue = {
       signIn,
       signUp,
       signInWithGoogle,
+      signInWithApple,
       signOut,
       clearBanBlocked,
       submitBanAppeal: handleSubmitBanAppeal,

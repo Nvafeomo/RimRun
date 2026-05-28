@@ -4,19 +4,25 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { colors, spacing, borderRadius } from '../constants/theme';
 
 type SocialAuthButtonsProps = {
   onGooglePress: () => void;
+  onApplePress?: () => void;
   disabled?: boolean;
   loading?: boolean;
+  appleLoading?: boolean;
 };
 
 export function SocialAuthButtons({
   onGooglePress,
+  onApplePress,
   disabled,
   loading,
+  appleLoading,
 }: SocialAuthButtonsProps) {
   return (
     <View style={styles.wrap}>
@@ -26,10 +32,25 @@ export function SocialAuthButtons({
         <View style={styles.dividerLine} />
       </View>
 
+      {Platform.OS === 'ios' && onApplePress ? (
+        <View
+          style={[styles.appleBtnWrap, (disabled || loading || appleLoading) && styles.btnDisabled]}
+          pointerEvents={(disabled || loading || appleLoading) ? 'none' : 'auto'}
+        >
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+            cornerRadius={borderRadius.md}
+            style={styles.appleBtn}
+            onPress={onApplePress}
+          />
+        </View>
+      ) : null}
+
       <TouchableOpacity
         style={[styles.socialBtn, styles.googleBtn]}
         onPress={onGooglePress}
-        disabled={disabled || loading}
+        disabled={disabled || loading || appleLoading}
         activeOpacity={0.85}
       >
         {loading ? (
@@ -64,6 +85,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  appleBtnWrap: {
+    marginBottom: spacing.sm,
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  appleBtn: {
+    height: 50,
+    width: '100%',
   },
   socialBtn: {
     height: 50,

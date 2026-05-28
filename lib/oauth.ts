@@ -6,6 +6,7 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { supabase } from './supabase';
 
 export const OAUTH_REDIRECT_PATH = 'auth/callback';
@@ -99,6 +100,24 @@ async function completeOAuthFromUrl(url: string): Promise<void> {
     return;
   }
   const { error } = await supabase.auth.exchangeCodeForSession(parsed.code);
+  if (error) throw error;
+}
+
+export async function signInWithApple(): Promise<void> {
+  const credential = await AppleAuthentication.signInAsync({
+    requestedScopes: [
+      AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+      AppleAuthentication.AppleAuthenticationScope.EMAIL,
+    ],
+  });
+  const { identityToken } = credential;
+  if (!identityToken) {
+    throw new Error('Apple sign-in failed: no identity token returned.');
+  }
+  const { error } = await supabase.auth.signInWithIdToken({
+    provider: 'apple',
+    token: identityToken,
+  });
   if (error) throw error;
 }
 

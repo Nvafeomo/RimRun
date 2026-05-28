@@ -35,7 +35,8 @@ export default function SignupScreen() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const { signUp, signInWithGoogle } = useAuth();
+  const [appleLoading, setAppleLoading] = useState(false);
+  const { signUp, signInWithGoogle, signInWithApple } = useAuth();
 
   function validateUsername(value: string): string | null {
     return validateUsernameInput(value);
@@ -121,6 +122,22 @@ export default function SignupScreen() {
       }
     } finally {
       setGoogleLoading(false);
+    }
+  }
+
+  async function handleApple() {
+    setError('');
+    setAppleLoading(true);
+    try {
+      await signInWithApple();
+      router.replace('/(app)');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Apple sign-in failed';
+      if (!msg.toLowerCase().includes('cancel')) {
+        setError(msg);
+      }
+    } finally {
+      setAppleLoading(false);
     }
   }
 
@@ -221,8 +238,10 @@ export default function SignupScreen() {
 
             <SocialAuthButtons
               onGooglePress={handleGoogle}
+              onApplePress={handleApple}
               disabled={submitting}
               loading={googleLoading}
+              appleLoading={appleLoading}
             />
           </View>
 

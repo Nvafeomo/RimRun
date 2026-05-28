@@ -24,7 +24,8 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const { signIn, signInWithGoogle } = useAuth();
+  const [appleLoading, setAppleLoading] = useState(false);
+  const { signIn, signInWithGoogle, signInWithApple } = useAuth();
 
   function validateEmailOrUsername(value: string): string | null {
     if (!value.trim()) return 'Email or Username is required';
@@ -71,6 +72,22 @@ export default function LoginScreen() {
       }
     } finally {
       setGoogleLoading(false);
+    }
+  }
+
+  async function handleApple() {
+    setError('');
+    setAppleLoading(true);
+    try {
+      await signInWithApple();
+      router.replace('/(app)');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Apple sign-in failed';
+      if (!msg.toLowerCase().includes('cancel')) {
+        setError(msg);
+      }
+    } finally {
+      setAppleLoading(false);
     }
   }
 
@@ -140,8 +157,10 @@ export default function LoginScreen() {
 
           <SocialAuthButtons
             onGooglePress={handleGoogle}
+            onApplePress={handleApple}
             disabled={submitting}
             loading={googleLoading}
+            appleLoading={appleLoading}
           />
 
           <TouchableOpacity
