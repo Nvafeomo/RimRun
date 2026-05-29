@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { colors, spacing, borderRadius } from '../constants/theme';
 
@@ -28,7 +29,7 @@ export function SocialAuthButtons({
     <View style={styles.wrap}>
       <View style={styles.dividerRow}>
         <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>or continue with</Text>
+        <Text style={styles.dividerText}>or sign in with</Text>
         <View style={styles.dividerLine} />
       </View>
 
@@ -48,15 +49,21 @@ export function SocialAuthButtons({
       ) : null}
 
       <TouchableOpacity
-        style={[styles.socialBtn, styles.googleBtn]}
+        style={[
+          styles.googleBtn,
+          (disabled || loading || appleLoading) && styles.btnDisabled,
+        ]}
         onPress={onGooglePress}
         disabled={disabled || loading || appleLoading}
-        activeOpacity={0.85}
+        activeOpacity={0.88}
       >
         {loading ? (
-          <ActivityIndicator color={colors.text} />
+          <ActivityIndicator color={colors.background} />
         ) : (
-          <Text style={styles.socialBtnText}>Continue with Google</Text>
+          <View style={styles.googleBtnContent}>
+            <Ionicons name="logo-google" size={20} color="#000000" />
+            <Text style={styles.googleBtnText}>Sign in with Google</Text>
+          </View>
         )}
       </TouchableOpacity>
     </View>
@@ -96,20 +103,26 @@ const styles = StyleSheet.create({
     height: 50,
     width: '100%',
   },
-  socialBtn: {
+  googleBtn: {
     height: 50,
+    width: '100%',
     borderRadius: borderRadius.md,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  googleBtn: {
-    backgroundColor: colors.surfaceElevated,
-    borderColor: colors.border,
+  googleBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
   },
-  socialBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
+  googleBtnText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000000',
+    letterSpacing: -0.2,
   },
 });
