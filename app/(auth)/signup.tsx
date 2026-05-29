@@ -114,7 +114,7 @@ export default function SignupScreen() {
     setGoogleLoading(true);
     try {
       await signInWithGoogle();
-      router.replace('/(app)');
+      router.replace('/(auth)/onboarding');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Google sign-in failed';
       if (!msg.toLowerCase().includes('cancel')) {
@@ -130,7 +130,7 @@ export default function SignupScreen() {
     setAppleLoading(true);
     try {
       await signInWithApple();
-      router.replace('/(app)');
+      router.replace('/(auth)/onboarding');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Apple sign-in failed';
       if (!msg.toLowerCase().includes('cancel')) {

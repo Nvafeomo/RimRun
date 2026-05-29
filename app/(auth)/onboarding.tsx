@@ -12,7 +12,7 @@ import {
   } from 'react-native';
   import { SafeAreaView } from 'react-native-safe-area-context';
   import { useRouter } from 'expo-router';
-  import { useState, useCallback } from 'react';
+  import { useState, useCallback, useEffect } from 'react';
   import { useAuth } from '../../context/AuthContext';
   import { useProfile } from '../../context/ProfileContext';
   import { colors, spacing, borderRadius } from '../../constants/theme';
@@ -31,6 +31,10 @@ import {
     mapProfileUsernameError,
   } from '../../lib/usernameRules';
   import { defaultUsernameSearchableForDob } from '../../lib/usernameSearchPolicy';
+  import {
+    getDisplayContactEmail,
+    isUsableContactEmail,
+  } from '../../lib/accountIdentity';
 
   function validateEmail(value: string): string | null {
     if (!value.trim()) return 'Email is required';
@@ -103,10 +107,18 @@ import {
     };
 
     const needsUsername = !profile?.username?.trim();
-    /** OAuth users must attach an email in Auth + profile when missing. */
-    const needsEmail = !user?.email?.trim();
+    /** Optional in onboarding — add a real email later under Account (Apple relay does not count). */
+    const needsEmail =
+      !isUsableContactEmail(profile?.email) && !isUsableContactEmail(user?.email);
     const needsLegacyDob = !profile?.date_of_birth;
     const hasProfileRow = profile !== null;
+
+    useEffect(() => {
+      if (profileLoading) return;
+      if (profile?.date_of_birth) {
+        router.replace('/(app)');
+      }
+    }, [profileLoading, profile?.date_of_birth, router]);
 
     const handleBack = useCallback(async () => {
       if (router.canGoBack()) {
@@ -158,7 +170,7 @@ import {
             }
         }
 
-        let resolvedEmail = user?.email?.trim() ?? '';
+        let resolvedEmail: string | null = getDisplayContactEmail(user, profile?.email);
         if (needsEmail) {
             const emailErr = validateEmail(email);
             if (emailErr) {
@@ -166,9 +178,6 @@ import {
                 return;
             }
             resolvedEmail = email.trim();
-        } else if (!resolvedEmail) {
-            setError('Email is required.');
-            return;
         }
 
         setError('');

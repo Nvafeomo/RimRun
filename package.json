@@ -15,7 +15,16 @@
     "prune-indoor-courts:execute": "node scripts/prune-indoor-courts.js --execute",
     "prune-indoor-courts:overpass": "node scripts/prune-indoor-courts.js --overpass",
     "prune-indoor-courts:overpass:execute": "node scripts/prune-indoor-courts.js --overpass --execute",
-    "sync-privacy-policy": "node scripts/sync-privacy-policy.js"
+    "sync-privacy-policy": "node scripts/sync-privacy-policy.js",
+    "eas:init": "eas init",
+    "build:dev:ios": "eas build --platform ios --profile development",
+    "build:dev:android": "eas build --platform android --profile development",
+    "build:preview:ios": "eas build --platform ios --profile preview",
+    "build:preview:android": "eas build --platform android --profile preview",
+    "build:production:ios": "eas build --platform ios --profile production",
+    "build:production:android": "eas build --platform android --profile production",
+    "submit:ios": "eas submit --platform ios --profile production --latest",
+    "submit:android": "eas submit --platform android --profile production --latest"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

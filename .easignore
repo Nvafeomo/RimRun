@@ -1,0 +1,6 @@
+docs/personal/
+scripts/
+.git/
+node_modules/
+*.md
+!README.md

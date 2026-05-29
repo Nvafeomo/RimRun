@@ -32,6 +32,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nvafeomo.RimRun",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "RimRun uses your location to show nearby basketball courts on the map.",
         "NSPhotoLibraryUsageDescription": "RimRun needs access to your photos to set your profile picture.",
@@ -62,10 +63,16 @@
           "apiKey": ""
         }
       },
-      "package": "com.nvafeomo.RimRun"
+      "package": "com.nvafeomo.RimRun",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b7156b72-ba46-4465-a9b5-34379e849c41"
+      }
     }
   }
 }

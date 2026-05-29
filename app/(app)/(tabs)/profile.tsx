@@ -19,6 +19,10 @@ import { supabase } from '../../../lib/supabase';
 import { AvatarImage } from '../../../components/AvatarImage';
 import { isAdminRole } from '../../../lib/moderation';
 import { messageFromEdgeFunctionFailure } from '../../../lib/edgeFunctions';
+import {
+  getDisplayContactEmail,
+  isOAuthOnlyUser,
+} from '../../../lib/accountIdentity';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -130,8 +134,9 @@ export default function ProfileScreen() {
     );
   }
 
-  const displayName = profile?.username ?? user?.email?.split('@')[0] ?? 'User';
-  const displayEmail = profile?.email ?? user?.email ?? '';
+  const displayName = profile?.username ?? 'User';
+  const displayEmail = getDisplayContactEmail(user, profile?.email);
+  const showAddEmailHint = !displayEmail && !!user;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -171,6 +176,10 @@ export default function ProfileScreen() {
           {displayEmail ? (
             <Text style={styles.email} numberOfLines={1}>
               {displayEmail}
+            </Text>
+          ) : showAddEmailHint ? (
+            <Text style={styles.emailHint}>
+              Add an email in Account settings{isOAuthOnlyUser(user) ? ' (optional)' : ''}
             </Text>
           ) : null}
 
@@ -417,6 +426,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 14,
     marginBottom: spacing.md,
+    maxWidth: '100%',
+  },
+  emailHint: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginBottom: spacing.md,
+    textAlign: 'center',
     maxWidth: '100%',
   },
   statsPanel: {

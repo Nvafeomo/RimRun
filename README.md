@@ -55,6 +55,8 @@ Then press `a` / `i` / `w` for Android, iOS, or web, or scan the QR code in Expo
 
 Native dev builds: `npm run android` · `npm run ios` · `npm run web`
 
+**Beta testing (TestFlight / Play):** see [docs/TESTING.md](docs/TESTING.md) — EAS Build setup, secrets, and QA checklist.
+
 ## Backend notes
 
 The app talks to **Supabase** (Postgres with RLS). Migration-style SQL lives under `scripts/` (policies, RPCs, triggers). You will need to apply whatever subset matches how you run the project: for example, friend and DM age checks, and how messages show up in court threads versus private chat. The client mirrors part of that logic in `lib/agePolicy.ts` and should stay in sync with what you deploy.

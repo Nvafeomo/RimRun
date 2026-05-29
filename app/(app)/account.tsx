@@ -24,6 +24,11 @@ import {
   USERNAME_RULES_USER_HINT,
   mapProfileUsernameError,
 } from "../../lib/usernameRules";
+import {
+  getAccountSettingsEmailDraft,
+  getDisplayContactEmail,
+  isOAuthOnlyUser,
+} from "../../lib/accountIdentity";
 
 function formatDateOfBirthDisplay(isoDate: string) {
   const [y, m, d] = isoDate.split("-").map(Number);
@@ -34,11 +39,17 @@ function formatDateOfBirthDisplay(isoDate: string) {
   });
 }
 
-
-function validateEmail(value: string): string | null {
-  if (!value.trim()) return "Email is required";
+function validateEmailIfProvided(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(value.trim())) return "Invalid email address";
+  if (!emailRegex.test(trimmed)) return "Invalid email address";
+  return null;
+}
+
+function validatePassword(value: string): string | null {
+  if (!value.trim()) return "Password is required";
+  if (value.length < 8) return "Password must be at least 8 characters";
   return null;
 }
 
@@ -49,10 +60,15 @@ export default function AccountScreen() {
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [settingPassword, setSettingPassword] = useState(false);
   const [error, setError] = useState("");
 
-  /** Avoid GO_BACK when there is no screen to pop (e.g. after auth refresh). */
+  const oauthOnly = isOAuthOnlyUser(user);
+  const hasContactEmail = !!getDisplayContactEmail(user, profile?.email);
+
   const exitAccountSettings = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
@@ -63,16 +79,16 @@ export default function AccountScreen() {
 
   useEffect(() => {
     if (!user) return;
-    setEmail(user.email ?? "");
+    setEmail(getAccountSettingsEmailDraft(user, profile?.email));
     setUsername((profile?.username ?? "").toLowerCase());
-  }, [user, profile?.username]);
+  }, [user, profile?.email, profile?.username]);
 
   const handleSave = useCallback(async () => {
     if (!user?.id) return;
     setError("");
 
     const usernameErr = validateUsernameInput(username);
-    const emailErr = validateEmail(email);
+    const emailErr = validateEmailIfProvided(email);
     if (usernameErr || emailErr) {
       setError(usernameErr ?? emailErr ?? "Invalid input");
       return;
@@ -81,10 +97,13 @@ export default function AccountScreen() {
     const normalizedUsername = normalizeUsername(username);
     const trimmedEmail = email.trim().toLowerCase();
     const currentUsername = (profile?.username ?? "").toLowerCase();
-    const currentEmail = (user.email ?? "").toLowerCase();
+    const currentContactEmail = (
+      getDisplayContactEmail(user, profile?.email) ?? ""
+    ).toLowerCase();
 
     const usernameChanged = normalizedUsername !== currentUsername;
-    const emailChanged = trimmedEmail !== currentEmail;
+    const emailChanged =
+      trimmedEmail.length > 0 && trimmedEmail !== currentContactEmail;
 
     if (!usernameChanged && !emailChanged) {
       exitAccountSettings();
@@ -138,7 +157,7 @@ export default function AccountScreen() {
       if (emailChanged) {
         Alert.alert(
           "Check your email",
-          "If your project requires confirmation, Supabase may send a link to verify the new address before it takes effect."
+          "If your project requires confirmation, Supabase may send a link to verify the new address before it takes effect.",
         );
       }
 
@@ -157,11 +176,47 @@ export default function AccountScreen() {
   }, [
     user,
     profile?.username,
+    profile?.email,
     username,
     email,
     refreshProfile,
     exitAccountSettings,
   ]);
+
+  const handleSetPassword = useCallback(async () => {
+    if (!user?.id) return;
+    setError("");
+
+    const passwordErr = validatePassword(newPassword);
+    if (passwordErr) {
+      setError(passwordErr);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setSettingPassword(true);
+    try {
+      const { error: pwErr } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (pwErr) throw pwErr;
+
+      setNewPassword("");
+      setConfirmPassword("");
+      Alert.alert(
+        "Password set",
+        "You can now sign in with your email and this password, in addition to Apple or Google.",
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Could not set password";
+      setError(msg);
+    } finally {
+      setSettingPassword(false);
+    }
+  }, [user?.id, newPassword, confirmPassword]);
 
   if (!user || profileLoading) {
     return (
@@ -189,9 +244,10 @@ export default function AccountScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.intro}>
-            Update your username and email. Usernames must be unique (6–20
-            characters). Email changes may require confirmation from your inbox
-            (Supabase settings).
+            Update your username{hasContactEmail ? " and email" : ""}. Signed in
+            with Apple or Google? Add an email below if you want password sign-in
+            or account recovery — your Apple private relay address is never shown
+            here.
           </Text>
 
           <View style={styles.card}>
@@ -219,7 +275,7 @@ export default function AccountScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="username"
-              editable={!submitting}
+              editable={!submitting && !settingPassword}
             />
             <Text style={styles.fieldHint}>{USERNAME_RULES_USER_HINT}</Text>
 
@@ -228,19 +284,26 @@ export default function AccountScreen() {
               style={styles.input}
               value={email}
               onChangeText={setEmail}
-              placeholder="you@example.com"
+              placeholder={
+                hasContactEmail ? "you@example.com" : "Add your email (optional)"
+              }
               placeholderTextColor={colors.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="email"
-              editable={!submitting}
+              editable={!submitting && !settingPassword}
             />
+            <Text style={styles.fieldHint}>
+              {hasContactEmail
+                ? "Changing email may require confirmation from your inbox."
+                : "Leave blank to skip. Useful for password sign-in and recovery."}
+            </Text>
 
             <Pressable
               style={[styles.saveButton, submitting && styles.saveButtonDisabled]}
               onPress={handleSave}
-              disabled={submitting}
+              disabled={submitting || settingPassword}
             >
               {submitting ? (
                 <ActivityIndicator color={colors.text} />
@@ -249,6 +312,57 @@ export default function AccountScreen() {
               )}
             </Pressable>
           </View>
+
+          {oauthOnly ? (
+            <View style={[styles.card, styles.passwordCard]}>
+              <Text style={styles.sectionTitle}>Password sign-in (optional)</Text>
+              <Text style={styles.sectionIntro}>
+                Set a password if you want to sign in with email and password later.
+                You’ll need to add an email above first.
+              </Text>
+
+              <Text style={styles.label}>New password</Text>
+              <TextInput
+                style={styles.input}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="At least 8 characters"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="new-password"
+                editable={!submitting && !settingPassword}
+              />
+
+              <Text style={styles.label}>Confirm password</Text>
+              <TextInput
+                style={styles.input}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Repeat password"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="new-password"
+                editable={!submitting && !settingPassword}
+              />
+
+              <Pressable
+                style={[
+                  styles.secondaryButton,
+                  settingPassword && styles.saveButtonDisabled,
+                ]}
+                onPress={handleSetPassword}
+                disabled={submitting || settingPassword}
+              >
+                {settingPassword ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Text style={styles.secondaryButtonText}>Set password</Text>
+                )}
+              </Pressable>
+            </View>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -300,6 +414,21 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  passwordCard: {
+    marginTop: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  sectionIntro: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: spacing.md,
   },
   label: {
     fontSize: 14,
@@ -362,5 +491,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: colors.text,
+  },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: "center",
+    marginTop: spacing.sm,
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.primary,
   },
 });
