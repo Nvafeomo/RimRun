@@ -322,7 +322,7 @@
     <p class="brand">RimRun</p>
     <h1>Privacy policy</h1>
     <div class="hero-meta">
-      <span class="pill"><strong>Updated</strong> May 27, 2026</span>
+      <span class="pill"><strong>Updated</strong> May 30, 2026</span>
       <span class="pill">Basketball Courts &amp; Communities</span>
     </div>
    </div>
@@ -398,7 +398,7 @@
     <li><strong>Profile information:</strong> Profile photo (optional), and any other details you choose to add to your profile.</li>
     <li><strong>Date of birth:</strong> Required during onboarding for age verification purposes only. We use this to apply age-appropriate defaults (for example, certain privacy settings default to more restrictive values for users under 18).</li>
     <li><strong>Chat messages:</strong> Content you send in direct messages, group chats, and court chats. Messages are stored to deliver real-time and historical chat functionality.</li>
-    <li><strong>Court contributions:</strong> Courts you submit, edit, or vote on (verify/flag), and courts you subscribe to.</li>
+    <li><strong>Court contributions:</strong> Courts you submit, edit, or vote on (verify/flag), and courts you subscribe to. When you add a court you provide its <strong>public street address</strong> and map location. This court information is <strong>public</strong> and visible to other users — you should only enter the public address of a basketball court, never a home or private address. Adding a court requires you to be at least 16 years old.</li>
     <li><strong>Content reports:</strong> If you report another user or piece of content, we store the report details to allow moderation review.</li>
   </ul>
 
@@ -488,7 +488,7 @@
   <p>We may need to share your personal information in situations such as:</p>
   <ul>
     <li><strong>Service providers.</strong> We use <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase</a> as our hosted backend, authentication, and database provider. Supabase processes data on our behalf according to their privacy policy.</li>
-    <li><strong>Other users.</strong> Information you share publicly (for example, chat messages in a court chat, or your public profile) is visible to other users of the app. Messages you send in group or court chats are visible to all participants of that conversation.</li>
+    <li><strong>Other users.</strong> Information you share publicly (for example, your public profile, or court information you submit) is visible to other users of the app. Messages you send in group or court chats are visible to other participants of that conversation. Court chat visibility is <strong>filtered by age</strong>: users generally only see messages from others within an age-appropriate range, so users under 18 and adults (18+) do not normally see each other's court-chat messages. Your email address and date of birth are <strong>not</strong> shared with other users.</li>
     <li><strong>Business transfers.</strong> We may share or transfer your information in connection with a merger, sale of assets, financing, or acquisition.</li>
     <li><strong>Legal requirements.</strong> We may disclose information if required by law, legal process, or to protect the rights, safety, and security of our users, the app, or others.</li>
   </ul>
@@ -510,14 +510,20 @@
   <h2 id="infosafe">7. How do we keep your information safe?</h2>
   <div class="in-short"><strong>In short:</strong> <em>We use organizational and technical measures to protect your personal information.</em></div>
 
-  <p>We implement reasonable technical and organizational safeguards, including row-level security policies on our database to restrict data access by role, and role-based access controls for administrative data. No electronic transmission or storage is completely secure; we cannot guarantee that unauthorized parties will never defeat our security. Use the Services at your own risk and in a secure environment.</p>
+  <p>We implement reasonable technical and organizational safeguards, including row-level security policies on our database to restrict data access by role, column-level restrictions so that sensitive fields such as your <strong>email address and date of birth are not readable by other users</strong>, and role-based access controls for administrative data. No electronic transmission or storage is completely secure; we cannot guarantee that unauthorized parties will never defeat our security. Use the Services at your own risk and in a secure environment.</p>
 
   <h2 id="minors">8. Children's privacy</h2>
   <div class="in-short"><strong>In short:</strong> <em>The app is not directed at children under 13. Users under 18 receive more restrictive privacy defaults.</em></div>
 
   <p>The App is not directed at children under 13, and we do not knowingly collect personal information from children under 13. If you believe we have collected such information, please contact us using the email below and we will take appropriate steps to remove it.</p>
 
-  <p>Users who are 13–17 years old may use the App. We apply more restrictive privacy defaults for users under 18, including turning off username discoverability in friend search by default. Users under 18 can adjust these defaults in <strong>Profile → Privacy</strong>.</p>
+  <p>Users who are 13–17 years old may use the App with a parent or guardian's consent. We apply more restrictive defaults and safety features for users under 18, including:</p>
+  <ul>
+    <li>Username discoverability in friend search is off by default.</li>
+    <li>Court chat messages are filtered by age, so younger users and adults do not normally see each other's messages.</li>
+    <li>A higher age requirement (16+) to add a court, since adding a court involves submitting a public address.</li>
+  </ul>
+  <p>Users under 18 can review and adjust the available defaults in <strong>Profile → Privacy</strong>.</p>
 
   <h2 id="privacyrights">9. What are your privacy rights?</h2>
   <div class="in-short"><strong>In short:</strong> <em>You may review, change, or terminate your account depending on where you live.</em></div>
@@ -527,6 +533,15 @@
   <h3>Account information</h3>
   <p>To review, change, or delete your account, you can log in and update your account settings in the app (Profile → Account).</p>
   <p>When you ask us to delete your account, we deactivate or delete it from active databases. We may retain some information as needed for fraud prevention, troubleshooting, investigations, enforcing our terms, or legal compliance.</p>
+
+  <h3>Canada (PIPEDA and provincial laws)</h3>
+  <p>If you are in Canada, we handle your personal information in accordance with the federal <strong>Personal Information Protection and Electronic Documents Act (PIPEDA)</strong> and applicable provincial privacy laws (such as Quebec's <strong>Law 25</strong>). You may:</p>
+  <ul>
+    <li><strong>Withdraw consent</strong> at any time, subject to legal or contractual limits, by contacting us — this may limit your ability to use some features.</li>
+    <li><strong>Request access</strong> to the personal information we hold about you, and ask us to <strong>correct</strong> inaccuracies.</li>
+    <li>Ask us to <strong>delete</strong> your account and associated personal information.</li>
+  </ul>
+  <p>We collect, use, and disclose personal information only for the purposes described in this notice and obtain consent where the law requires it. To exercise these rights, email <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a>. If you are not satisfied with our response, you may contact the <a href="https://www.priv.gc.ca/" target="_blank" rel="noopener noreferrer">Office of the Privacy Commissioner of Canada</a>, or your provincial regulator (for example, the Commission d'accès à l'information du Québec for Quebec residents).</p>
 
   <p>Questions about privacy rights? Email <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a>.</p>
 

@@ -1,6 +1,6 @@
 export const TERMS_OF_SERVICE_MARKDOWN = `# Terms of Service
 
-**Effective:** May 27, 2026
+**Effective:** May 30, 2026
 
 By using RimRun, you agree to these Terms. If you do not agree, please do not use the app.
 
@@ -8,7 +8,7 @@ By using RimRun, you agree to these Terms. If you do not agree, please do not us
 
 ## 1. Eligibility
 
-You must be at least **13 years old** to use RimRun. Users aged 13–17 must have a parent or guardian's consent. We collect your date of birth during onboarding to verify eligibility and apply age-appropriate defaults.
+You must be at least **13 years old** to use RimRun. Users aged 13–17 must have a parent or guardian's consent. We collect your date of birth during onboarding to verify eligibility and apply age-appropriate defaults and safety rules. Some features have a higher age requirement — for example, you must be at least **16 years old to add a court** (see Section 5).
 
 ## 2. Your account
 
@@ -43,11 +43,19 @@ You own content you create. By submitting content (messages, court listings, pho
 
 Court listings are **community-submitted**. RimRun does not guarantee accuracy, safety, or accessibility of any listed court. A "Verified" badge reflects community votes — not an official inspection. Visit courts at your own risk.
 
+**Adding courts.** You must be at least **16 years old** to add a court. When you add a court, you must provide the court's **public street address** — never your home address or any private location. Court information you submit, including the address and map location, is **public** and visible to all users. Do not submit a private residence or any place that is not a public basketball court.
+
+**Removing a court you added.** You can remove a court you created within **5 days** of adding it. After that window, the listing belongs to the community; use the Flag vote or contact us to request review or removal.
+
 ## 6. Chat and messaging
 
-All messages must follow the acceptable use rules above. Messages are stored on our servers and may be reviewed for moderation. Court chats are visible to all subscribers of that court and are not private.
+All messages must follow the acceptable use rules above. Messages are stored on our servers and may be reviewed for moderation. Court chats are community threads tied to a court and are not private from RimRun administrators.
 
-You may edit or unsend your own messages within a time window. A record may be retained for safety purposes.
+**Age-based visibility.** To protect younger users, messages are filtered by age. In court chats, you only see messages from other users within an age-appropriate range — in practice, users under 18 and adults (18+) generally do not see each other's messages, except where an adult is a verified professional (such as a coach or trainer). The same age-based limits apply to direct messages, friend connections, and group chats.
+
+**Rate limits.** We may limit how quickly or how many messages you can send to prevent spam, flooding, and abuse.
+
+You may edit or unsend your own messages within a time window. A record may be retained for safety and moderation purposes.
 
 ## 7. Community voting
 

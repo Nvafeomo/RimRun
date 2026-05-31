@@ -6,7 +6,7 @@
 
 ---
 
-**Last updated:** April 2, 2026
+**Last updated:** May 30, 2026
 
 RimRun (“we,” “us,” or “our”) operates the RimRun mobile application (the “App”). This Privacy Policy describes how we collect, use, disclose, and safeguard your information when you use the App.
 
@@ -17,7 +17,9 @@ By using the App, you agree to this Privacy Policy. If you do not agree, please 
 ### Information you provide
 
 - **Account and profile:** Email address, username, profile photo (if you choose to add one), and other information you submit when you create or update your account or profile.
-- **Content you submit:** Information you add in the App, such as court-related contributions or other user-generated content, as applicable.
+- **Date of birth:** Required during onboarding, for age verification only. We use it to confirm eligibility and to apply age-appropriate defaults and safety features (for example, more restrictive privacy defaults for users under 18 and age-based chat visibility).
+- **Chat messages:** Content you send in direct messages, group chats, and court chats. Messages are stored to deliver chat functionality and may be reviewed for moderation.
+- **Court contributions:** Courts you submit (including the **public street address** and map location), edits, verify/flag votes, and courts you subscribe to. Court information you submit is **public** and visible to other users — only enter the public address of a basketball court, never a home or private address.
 
 ### Information collected automatically
 
@@ -52,6 +54,14 @@ We share information with **service providers** who help us run the App, includi
 
 - **Supabase** (hosted backend, authentication, and database services). Supabase processes data on our behalf as described in their documentation: [Supabase Privacy Policy](https://supabase.com/privacy).
 
+We also share some information **with other users** as part of how the App works:
+
+- Your username, profile photo, and any public profile details are visible to other users.
+- Court information you submit, including the address and map location, is public.
+- Messages you send in group and court chats are visible to other participants. Court chat visibility is **filtered by age**: users generally only see messages from others within an age-appropriate range, so users under 18 and adults (18+) do not normally see each other's court-chat messages.
+
+Your **email address and date of birth are not shared with other users.** Access to those fields is restricted so that only you (and our systems, for the purposes above) can see them.
+
 When you use **Sign in with Google**, Google’s processing is governed by Google’s policies (links above).
 
 We may disclose information if required by law, legal process, or to protect the rights, safety, and security of our users, the App, or others.
@@ -62,15 +72,35 @@ We retain your information for as long as your account is active or as needed to
 
 ## Security
 
-We implement reasonable administrative, technical, and organizational measures designed to protect your personal information. No method of transmission or storage is completely secure; we cannot guarantee absolute security.
+We implement reasonable administrative, technical, and organizational measures designed to protect your personal information. These include database row-level security and role-based access controls. In particular, sensitive fields such as your **email address and date of birth are restricted so they are not visible to other users**. No method of transmission or storage is completely secure; we cannot guarantee absolute security.
 
 ## Children’s privacy
 
 The App is not directed at children under 13, and we do not knowingly collect personal information from children under 13. If you believe we have collected such information, contact us using the email below and we will take appropriate steps.
 
+Users who are 13–17 years old may use the App with a parent or guardian's consent. For users under 18, we apply more restrictive defaults and safety features, including:
+
+- Username discoverability in friend search is off by default.
+- Court chat messages are filtered by age, so younger users and adults do not normally see each other's messages.
+- A higher age requirement (16+) to add a court, which involves submitting a public address.
+
+Users under 18 can review and adjust the available defaults in **Profile → Privacy**.
+
 ## Your privacy rights (United States)
 
 Depending on where you live, you may have rights regarding your personal information (for example, rights to access, delete, or correct certain data, or to opt out of certain processing). To exercise rights that apply to you, contact us at the email below. We may need to verify your request before responding.
+
+## Canadian privacy rights (PIPEDA)
+
+If you are in Canada, we handle your personal information in accordance with the federal **Personal Information Protection and Electronic Documents Act (PIPEDA)** and applicable provincial privacy laws (such as Quebec's **Law 25**). In particular:
+
+- We collect, use, and disclose your personal information only for the purposes described in this policy, and we obtain your consent where the law requires it.
+- You may **withdraw your consent** at any time, subject to legal or contractual limits, by contacting us. This may affect your ability to use some features.
+- You may **request access** to the personal information we hold about you and ask us to **correct** it if it is inaccurate.
+- You may ask us to **delete** your account and associated personal information.
+- We retain personal information only as long as necessary for the purposes described in this policy.
+
+To exercise these rights, email [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com). If you are not satisfied with our response, you may contact the **Office of the Privacy Commissioner of Canada (OPC)** at [priv.gc.ca](https://www.priv.gc.ca/), or your provincial privacy regulator (for example, the Commission d'accès à l'information du Québec for Quebec residents).
 
 ## Changes to this policy
 
