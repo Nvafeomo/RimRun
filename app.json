@@ -12,7 +12,12 @@
         }
       ],
       "expo-web-browser",
-      "@react-native-google-signin/google-signin",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.311684625990-hs2v339cn5ssrgho3p4efi9p86p6nd2l"
+        }
+      ],
       "expo-apple-authentication"
     ],
     "scheme": "rimrun",
@@ -37,7 +42,8 @@
         "NSLocationWhenInUseUsageDescription": "RimRun uses your location to show nearby basketball courts on the map.",
         "NSPhotoLibraryUsageDescription": "RimRun needs access to your photos to set your profile picture.",
         "NSPhotoLibraryAddUsageDescription": "RimRun needs access to your photos to set your profile picture.",
-        "NSCameraUsageDescription": "RimRun needs camera access to take your profile picture."
+        "NSCameraUsageDescription": "RimRun needs camera access to take your profile picture.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

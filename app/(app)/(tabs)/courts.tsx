@@ -55,6 +55,9 @@ const MIN_ANCHOR_SHIFT_MILES = 1.5;
 /** Minimum time between court fetches (ms). */
 const MIN_REFETCH_INTERVAL_MS = 2500;
 
+/** Smooth pan/zoom when jumping to a search anchor or recentering (ms). */
+const MAP_FLY_DURATION_MS = 950;
+
 /** Debounce GPS-driven refetch checks (ms). */
 const GPS_REFETCH_DEBOUNCE_MS = 3000;
 
@@ -91,6 +94,20 @@ function mapDeltaForRadiusMiles(radiusMiles: number): number {
   return Math.min(2.5, Math.max(0.08, spanDeg * 1.15));
 }
 
+function regionForAnchor(
+  latitude: number,
+  longitude: number,
+  radiusMiles: number
+): Region {
+  const d = mapDeltaForRadiusMiles(radiusMiles);
+  return {
+    latitude,
+    longitude,
+    latitudeDelta: d,
+    longitudeDelta: d,
+  };
+}
+
 const RIMRUN_MAP_THEME = [
   { elementType: "geometry", stylers: [{ color: colors.surface }] },
   { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
@@ -101,6 +118,16 @@ const RIMRUN_MAP_THEME = [
   {
     elementType: "labels.text.stroke",
     stylers: [{ color: colors.background }],
+  },
+  {
+    featureType: "landscape",
+    elementType: "geometry",
+    stylers: [{ color: "#1e2836" }],
+  },
+  {
+    featureType: "landscape.natural",
+    elementType: "geometry",
+    stylers: [{ color: "#1a2330" }],
   },
   {
     featureType: "administrative",
@@ -366,9 +393,11 @@ const styles = StyleSheet.create({
   mapSlot: {
     flex: 1,
     position: "relative",
+    backgroundColor: "#1e2836",
   },
   map: {
     flex: 1,
+    backgroundColor: "#1e2836",
   },
   androidCourtBubbleWrap: {
     position: "absolute",
@@ -422,16 +451,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.background,
   },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(15, 20, 25, 0.55)",
-    justifyContent: "center",
+  loadingOverlayWrap: {
+    position: "absolute",
+    top: spacing.sm,
+    left: 0,
+    right: 0,
     alignItems: "center",
     zIndex: 10,
   },
+  loadingOverlay: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
   loadingLabel: {
-    marginTop: spacing.md,
-    fontSize: 15,
+    fontSize: 13,
+    fontWeight: "600",
     color: colors.textSecondary,
   },
   callout: {
@@ -511,6 +563,8 @@ export default function CourtsScreen() {
   const [sortedCourts, setSortedCourts] = useState<Court[]>([]);
   const [visibleCourts, setVisibleCourts] = useState<Court[]>([]);
   const [courtsLoading, setCourtsLoading] = useState(false);
+  /** Avoid flashing a loader on fast RPC responses; keeps map visible. */
+  const [showCourtsLoadingUi, setShowCourtsLoadingUi] = useState(false);
   /** Android: native map callouts are unreliable; we show the same UI as a floating card. */
   const [androidSelectedCourt, setAndroidSelectedCourt] = useState<Court | null>(
     null,
@@ -556,6 +610,72 @@ export default function CourtsScreen() {
   const pendingGpsRef = useRef<{ latitude: number; longitude: number } | null>(
     null,
   );
+  /** Captured once so MapView never receives a changing `initialRegion` during flies. */
+  const mapInitialRegionRef = useRef<Region | null>(null);
+  const mapFlyUntilRef = useRef(0);
+  const mapFlyEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRegionRef = useRef<Region | null>(null);
+  const pendingCourtsRef = useRef<Court[] | null>(null);
+  const pendingCourtsRequestIdRef = useRef(0);
+
+  const commitAfterMapFly = useCallback(() => {
+    if (pendingRegionRef.current) {
+      setRegion(pendingRegionRef.current);
+      pendingRegionRef.current = null;
+    }
+    const pending = pendingCourtsRef.current;
+    if (
+      pending &&
+      pendingCourtsRequestIdRef.current === fetchRequestIdRef.current
+    ) {
+      pendingCourtsRef.current = null;
+      setSortedCourts(pending);
+      setCourtsLoading(false);
+    }
+  }, []);
+
+  const beginMapFly = useCallback(() => {
+    mapFlyUntilRef.current = Date.now() + MAP_FLY_DURATION_MS;
+    if (mapFlyEndTimerRef.current) {
+      clearTimeout(mapFlyEndTimerRef.current);
+    }
+    mapFlyEndTimerRef.current = setTimeout(() => {
+      mapFlyEndTimerRef.current = null;
+      mapFlyUntilRef.current = 0;
+      commitAfterMapFly();
+    }, MAP_FLY_DURATION_MS);
+  }, [commitAfterMapFly]);
+
+  const applyCourtsToMap = useCallback((courts: Court[], requestId: number) => {
+    const slice = courts.slice(0, MAX_COURTS_SHOWN);
+    if (Date.now() < mapFlyUntilRef.current) {
+      pendingCourtsRef.current = slice;
+      pendingCourtsRequestIdRef.current = requestId;
+      return;
+    }
+    setSortedCourts(slice);
+    setCourtsLoading(false);
+  }, []);
+
+  const flyMapToAnchor = useCallback(
+    (latitude: number, longitude: number, radiusMiles: number) => {
+      const next = regionForAnchor(latitude, longitude, radiusMiles);
+      pendingRegionRef.current = next;
+      beginMapFly();
+      requestAnimationFrame(() => {
+        mapRef.current?.animateToRegion(next, MAP_FLY_DURATION_MS);
+      });
+    },
+    [beginMapFly]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (mapFlyEndTimerRef.current) {
+        clearTimeout(mapFlyEndTimerRef.current);
+      }
+    };
+  }, []);
 
   const loadCourtsAtAnchor = useCallback(
     async (
@@ -583,8 +703,7 @@ export default function CourtsScreen() {
       }
 
       if (!rpcError && Array.isArray(rpcData)) {
-        setSortedCourts((rpcData as Court[]).slice(0, MAX_COURTS_SHOWN));
-        setCourtsLoading(false);
+        applyCourtsToMap(rpcData as Court[], requestId);
         return true;
       }
 
@@ -632,12 +751,11 @@ export default function CourtsScreen() {
           .filter(({ d }) => d <= radiusMiles)
           .map(({ c }) => c);
 
-        setSortedCourts(inRadius.slice(0, MAX_COURTS_SHOWN));
-        setCourtsLoading(false);
+        applyCourtsToMap(inRadius, requestId);
         return true;
       }
     },
-    []
+    [applyCourtsToMap]
   );
 
   const runCourtsSearch = useCallback(
@@ -665,6 +783,10 @@ export default function CourtsScreen() {
         }
       }
 
+      if (opts.animateMap) {
+        flyMapToAnchor(opts.anchorLat, opts.anchorLng, opts.radiusMiles);
+      }
+
       const requestId = ++fetchRequestIdRef.current;
       const ok = await loadCourtsAtAnchor(
         opts.anchorLat,
@@ -686,24 +808,8 @@ export default function CourtsScreen() {
         lng: opts.anchorLng,
       };
       lastFetchWasUserAnchoredRef.current = opts.userAnchored;
-
-      if (opts.animateMap) {
-        const d = mapDeltaForRadiusMiles(opts.radiusMiles);
-        mapRef.current?.animateToRegion({
-          latitude: opts.anchorLat,
-          longitude: opts.anchorLng,
-          latitudeDelta: d,
-          longitudeDelta: d,
-        });
-        setRegion({
-          latitude: opts.anchorLat,
-          longitude: opts.anchorLng,
-          latitudeDelta: d,
-          longitudeDelta: d,
-        });
-      }
     },
-    [loadCourtsAtAnchor]
+    [loadCourtsAtAnchor, flyMapToAnchor]
   );
 
   const runCourtsSearchRef = useRef(runCourtsSearch);
@@ -765,6 +871,15 @@ export default function CourtsScreen() {
       cancelAnimationFrame(raf);
     };
   }, [sortedCourts]);
+
+  useEffect(() => {
+    if (!courtsLoading) {
+      setShowCourtsLoadingUi(false);
+      return;
+    }
+    const t = setTimeout(() => setShowCourtsLoadingUi(true), 450);
+    return () => clearTimeout(t);
+  }, [courtsLoading]);
 
   useEffect(() => {
     (async () => {
@@ -1038,23 +1153,6 @@ export default function CourtsScreen() {
     [updateAndroidBubblePosition],
   );
 
-  const applyMapToAnchor = useCallback(
-    (latitude: number, longitude: number, radiusMiles: number) => {
-      const d = mapDeltaForRadiusMiles(radiusMiles);
-      const next: Region = {
-        latitude,
-        longitude,
-        latitudeDelta: d,
-        longitudeDelta: d,
-      };
-      requestAnimationFrame(() => {
-        mapRef.current?.animateToRegion(next);
-        setRegion(next);
-      });
-    },
-    []
-  );
-
   const handleRecenter = useCallback(async () => {
     Keyboard.dismiss();
     const radiusMiles = parseMilesInput(milesInput);
@@ -1062,7 +1160,7 @@ export default function CourtsScreen() {
     const moveAndRefetch = (latitude: number, longitude: number) => {
       setUserLocation({ latitude, longitude });
       setLocationQuery("");
-      applyMapToAnchor(latitude, longitude, radiusMiles);
+      flyMapToAnchor(latitude, longitude, radiusMiles);
       void runCourtsSearch({
         anchorLat: latitude,
         anchorLng: longitude,
@@ -1097,7 +1195,11 @@ export default function CourtsScreen() {
         moveAndRefetch(userLocation.latitude, userLocation.longitude);
       }
     }
-  }, [milesInput, runCourtsSearch, userLocation, applyMapToAnchor]);
+  }, [milesInput, runCourtsSearch, userLocation, flyMapToAnchor]);
+
+  if (region && !mapInitialRegionRef.current) {
+    mapInitialRegionRef.current = region;
+  }
 
   if (!region) {
     return (
@@ -1221,9 +1323,12 @@ export default function CourtsScreen() {
           ref={mapRef}
           style={styles.map}
           customMapStyle={RIMRUN_MAP_THEME}
-          initialRegion={region}
+          initialRegion={mapInitialRegionRef.current ?? region}
           showsUserLocation={false}
           userInterfaceStyle="dark"
+          loadingEnabled={Platform.OS === "android"}
+          loadingBackgroundColor={colors.background}
+          loadingIndicatorColor={colors.primary}
           onPress={
             Platform.OS === "android" ? clearAndroidCourtSelection : undefined
           }
@@ -1253,10 +1358,12 @@ export default function CourtsScreen() {
           ))}
         </MapView>
 
-        {courtsLoading && (
-          <View style={styles.loadingOverlay} pointerEvents="none">
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingLabel}>Loading nearby courts…</Text>
+        {showCourtsLoadingUi && (
+          <View style={styles.loadingOverlayWrap} pointerEvents="none">
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.loadingLabel}>Updating courts…</Text>
+            </View>
           </View>
         )}
 

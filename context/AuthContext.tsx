@@ -8,7 +8,7 @@ import {
 import { Linking } from 'react-native';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { signInWithGoogle as oauthGoogle, signInWithApple as appleSignIn } from '../lib/oauth';
+import { signInWithGoogle as oauthGoogle, signInWithApple as appleSignIn, signOutGoogleIfNeeded } from '../lib/oauth';
 import {
   applyAuthFromUrl,
   clearPendingPasswordRecovery,
@@ -291,6 +291,7 @@ type AuthContextValue = {
       await clearPendingPasswordRecovery();
       setBanBlocked(false);
       setBanAppealPending(false);
+      await signOutGoogleIfNeeded();
       const { error } = await supabase.auth.signOut();
       if (error) {
         // Invalid token etc: clear local session anyway

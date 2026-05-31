@@ -1,6 +1,6 @@
 # RimRun beta testing (EAS + TestFlight + Play)
 
-Use **Expo Application Services (EAS)** to build installable apps for testers. Expo Go is fine for quick dev work; **Apple Sign In, Google OAuth redirects, and production maps** need a real build.
+Use **Expo Application Services (EAS)** to build installable apps for testers. Expo Go is fine for quick dev work; **Apple Sign In, native Google Sign-In, and production maps** need a real build.
 
 ## Profiles (`eas.json`)
 
@@ -29,33 +29,40 @@ npm run eas:init
 
 This adds `extra.eas.projectId` to `app.json`. Commit that change.
 
-### 3. Add build secrets (production Supabase + Maps)
+### 3. Add build env vars (Supabase, Maps, Google Sign-In)
 
-Do **not** commit `.env`. Set secrets on EAS (repeat for each profile if needed, or use project-wide secrets):
+Do **not** commit `.env`. Use `eas env:create` for **preview** and **production**:
 
 ```bash
-eas secret:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://YOUR_PROJECT.supabase.co" --type string
-eas secret:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "your-anon-key" --type string
-eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY --value "your-android-maps-key" --type string
+eas env:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://YOUR_PROJECT.supabase.co" --environment preview --visibility plaintext
+eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "your-anon-key" --environment preview --visibility sensitive
+eas env:create --name EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY --value "your-android-maps-key" --environment preview --visibility sensitive
+eas env:create --name EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID --value "your-web-client-id.apps.googleusercontent.com" --environment preview --visibility sensitive
+eas env:create --name EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID --value "your-ios-client-id.apps.googleusercontent.com" --environment preview --visibility sensitive
+eas env:create --name EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME --value "com.googleusercontent.apps.your-ios-id" --environment preview --visibility plaintext
 ```
 
-List secrets: `eas secret:list`
+Repeat with `--environment production`. List: `eas env:list`
 
-### 4. Supabase Auth (required for OAuth on builds)
+Also add the same `EXPO_PUBLIC_GOOGLE_*` vars to your local `.env` for local dev builds.
 
-In **Supabase → Authentication → URL configuration → Redirect URLs**, add:
+### 4. Supabase Auth
+
+In **Supabase → Authentication → URL configuration → Redirect URLs**, keep:
 
 ```text
-rimrun://auth/callback
+rimrun://reset-password
 ```
+
+(`rimrun://auth/callback` is **not** used for native Google sign-in.)
+
+**Google provider:** Web OAuth client ID + secret from Google Cloud Console. If iOS Google fails with a **nonce** error, enable **Skip nonce check** on the Google provider.
 
 In **Apple provider → Client IDs**:
 
 ```text
 com.nvafeomo.RimRun
 ```
-
-(Remove `host.exp.Exponent` from production-only testing if you no longer use Expo Go for OAuth.)
 
 ### 5. Apple Developer
 
@@ -129,11 +136,11 @@ Then in **App Store Connect → TestFlight**, add internal testers and install v
 
 | Issue | Fix |
 |-------|-----|
-| Google sign-in fails after build | Add `rimrun://auth/callback` to Supabase redirect URLs |
+| Google sign-in fails after build | Add Google OAuth client IDs to EAS env; Web client in Supabase; Android SHA-1 on Google Cloud |
 | Apple “Unacceptable audience” | Add `com.nvafeomo.RimRun` to Supabase Apple Client IDs |
 | Android map blank | Set `EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY` EAS secret; restrict key to package `com.nvafeomo.RimRun` |
 | Build fails credentials | Run `eas credentials` for the platform |
-| OAuth worked in Expo Go, not in build | Expo Go uses `exp://`; builds use `rimrun://` |
+| Google worked before browser OAuth, not after native switch | Rebuild after adding `EXPO_PUBLIC_GOOGLE_*` env vars; confirm Web + iOS OAuth clients in Google Cloud |
 
 ---
 

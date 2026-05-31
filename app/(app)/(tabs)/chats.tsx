@@ -20,6 +20,7 @@ import { fetchLastMessagesByConversation } from "../../../lib/chatLastMessages";
 import { clearConversationAndLeave } from "../../../lib/chatDeletion";
 import { FriendsPanel } from "../../../components/FriendsPanel";
 import { NewGroupChatModal } from "../../../components/NewGroupChatModal";
+import { AvatarImage } from "../../../components/AvatarImage";
 
 type CourtChatItem = {
   courtId: string;
@@ -35,6 +36,7 @@ type MessageThreadItem =
       conversationId: string;
       otherUserId: string;
       otherUsername: string;
+      otherProfileImageUrl: string | null;
       lastMessage?: string;
       lastMessageAt?: string;
     }
@@ -243,16 +245,25 @@ export default function ChatsScreen() {
         profileIds.length > 0
           ? await supabase
               .from("profiles")
-              .select("id, username")
+              .select("id, username, profile_image_url")
               .in("id", profileIds)
-          : { data: [] as { id: string; username: string | null }[] };
-      const nameMap = Object.fromEntries(
-        (profiles ?? []).map((p) => [p.id, p.username ?? "?"]),
+          : {
+              data: [] as {
+                id: string;
+                username: string | null;
+                profile_image_url: string | null;
+              }[],
+            };
+      const profileById = Object.fromEntries(
+        (profiles ?? []).map((p) => [p.id, p]),
       );
 
       const groupItems: MessageThreadItem[] = groupConvs.map((c) => {
         const otherIds = othersByGroupConv.get(c.id) ?? [];
-        const names = otherIds.map((id) => nameMap[id] ?? "?").sort().join(", ");
+        const names = otherIds
+          .map((id) => profileById[id]?.username ?? "?")
+          .sort()
+          .join(", ");
         const title = c.name?.trim() || names || "Group chat";
         const last = lastByConv.get(c.id);
         return {
@@ -269,11 +280,13 @@ export default function ChatsScreen() {
         const otherId = otherByDmConv.get(cid);
         if (!otherId) continue;
         const last = lastByConv.get(cid);
+        const otherProfile = profileById[otherId];
         dmItems.push({
           kind: "dm",
           conversationId: cid,
           otherUserId: otherId,
-          otherUsername: nameMap[otherId] ?? "Unknown",
+          otherUsername: otherProfile?.username ?? "Unknown",
+          otherProfileImageUrl: otherProfile?.profile_image_url ?? null,
           lastMessage: last?.content,
           lastMessageAt: last?.created_at,
         });
@@ -471,27 +484,34 @@ export default function ChatsScreen() {
     const deleting = threadDeletingId === item.conversationId;
     return (
       <View style={styles.threadRow}>
+        {item.kind === "dm" ? (
+          <Pressable
+            style={styles.threadAvatarBtn}
+            onPress={() => router.push(`/(app)/user/${item.otherUserId}`)}
+            disabled={deleting}
+            hitSlop={6}
+            accessibilityLabel="View profile"
+          >
+            <AvatarImage
+              userId={item.otherUserId}
+              username={item.otherUsername}
+              profileImageUrl={item.otherProfileImageUrl}
+              size={48}
+            />
+          </Pressable>
+        ) : (
+          <View style={styles.threadGroupIconWrap}>
+            <View style={styles.chatItemIcon}>
+              <Ionicons name="people" size={24} color={colors.primary} />
+            </View>
+          </View>
+        )}
         <Pressable
           style={styles.threadRowMain}
           onPress={() => openMessageThread(item)}
           disabled={deleting}
           android_ripple={{ color: colors.border }}
         >
-          <View style={styles.chatItemIcon}>
-            {item.kind === "dm" ? (
-              <Pressable
-                onPress={() =>
-                  router.push(`/(app)/user/${item.otherUserId}`)
-                }
-                hitSlop={8}
-                accessibilityLabel="View profile"
-              >
-                <Ionicons name="person" size={24} color={colors.primary} />
-              </Pressable>
-            ) : (
-              <Ionicons name="people" size={24} color={colors.primary} />
-            )}
-          </View>
           <View style={styles.chatItemContent}>
             <View style={styles.chatItemHeader}>
               <Text style={styles.chatItemTitle} numberOfLines={1}>
@@ -861,12 +881,24 @@ const styles = StyleSheet.create({
   courtChatRowLast: {
     marginBottom: 0,
   },
+  threadAvatarBtn: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingLeft: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  threadGroupIconWrap: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingLeft: spacing.md,
+    paddingVertical: spacing.md,
+  },
   threadRowMain: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: spacing.md,
-    paddingLeft: spacing.md,
+    paddingLeft: spacing.sm,
     paddingRight: spacing.sm,
     minWidth: 0,
   },
@@ -934,7 +966,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
   },

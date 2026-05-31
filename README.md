@@ -7,7 +7,7 @@ A mobile app for finding pickup basketball: browse courts on a map, save the spo
 - **Courts:** Map and search, subscribe to courts, and add new ones (address-only vs location flows depend on age, matching how the product handles minors.)
 - **Profile:** Username, optional photo, privacy toggles, and date of birth so age rules can be enforced server-side.
 - **Social:** Friends, direct messages, group chats, and threads tied to a court. Direct chats and court threads follow different visibility rules on purpose.
-- **Auth:** Email and password, Google sign-in through Supabase, and password reset via deep link.
+- **Auth:** Email and password, native Google and Apple sign-in through Supabase, and password reset via deep link.
 
 ## Stack
 
@@ -41,6 +41,9 @@ Add a `.env` in the project root with your Supabase values (keep real keys out o
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY=your-google-maps-android-api-key
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=your-ios-client-id.apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.your-ios-client-id
 ```
 
 Restart the dev server after editing env vars.
