@@ -20,8 +20,11 @@ import * as Location from "expo-location";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
 import { useProfile } from "../../../context/ProfileContext";
-import { ageInFullYears, getAgeBracket } from "../../../lib/agePolicy";
+import { ageInFullYears } from "../../../lib/agePolicy";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
+
+/** Minimum age to add a court. Younger users would have to expose a precise public location. */
+const MIN_ADD_COURT_AGE = 16;
 
 const ZOOM_DELTA = 0.008;
 /** Shown immediately so the screen does not wait on GPS (Android fix is slow with Balanced). */
@@ -252,16 +255,20 @@ export default function AddCourtScreen() {
     }
 
     const trimmedAddress = address.trim();
-    if (profile?.date_of_birth) {
-      const age = ageInFullYears(profile.date_of_birth);
-      const bracket = age !== null ? getAgeBracket(age) : null;
-      if (bracket === "13-15" && trimmedAddress.length === 0) {
-        Alert.alert(
-          "Address required",
-          "Users aged 13–15 must enter a street address to add a court (map pin alone is not enough)."
-        );
-        return;
-      }
+    const age = profile?.date_of_birth ? ageInFullYears(profile.date_of_birth) : null;
+    if (age === null || age < MIN_ADD_COURT_AGE) {
+      Alert.alert(
+        "Must be 16 or older",
+        "You must be at least 16 years old to add a court."
+      );
+      return;
+    }
+    if (trimmedAddress.length === 0) {
+      Alert.alert(
+        "Address required",
+        "Enter the court's public street address. Never enter a home or any private address."
+      );
+      return;
     }
     setSubmitting(true);
     try {
@@ -318,6 +325,33 @@ export default function AddCourtScreen() {
   };
 
   const hasAddress = address.trim().length > 0;
+  const viewerAge = profile?.date_of_birth
+    ? ageInFullYears(profile.date_of_birth)
+    : null;
+  const tooYoungToAdd = viewerAge !== null && viewerAge < MIN_ADD_COURT_AGE;
+
+  if (tooYoungToAdd) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </Pressable>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Add court
+          </Text>
+        </View>
+        <View style={styles.blockedWrap}>
+          <Ionicons name="lock-closed-outline" size={48} color={colors.textMuted} />
+          <Text style={styles.blockedTitle}>You must be 16 or older</Text>
+          <Text style={styles.blockedBody}>
+            Adding a court requires a public street address. To protect younger
+            users, you must be at least 16 years old to add one.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -352,8 +386,8 @@ export default function AddCourtScreen() {
           </View>
           <Text style={styles.mapHint}>
             {hasAddress
-              ? "Location will come from the address below (not this map or GPS)"
-              : "Pan and zoom so the pin sits on the court"}
+              ? "Location comes from the address below (not this map or GPS)"
+              : "Enter the court's public address below to place it on the map"}
           </Text>
           <Pressable
             style={[styles.locateChip, hasAddress && styles.locateChipDisabled]}
@@ -386,16 +420,20 @@ export default function AddCourtScreen() {
             autoCapitalize="words"
           />
 
-          <Text style={styles.label}>Address (optional)</Text>
+          <Text style={styles.label}>Address *</Text>
           <Text style={styles.fieldHint}>
-            If you enter an address, we set latitude/longitude from that (geocoding), not from the
+            We set the court&apos;s latitude/longitude from this address (geocoding), not from the
             map or your current location.
+          </Text>
+          <Text style={styles.warningHint}>
+            Only enter the public address of the basketball court. Never enter
+            your home or any private address — it is visible to everyone.
           </Text>
           <TextInput
             style={styles.input}
             value={address}
             onChangeText={setAddress}
-            placeholder="Street, city (used to place the court)"
+            placeholder="Street, city (public court location)"
             placeholderTextColor={colors.textMuted}
           />
 
@@ -546,6 +584,32 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: spacing.sm,
     lineHeight: 17,
+  },
+  warningHint: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.error,
+    marginBottom: spacing.sm,
+    lineHeight: 17,
+  },
+  blockedWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+  },
+  blockedTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+    textAlign: "center",
+  },
+  blockedBody: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
   },
   input: {
     backgroundColor: colors.inputBg,

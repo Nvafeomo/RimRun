@@ -33,6 +33,17 @@ import {
   type VoteType,
 } from "../../../lib/courtVoting";
 
+/** Creators can remove a court they added only within this many days of creating it. */
+const COURT_DELETE_WINDOW_DAYS = 5;
+
+function withinDeleteWindow(createdAtIso: string | null): boolean {
+  if (!createdAtIso) return false;
+  const createdAt = new Date(createdAtIso).getTime();
+  if (Number.isNaN(createdAt)) return false;
+  const windowMs = COURT_DELETE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  return Date.now() - createdAt <= windowMs;
+}
+
 type Court = {
   id: string;
   name: string | null;
@@ -44,6 +55,7 @@ type Court = {
   is_indoor: boolean | null;
   source: string | null;
   created_by: string | null;
+  created_at: string | null;
   verified: boolean;
   flagged_for_review: boolean;
   verify_count: number;
@@ -102,7 +114,7 @@ export default function CourtDetailScreen() {
         supabase
           .from("courts")
           .select(
-            "id, name, address, latitude, longitude, hoops, is_private, is_indoor, source, created_by, verified, flagged_for_review, verify_count, flag_count",
+            "id, name, address, latitude, longitude, hoops, is_private, is_indoor, source, created_by, created_at, verified, flagged_for_review, verify_count, flag_count",
           )
           .eq("id", courtId)
           .single(),
@@ -251,9 +263,17 @@ export default function CourtDetailScreen() {
 
   const isCreator =
     !!user?.id && !!court?.created_by && court.created_by === user.id;
+  const canDelete = isCreator && withinDeleteWindow(court?.created_at ?? null);
 
   const handleDeleteCourt = () => {
     if (!courtId || !user?.id || deleting) return;
+    if (!withinDeleteWindow(court?.created_at ?? null)) {
+      Alert.alert(
+        "Removal window closed",
+        `You can only remove a court within ${COURT_DELETE_WINDOW_DAYS} days of adding it. Use the Flag option or contact support to report a problem with this court.`
+      );
+      return;
+    }
     Alert.alert(
       "Remove court",
       "This permanently deletes this court for everyone (map, chat, subscriptions). This cannot be undone.",
@@ -434,7 +454,7 @@ export default function CourtDetailScreen() {
           </Text>
         </Pressable>
 
-        {isCreator ? (
+        {canDelete ? (
           <Pressable
             onPress={handleDeleteCourt}
             style={styles.deleteButton}

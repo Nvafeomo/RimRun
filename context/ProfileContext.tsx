@@ -14,26 +14,6 @@ import { validateDateOfBirthForSignup } from '../lib/agePolicy';
 import { resolveAvatarUriForDisplay } from '../lib/avatarUrls';
 import { useAuth } from './AuthContext';
 
-/** Columns added by `scripts/profile-privacy-public-profile.sql`; optional until migration runs. */
-const PROFILE_SELECT_BASE =
-  'profile_image_url, date_of_birth, username, email' as const;
-const PROFILE_SELECT_WITH_PRIVACY =
-  `${PROFILE_SELECT_BASE}, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added, messages_only_from_friends, username_searchable, chat_suspended_until, auto_suspension_count, role` as const;
-
-function isUndefinedColumnError(err: unknown): boolean {
-  if (err && typeof err === 'object' && 'code' in err) {
-    const code = (err as { code?: string }).code;
-    if (code === '42703') return true;
-  }
-  const msg =
-    err instanceof Error
-      ? err.message
-      : typeof err === 'object' && err !== null && 'message' in err
-        ? String((err as { message: unknown }).message)
-        : '';
-  return /column .* does not exist/i.test(msg);
-}
-
 function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(
@@ -124,30 +104,16 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setLoading(true);
     }
     try {
-      const query = supabase
-        .from('profiles')
-        .select(PROFILE_SELECT_WITH_PRIVACY)
-        .eq('id', user.id)
-        .maybeSingle();
-      const first = await withTimeout(query, 20_000);
-      let data: ProfileDbRow | null = first.data as ProfileDbRow | null;
-      let error = first.error;
-
-      if (error && isUndefinedColumnError(error)) {
-        const fallback = await withTimeout(
-          supabase
-            .from('profiles')
-            .select(PROFILE_SELECT_BASE)
-            .eq('id', user.id)
-            .maybeSingle(),
-          20_000,
-        );
-        data = fallback.data as ProfileDbRow | null;
-        error = fallback.error;
-      }
+      // Sensitive columns (email, date_of_birth, role, ...) are not directly
+      // selectable by the authenticated role; the owner reads their full row
+      // through this security-definer RPC. See scripts/profiles-pii-lockdown.sql.
+      const { data, error } = await withTimeout(
+        supabase.rpc('get_my_profile'),
+        20_000,
+      );
 
       if (error) throw error;
-      let row = data;
+      let row = data as ProfileDbRow | null;
       // Email-confirm signup: DOB may only exist in auth metadata until first profile row sync.
       if (row && !row.date_of_birth) {
         const metaDob = user.user_metadata?.date_of_birth;
@@ -205,25 +171,21 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         const { data: urlData } = supabase.storage.from('Avatars').getPublicUrl(filePath);
         const avatarUrl = urlData.publicUrl;
 
-        let updateResult = await supabase
+        const { error: updateError } = await supabase
           .from('profiles')
           .update({ profile_image_url: avatarUrl })
-          .eq('id', user.id)
-          .select(PROFILE_SELECT_WITH_PRIVACY)
-          .maybeSingle();
-        if (updateResult.error && isUndefinedColumnError(updateResult.error)) {
-          updateResult = await supabase
-            .from('profiles')
-            .update({ profile_image_url: avatarUrl })
-            .eq('id', user.id)
-            .select(PROFILE_SELECT_BASE)
-            .maybeSingle();
-        }
-        const { data: updated, error: updateError } = updateResult;
+          .eq('id', user.id);
         if (updateError) throw updateError;
+
+        // Re-read the full row through the secure RPC (sensitive columns are not
+        // directly selectable). See scripts/profiles-pii-lockdown.sql.
+        const { data: updated, error: refetchError } = await supabase.rpc(
+          'get_my_profile',
+        );
+        if (refetchError) throw refetchError;
         if (!updated) {
           throw new Error(
-            'Could not save profile photo (no row updated). Check RLS allows UPDATE on profiles for your user.'
+            'Could not save profile photo (no row returned). Check RLS allows UPDATE on profiles for your user.'
           );
         }
 

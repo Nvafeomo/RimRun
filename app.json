@@ -30,7 +30,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/rimrun-logo.png",
+      "image": "./assets/adaptive-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -48,7 +48,7 @@
     },
     "android": {
       "splash": {
-        "image": "./assets/rimrun-logo.png",
+        "image": "./assets/adaptive-icon.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       },
