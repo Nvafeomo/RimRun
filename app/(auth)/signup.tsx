@@ -102,9 +102,9 @@ export default function SignupScreen() {
       const dobIso = dateOfBirth.trim();
       await signUp(email.trim(), password, normalizedUsername, dobIso);
       router.replace('/(auth)/onboarding');
+      // Keep spinner until navigation unmounts this screen.
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Sign up failed');
-    } finally {
       setSubmitting(false);
     }
   }

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="How to install and test RimRun on iPhone via TestFlight." />
+  <title>iOS testing — RimRun</title>
+  <link rel="icon" href="assets/rimrun-logo.png" type="image/png" />
+  <link rel="stylesheet" href="css/site.css" />
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <div class="wrap">
+      <a class="brand" href="./">
+        <img src="assets/rimrun-logo.png" alt="" width="36" height="36" />
+        RimRun
+      </a>
+      <div class="nav-links">
+        <a href="./">Home</a>
+        <a href="./#signup">Sign up</a>
+        <a href="android-testing.html">Android testing</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="wrap" style="padding: 2.5rem 1.25rem 4rem;">
+    <h1 style="font-size: 1.75rem; margin: 0 0 0.5rem;">Test RimRun on iPhone / iPad</h1>
+    <p style="color: var(--muted); max-width: 40rem;">
+      RimRun beta builds are distributed through <strong style="color: var(--text);">TestFlight</strong>.
+      Install Apple’s TestFlight app first, then accept our invite.
+    </p>
+
+    <div class="callout">
+      <strong>TestFlight invite</strong> — We’ll email you an invite or share a public link when the build is on TestFlight.
+      <p style="margin: 0.75rem 0 0;">
+        <a class="btn btn-primary" href="#" id="ios-test-link">IOS_TEST_LINK_PLACEHOLDER</a>
+      </p>
+    </div>
+
+    <article class="prose">
+      <h2>Before you start</h2>
+      <ul>
+        <li>iPhone or iPad on a recent iOS version.</li>
+        <li>Apple ID signed into the App Store.</li>
+        <li><a href="https://apps.apple.com/app/testflight/id899247664" target="_blank" rel="noopener">TestFlight</a> installed from the App Store.</li>
+        <li>Email address added as a tester in App Store Connect (internal) or invited via TestFlight link.</li>
+      </ul>
+
+      <h2>Install steps</h2>
+      <ol>
+        <li>Install <strong>TestFlight</strong> if you don’t have it.</li>
+        <li>Open the <strong>invite link</strong> we sent (email or the button above once set) on your iPhone.</li>
+        <li>TestFlight opens → tap <strong>Accept</strong>, then <strong>Install</strong> for RimRun.</li>
+        <li>Launch RimRun from TestFlight or your home screen.</li>
+        <li>Allow <strong>location</strong> for the court map; allow <strong>photos</strong> only if you add a profile picture.</li>
+      </ol>
+
+      <h2>What to try</h2>
+      <ul>
+        <li>Sign up or sign in (email, Apple, or Google).</li>
+        <li>Browse courts on the map and open a court detail.</li>
+        <li>Subscribe to a court and post in court chat.</li>
+        <li>Send feedback to <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a> (include iOS version and what you were doing).</li>
+      </ul>
+
+      <h2>Troubleshooting</h2>
+      <ul>
+        <li><strong>No invite showing</strong> — Check the Apple ID on your device matches the email we invited.</li>
+        <li><strong>Apple / Google sign-in errors</strong> — Try again on Wi‑Fi; report the exact message if it keeps failing.</li>
+        <li><strong>Blank map</strong> — Settings → RimRun → Location → While Using the App.</li>
+      </ul>
+
+      <p>
+        <a class="btn btn-secondary" href="./">← Back to home</a>
+      </p>
+    </article>
+  </main>
+
+  <footer class="site-footer wrap">
+    <p>
+      <a href="./">RimRun home</a> ·
+      <a href="android-testing.html">Android testing</a> ·
+      <a href="privacy/privacy-policy.html">Privacy</a>
+    </p>
+  </footer>
+  <script>
+    (function () {
+      var el = document.getElementById('ios-test-link');
+      var url = 'IOS_TEST_LINK_PLACEHOLDER';
+      if (el && url.indexOf('PLACEHOLDER') === -1 && url !== '#') {
+        el.href = url;
+        el.textContent = 'Open TestFlight invite';
+      } else if (el) {
+        el.style.pointerEvents = 'none';
+        el.style.opacity = '0.6';
+        el.textContent = 'Invite link coming soon';
+      }
+    })();
+  </script>
+</body>
+</html>

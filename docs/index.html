@@ -3,26 +3,154 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RimRun — Docs</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      max-width: 36rem;
-      margin: 3rem auto;
-      padding: 0 1.25rem;
-      line-height: 1.6;
-      color: #1e293b;
-    }
-    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    p { color: #64748b; margin: 0 0 1rem; }
-    a { color: #e85d04; font-weight: 600; }
-  </style>
+  <meta name="description" content="RimRun — find pickup basketball courts, connect with players, and chat. Join the waitlist for pre-release updates and launch." />
+  <title>RimRun — Pickup basketball, courts &amp; community</title>
+  <link rel="icon" href="assets/rimrun-logo.png" type="image/png" />
+  <link rel="stylesheet" href="css/site.css" />
 </head>
 <body>
-  <h1>RimRun</h1>
-  <p>Public pages for the RimRun app.</p>
-  <p><a href="Demo/Screenshots/demo.html">App demos</a> (screen recordings)</p>
-  <p><a href="privacy/privacy-policy.html">Privacy policy</a></p>
-  <p><a href="termsofservice/">Terms of service</a></p>
+  <nav class="site-nav" aria-label="Main">
+    <div class="wrap">
+      <a class="brand" href="./">
+        <img src="assets/rimrun-logo.png" alt="" width="36" height="36" />
+        RimRun
+      </a>
+      <div class="nav-links">
+        <a href="#demos">Demos</a>
+        <a href="#features">Features</a>
+        <a href="#signup">Sign up</a>
+        <a href="android-testing.html">Android testing</a>
+        <a href="ios-testing.html">iOS testing</a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <header class="hero wrap">
+      <img class="hero-logo" src="assets/rimrun-logo.png" alt="RimRun logo" width="120" height="120" />
+      <h1>Find courts. Run the rim.</h1>
+      <p class="lead">
+        RimRun is a mobile app for pickup basketball — browse courts on a map, subscribe to your spots,
+        and coordinate with players through DMs and court chats.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#signup">Join the list</a>
+        <a class="btn btn-secondary" href="#demos">Watch demos</a>
+      </div>
+    </header>
+
+    <section id="demos" class="wrap">
+      <h2>See it in action</h2>
+      <p class="section-lead">Short screen recordings from the app. <a href="Demo/Screenshots/demo.html">Open full demo page</a>.</p>
+      <div class="demo-grid">
+        <article class="demo-card">
+          <h3>Courts, search &amp; chat</h3>
+          <img src="Demo/Screenshots/RimRunDemo1.gif" alt="Courts map, add court, and chat" width="390" height="844" loading="lazy" />
+          <p>Map discovery, court subscriptions, adding a court, and messaging.</p>
+        </article>
+        <article class="demo-card">
+          <h3>Authentication</h3>
+          <img src="Demo/Screenshots/authdemo.gif" alt="Sign-in and account flows" width="390" height="844" loading="lazy" />
+          <p>Email, Google, and Apple sign-in; account and recovery flows.</p>
+        </article>
+        <article class="demo-card">
+          <h3>Profile</h3>
+          <img src="Demo/Screenshots/profiledemo.gif" alt="Profile and privacy settings" width="390" height="844" loading="lazy" />
+          <p>Profile, privacy controls, and settings.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="features" class="wrap">
+      <h2>What you get</h2>
+      <p class="section-lead">Built for players who want courts and community in one place.</p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>Courts on a map</h3>
+          <p>Discover nearby hoops, open details, and jump to Maps for directions.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Subscribe &amp; chat</h3>
+          <p>Follow courts you play at and join court threads with other subscribers.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Friends &amp; DMs</h3>
+          <p>Direct messages and group chats with age-appropriate safety defaults.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Add courts</h3>
+          <p>Contribute new spots so the community map stays useful.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Sign in your way</h3>
+          <p>Email and password, Google, or Apple — with optional password later for OAuth users.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Privacy built in</h3>
+          <p>Control what others see, who can DM you, and how you appear in search.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="signup" class="wrap">
+      <h2>Stay in the loop</h2>
+      <p class="section-lead">Get emails about beta builds and be notified when RimRun hits the stores.</p>
+      <div class="signup-layout">
+        <div>
+          <p style="color: var(--muted); margin: 0 0 1rem;">
+            <strong style="color: var(--text);">Pre-release updates</strong> — test invites, build notes, and what to try next.<br /><br />
+            <strong style="color: var(--text);">Release waitlist</strong> — one email when the app is publicly available on iOS and Android.
+          </p>
+          <p style="color: var(--muted); font-size: 0.9rem; margin: 0;">
+            Want to test early? After you sign up, see
+            <a href="android-testing.html">Android testing</a> or
+            <a href="ios-testing.html">iOS testing</a>.
+          </p>
+        </div>
+        <form id="waitlist-form" class="signup-panel" novalidate>
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@example.com" />
+
+          <label class="checkbox-row">
+            <input type="checkbox" name="pre_release" value="yes" />
+            <span>Send me pre-release updates (beta builds &amp; testing news)</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" name="release_waitlist" value="yes" />
+            <span>Notify me when RimRun is released on the App Store &amp; Play Store</span>
+          </label>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">Sign up</button>
+          <p class="form-note">
+            We only use your email for RimRun updates. See our
+            <a href="privacy/privacy-policy.html">Privacy Policy</a>.
+          </p>
+          <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="wrap" style="padding-top: 0;">
+      <h2>Beta testers</h2>
+      <p class="section-lead">Already invited? Follow the platform guide.</p>
+      <div class="hero-actions" style="justify-content: flex-start;">
+        <a class="btn btn-secondary" href="android-testing.html">Android (Play internal testing)</a>
+        <a class="btn btn-secondary" href="ios-testing.html">iOS (TestFlight)</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer wrap">
+    <p>
+      <strong>RimRun</strong> ·
+      <a href="privacy/privacy-policy.html">Privacy</a> ·
+      <a href="termsofservice/">Terms</a> ·
+      <a href="Demo/Screenshots/demo.html">Demos</a> ·
+      <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a>
+    </p>
+  </footer>
+
+  <script src="site-config.js"></script>
+  <script src="js/waitlist.js"></script>
 </body>
 </html>

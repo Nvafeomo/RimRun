@@ -51,10 +51,9 @@ export default function LoginScreen() {
     setSubmitting(true);
     try {
       await signIn(emailOrUsername.trim(), password);
-      router.replace('/(app)');
+      // Auth layout redirects once user is set; keep spinner until unmount.
     } catch (e: any) {
       setError(e?.message ?? 'Invalid credentials');
-    } finally {
       setSubmitting(false);
     }
   }

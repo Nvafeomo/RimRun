@@ -201,12 +201,15 @@ type AuthContextValue = {
         email = loginEmail;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ 
-        email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (error) {
         throw error;
       }
-      // No need to set state here; onAuthStateChange will fire.
+      // Apply session before callers navigate so guards see an authenticated user.
+      await applySession(data.session);
     }
   
     async function signUp(
@@ -276,6 +279,10 @@ type AuthContextValue = {
         } else if (insertErr) {
           throw new Error(mapProfileUsernameError(insertErr));
         }
+      }
+
+      if (data.session) {
+        await applySession(data.session);
       }
     }
   

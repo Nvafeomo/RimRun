@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="How to install and test RimRun on Android via Google Play internal testing." />
+  <title>Android testing — RimRun</title>
+  <link rel="icon" href="assets/rimrun-logo.png" type="image/png" />
+  <link rel="stylesheet" href="css/site.css" />
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <div class="wrap">
+      <a class="brand" href="./">
+        <img src="assets/rimrun-logo.png" alt="" width="36" height="36" />
+        RimRun
+      </a>
+      <div class="nav-links">
+        <a href="./">Home</a>
+        <a href="./#signup">Sign up</a>
+        <a href="ios-testing.html">iOS testing</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="wrap" style="padding: 2.5rem 1.25rem 4rem;">
+    <h1 style="font-size: 1.75rem; margin: 0 0 0.5rem;">Test RimRun on Android</h1>
+    <p style="color: var(--muted); max-width: 40rem;">
+      RimRun beta builds are distributed through <strong style="color: var(--text);">Google Play internal testing</strong>.
+      You need an invite link from us and a Google account on your phone.
+    </p>
+
+    <div class="callout">
+      <strong>Invite link</strong> — When your track is live, we’ll share a Play Console opt-in URL here and by email.
+      <!-- Replace href below with your Play internal testing link -->
+      <p style="margin: 0.75rem 0 0;">
+        <a class="btn btn-primary" href="#" id="android-test-link">ANDROID_TEST_LINK_PLACEHOLDER</a>
+      </p>
+    </div>
+
+    <article class="prose">
+      <h2>Before you start</h2>
+      <ul>
+        <li>Android phone or tablet (physical device recommended).</li>
+        <li>Google account signed in on the device (Play Store).</li>
+        <li>Email address added as a tester in our Play Console list (we’ll confirm when you sign up).</li>
+      </ul>
+
+      <h2>Install steps</h2>
+      <ol>
+        <li><strong>Open the invite link</strong> we sent (or the button above once the link is set) on your Android device.</li>
+        <li>Tap <strong>Become a tester</strong> (or similar) on the Play testing page.</li>
+        <li>Accept terms if prompted, then tap <strong>Download it on Google Play</strong>.</li>
+        <li>Install <strong>RimRun</strong> from the Play Store like any other app.</li>
+        <li>On first launch, allow <strong>location</strong> if you want the court map; allow <strong>photos</strong> only if you set a profile picture.</li>
+      </ol>
+
+      <h2>What to try</h2>
+      <ul>
+        <li>Sign up or sign in (email, Google).</li>
+        <li>Open the map and browse courts near you.</li>
+        <li>Subscribe to a court and send a message in court chat.</li>
+        <li>Report anything broken to <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a> with your Android version and a short description.</li>
+      </ul>
+
+      <h2>Troubleshooting</h2>
+      <ul>
+        <li><strong>“App not available”</strong> — Make sure you’re signed into the same Google account we invited, and that you accepted the tester opt-in.</li>
+        <li><strong>Blank map</strong> — Toggle location permission for RimRun in system Settings.</li>
+        <li><strong>Google sign-in fails</strong> — Try again on a stable network; email us if it persists.</li>
+      </ul>
+
+      <p>
+        <a class="btn btn-secondary" href="./">← Back to home</a>
+      </p>
+    </article>
+  </main>
+
+  <footer class="site-footer wrap">
+    <p>
+      <a href="./">RimRun home</a> ·
+      <a href="ios-testing.html">iOS testing</a> ·
+      <a href="privacy/privacy-policy.html">Privacy</a>
+    </p>
+  </footer>
+  <script>
+    (function () {
+      var el = document.getElementById('android-test-link');
+      var url = 'ANDROID_TEST_LINK_PLACEHOLDER';
+      if (el && url.indexOf('PLACEHOLDER') === -1 && url !== '#') {
+        el.href = url;
+        el.textContent = 'Open Play testing invite';
+      } else if (el) {
+        el.style.pointerEvents = 'none';
+        el.style.opacity = '0.6';
+        el.textContent = 'Invite link coming soon';
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -58,7 +58,9 @@ Then press `a` / `i` / `w` for Android, iOS, or web, or scan the QR code in Expo
 
 Native dev builds: `npm run android` · `npm run ios` · `npm run web`
 
-**Beta testing (TestFlight / Play):** see [docs/TESTING.md](docs/TESTING.md) — EAS Build setup, secrets, and QA checklist.
+**Landing page (waitlist, demos, tester guides):** [docs/index.html](docs/index.html) → GitHub Pages at `https://nvafeomo.github.io/RimRun/`. Setup: [docs/LANDING_SETUP.md](docs/LANDING_SETUP.md).
+
+**Beta testing (TestFlight / Play):** see [docs/TESTING.md](docs/TESTING.md) — EAS Build setup, secrets, and QA checklist. Tester-facing pages: [docs/android-testing.html](docs/android-testing.html), [docs/ios-testing.html](docs/ios-testing.html).
 
 ## Backend notes
 
