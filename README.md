@@ -77,7 +77,6 @@ Personal roadmap notes are kept in `future-features.tex` under a local personal 
 **Nvafeomo K. Konneh**
 
 - **Email:** [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com)
-- **Phone:** 267-461-8268
 - **LinkedIn:** [Nvafeomo Konneh](https://www.linkedin.com/in/nvafeomo-konneh-a6a1a9367)
 
 ## License
