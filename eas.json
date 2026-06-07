@@ -37,7 +37,8 @@
     "production": {
       "android": {
         "serviceAccountKeyPath": "./docs/personal/google-service-account.json",
-        "track": "internal"
+        "track": "production",
+        "releaseStatus": "draft"
       }
     }
   }

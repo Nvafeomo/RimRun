@@ -1,6 +1,6 @@
 export const TERMS_OF_SERVICE_MARKDOWN = `# Terms of Service
 
-**Effective:** May 30, 2026
+**Effective:** June 6, 2026
 
 By using RimRun, you agree to these Terms. If you do not agree, please do not use the app.
 
@@ -18,7 +18,7 @@ You are responsible for your account. You agree to:
 - Keep your password secure. You are responsible for all activity under your account.
 - Maintain only one account. Creating additional accounts to evade a suspension or ban is prohibited.
 
-You may register with an email and password or through **Google Sign-In**.
+You may register with an email and password, **Google Sign-In**, or **Sign in with Apple** (iOS). By using a third-party sign-in provider, you also agree to that provider's terms.
 
 ## 3. Acceptable use
 
@@ -32,7 +32,7 @@ Use RimRun to find courts and connect with the basketball community. The followi
 - Impersonation or submitting false court information
 - Self-harm content
 - Illegal activity of any kind
-- Attempting to bypass content filters or account bans
+- Attempting to bypass content filters, blocks, or account bans
 - Scraping or automated data extraction
 
 ## 4. User content
@@ -53,9 +53,11 @@ All messages must follow the acceptable use rules above. Messages are stored on 
 
 **Age-based visibility.** To protect younger users, messages are filtered by age. In court chats, you only see messages from other users within an age-appropriate range — in practice, users under 18 and adults (18+) generally do not see each other's messages, except where an adult is a verified professional (such as a coach or trainer). The same age-based limits apply to direct messages, friend connections, and group chats.
 
-**Rate limits.** We may limit how quickly or how many messages you can send to prevent spam, flooding, and abuse.
+**Rate limits.** We may limit how quickly or how many messages you can send to prevent spam, flooding, and abuse. Messages also have a maximum length.
 
-You may edit or unsend your own messages within a time window. A record may be retained for safety and moderation purposes.
+You may **edit** your own messages within **15 minutes**. You may **unsend** your own messages at any time before they are deleted. A record may be retained for safety and moderation purposes.
+
+**Blocking.** You may block other users from their profile. Blocked users cannot message you or interact with you through certain features. You can unblock users from **Friends → Blocked**.
 
 ## 7. Community voting
 
@@ -71,19 +73,21 @@ You control key privacy settings under **Profile → Privacy**:
 
 ## 9. Moderation and enforcement
 
-**Reporting:** You can report users or content in the app (up to 10 reports per 24 hours).
+**Reporting:** You can report users or content in the app (up to 10 reports per 24 hours; duplicate reports for the same target within 24 hours are deduplicated).
 
-**Chat suspension:** Receiving multiple reports may result in automatic chat suspension:
+**Chat suspension:** Receiving multiple reports from distinct users may result in automatic chat suspension:
 - 1st offense: 48-hour suspension
 - Repeat offenses: 7-day, then 30-day suspension
 
-**Banning:** Severe or repeated violations may result in a permanent account ban.
+During a chat suspension, you can still use other app features (map, courts, profile) but cannot send messages.
 
-**Appeals:** Email [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com) to appeal a moderation decision.
+**Banning:** Severe or repeated violations may result in a permanent account ban. Banned users cannot use the app.
+
+**Appeals:** If you believe a moderation action was applied in error, submit an appeal in the app (if your account is banned) or email [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com).
 
 ## 10. Privacy
 
-Your use of RimRun is also governed by our **Privacy Policy**, accessible from this Settings screen.
+Your use of RimRun is also governed by our **Privacy Policy**, accessible from the Profile tab in the app.
 
 ## 11. Intellectual property
 
@@ -99,7 +103,7 @@ To the fullest extent permitted by law, RimRun is not liable for any indirect, i
 
 ## 14. Termination
 
-You may delete your account at any time under **Profile → Account**. We may suspend or terminate your access for violations of these Terms.
+You may delete your account at any time from the **Profile** tab in the app (Delete account). We may suspend or terminate your access for violations of these Terms.
 
 ## 15. Governing law
 

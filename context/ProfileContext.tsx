@@ -15,6 +15,73 @@ import { resolveAvatarUriForDisplay } from '../lib/avatarUrls';
 import { useAuth } from './AuthContext';
 import { withTimeout } from '../lib/withTimeout';
 
+const MY_PROFILE_SELECT =
+  'profile_image_url, date_of_birth, username, email, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added, messages_only_from_friends, username_searchable, chat_suspended_until, auto_suspension_count, role';
+
+function formatErrorForLog(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object' && err !== null) {
+    const e = err as {
+      message?: string;
+      code?: string;
+      details?: string;
+      hint?: string;
+    };
+    const parts = [e.message, e.code, e.details, e.hint].filter(Boolean);
+    return parts.length > 0 ? parts.join(' | ') : JSON.stringify(err);
+  }
+  return String(err);
+}
+
+function isUndefinedColumnError(err: unknown): boolean {
+  if (err && typeof err === 'object' && 'code' in err) {
+    if ((err as { code?: string }).code === '42703') return true;
+  }
+  const msg =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'object' && err !== null && 'message' in err
+        ? String((err as { message: unknown }).message)
+        : '';
+  return /column .* does not exist/i.test(msg);
+}
+
+/** PostgREST: function not in schema (migration not applied yet). */
+function isRpcMissingError(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.code === 'PGRST202' || err.code === '42883') return true;
+  const m = err.message ?? '';
+  return /could not find .* function/i.test(m) || /schema cache/i.test(m);
+}
+
+async function fetchMyProfileRow(
+  userId: string,
+): Promise<{ row: ProfileDbRow | null; error: unknown | null }> {
+  const { data, error } = await supabase.rpc('get_my_profile');
+  if (!error) {
+    return { row: (data as ProfileDbRow | null) ?? null, error: null };
+  }
+  if (!isRpcMissingError(error)) {
+    return { row: null, error };
+  }
+
+  // Fallback when scripts/profiles-pii-lockdown.sql is not applied yet.
+  let res = await supabase
+    .from('profiles')
+    .select(MY_PROFILE_SELECT)
+    .eq('id', userId)
+    .maybeSingle();
+  if (res.error && isUndefinedColumnError(res.error)) {
+    res = await supabase
+      .from('profiles')
+      .select('profile_image_url, date_of_birth, username, email')
+      .eq('id', userId)
+      .maybeSingle();
+  }
+  if (res.error) return { row: null, error: res.error };
+  return { row: (res.data as ProfileDbRow | null) ?? null, error: null };
+}
+
 function profileFromAuthMetadata(user: {
   user_metadata?: Record<string, unknown>;
   email?: string;
@@ -114,14 +181,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       // Sensitive columns (email, date_of_birth, role, ...) are not directly
       // selectable by the authenticated role; the owner reads their full row
       // through this security-definer RPC. See scripts/profiles-pii-lockdown.sql.
-      const { data, error } = await withTimeout(
-        supabase.rpc('get_my_profile'),
+      const { row: fetchedRow, error } = await withTimeout(
+        fetchMyProfileRow(user.id),
         20_000,
         'Profile fetch',
       );
 
       if (error) throw error;
-      let row = data as ProfileDbRow | null;
+      let row = fetchedRow;
       // Email-confirm signup: DOB may only exist in auth metadata until first profile row sync.
       if (row && !row.date_of_birth) {
         const metaDob = user.user_metadata?.date_of_birth;
@@ -151,7 +218,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         setProfile(null);
       }
     } catch (err) {
-      console.error('Error fetching profile:', err);
+      console.error('Error fetching profile:', formatErrorForLog(err));
       setProfileFetchFailed(true);
       const fallback = user ? profileFromAuthMetadata(user) : null;
       setProfile(fallback);
@@ -189,8 +256,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
         // Re-read the full row through the secure RPC (sensitive columns are not
         // directly selectable). See scripts/profiles-pii-lockdown.sql.
-        const { data: updated, error: refetchError } = await supabase.rpc(
-          'get_my_profile',
+        const { row: updated, error: refetchError } = await fetchMyProfileRow(
+          user.id,
         );
         if (refetchError) throw refetchError;
         if (!updated) {
