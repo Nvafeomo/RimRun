@@ -23,7 +23,15 @@ export async function submitContentReport(
   });
 
   if (error) {
-    return { ok: false, error: error.message };
+    const msg = error.message ?? 'Report failed';
+    if (error.code === 'PGRST202' || /could not find.*function/i.test(msg)) {
+      return {
+        ok: false,
+        error:
+          'Reporting is not set up on the server yet. Run scripts/reporting-and-chat-suspensions.sql in Supabase, then reload the API schema.',
+      };
+    }
+    return { ok: false, error: msg };
   }
 
   const row = data as { ok?: boolean; deduped?: boolean } | null;

@@ -23,7 +23,22 @@ export async function fetchOpenReports(): Promise<
     p_limit: 50,
   });
   if (error) {
-    return { ok: false, error: error.message };
+    const msg = error.message ?? 'Could not load reports';
+    if (msg === 'Forbidden' || /forbidden/i.test(msg)) {
+      return {
+        ok: false,
+        error:
+          'Admin access denied. Confirm your profile role is admin in Supabase (profiles.role = \'admin\').',
+      };
+    }
+    if (error.code === 'PGRST202' || /could not find.*function/i.test(msg)) {
+      return {
+        ok: false,
+        error:
+          'Moderation queue is not set up on the server yet. Run scripts/admin-moderation-app-rpc.sql in Supabase, then reload the API schema.',
+      };
+    }
+    return { ok: false, error: msg };
   }
   return { ok: true, reports: (data ?? []) as AdminReportRow[] };
 }

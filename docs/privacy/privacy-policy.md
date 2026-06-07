@@ -125,7 +125,23 @@ To exercise these rights, email [rimrun.support@gmail.com](mailto:rimrun.support
 
 ## Deleting your account
 
-You can delete your account at any time from the **Profile** tab in the App (Delete account). You can also email [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com) to request deletion. When your account is deleted, we remove or deactivate your personal data from active systems; we may retain limited information where required for fraud prevention, safety investigations, or legal compliance.
+### In the app (recommended)
+
+1. Open RimRun and sign in.
+2. Go to the **Profile** tab.
+3. Tap **Delete account** and confirm.
+
+### By email
+
+If you cannot use the app, email [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com) from the address on your account and ask us to delete your RimRun account.
+
+### What we delete
+
+When your account is deleted, we remove your authentication account and delete or deactivate associated personal data from our active systems, including your profile (username, email, date of birth, profile photo, and privacy settings), friendships, court subscriptions, and chat participation tied to your account.
+
+### What we may keep
+
+We may retain limited information for fraud prevention, safety investigations, moderation, enforcing our terms, or legal compliance — for example moderation records, anonymized court listings you submitted, limited chat/safety records, and short-term backup copies. We do not sell your personal information.
 
 ## Changes to this policy
 

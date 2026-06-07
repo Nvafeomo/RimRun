@@ -5,17 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="87a0e9ac-58cf-4d2d-8ac8-bbab96942908" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(app)/(tabs)/courts.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(app)/(tabs)/courts.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(app)/_layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(app)/_layout.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(app)/court/[courtId].tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(app)/court/[courtId].tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(auth)/login.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(auth)/login.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ChatScreen.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ChatScreen.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/FriendsPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/FriendsPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/context/AuthContext.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/context/AuthContext.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/context/ProfileContext.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/context/ProfileContext.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hooks/useConversationChat.ts" beforeDir="false" afterPath="$PROJECT_DIR$/hooks/useConversationChat.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(app)/admin/moderation.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(app)/admin/moderation.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ReportUserModal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ReportUserModal.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/moderation.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/moderation.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/reports.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/reports.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -80,7 +80,7 @@ export function ReportUserModal({
     if (res.deduped) {
       Alert.alert(
         "Already reported",
-        "You already submitted a similar report recently. Our team will review it.",
+        "You already have an open report for this person or court from the last 24 hours. Check Moderation if you are an admin, or wait for review.",
       );
     } else {
       Alert.alert(

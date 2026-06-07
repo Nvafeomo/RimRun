@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -122,6 +122,13 @@ export default function AdminModerationScreen() {
       }
     }, [loadModeration, profile?.role]),
   );
+
+  // Reload when admin role becomes available after profile fetch (focus may have fired earlier).
+  useEffect(() => {
+    if (!profileLoading && isAdminRole(profile?.role)) {
+      void loadModeration();
+    }
+  }, [profileLoading, profile?.role, loadModeration]);
 
   const exitModeration = useCallback(() => {
     if (router.canGoBack()) {
@@ -422,7 +429,12 @@ export default function AdminModerationScreen() {
 
           <Text style={styles.sectionHeading}>Open reports</Text>
           {reports.length === 0 && !error ? (
-            <Text style={styles.sectionEmpty}>No open reports</Text>
+            <Text style={styles.sectionEmpty}>
+              No open reports. If you just submitted one, pull to refresh. Still missing?
+              In Supabase run scripts/reporting-and-chat-suspensions.sql and
+              scripts/admin-moderation-app-rpc.sql, then verify with
+              scripts/verify-moderation-setup.sql.
+            </Text>
           ) : null}
 
           {reports.length === 0 && !error && appeals.length === 0 && flaggedCourts.length === 0 ? (
