@@ -128,9 +128,22 @@ export async function geocodeSearchQuery(
  */
 export async function enrichPickOptions(
   results: Location.LocationGeocodedLocation[],
-  userCoords: { latitude: number; longitude: number } | null
+  userCoords: { latitude: number; longitude: number } | null,
+  queryLabel?: string,
 ): Promise<LocationPickOption[]> {
   const limited = results.slice(0, MAX_PICK_OPTIONS);
+
+  if (limited.length === 1 && queryLabel?.trim()) {
+    const only = limited[0];
+    return [
+      {
+        latitude: only.latitude,
+        longitude: only.longitude,
+        label: queryLabel.trim(),
+      },
+    ];
+  }
+
   const labels = await Promise.all(
     limited.map((r) => reverseGeocodeLabel(r.latitude, r.longitude))
   );

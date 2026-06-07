@@ -47,6 +47,8 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
   const {
     messages,
     loading,
+    messagesLoadFailed,
+    retryLoadMessages,
     sending,
     typingUsers,
     sendMessage,
@@ -319,6 +321,18 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
     );
   }
 
+  if (messagesLoadFailed) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loadErrorTitle}>Couldn&apos;t load messages</Text>
+        <Text style={styles.loadErrorBody}>Check your connection and try again.</Text>
+        <Pressable style={styles.loadErrorButton} onPress={() => void retryLoadMessages()}>
+          <Text style={styles.loadErrorButtonText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -437,6 +451,31 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  loadErrorTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: spacing.sm,
+    textAlign: "center",
+  },
+  loadErrorBody: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginBottom: spacing.lg,
+  },
+  loadErrorButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  loadErrorButtonText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
   },
   typingBar: {
     paddingHorizontal: spacing.md,

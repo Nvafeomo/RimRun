@@ -49,12 +49,15 @@ export default function LoginScreen() {
       return;
     }
     setSubmitting(true);
+    const submitTimeout = setTimeout(() => setSubmitting(false), 12_000);
     try {
       await signIn(emailOrUsername.trim(), password);
       // Auth layout redirects once user is set; keep spinner until unmount.
     } catch (e: any) {
       setError(e?.message ?? 'Invalid credentials');
       setSubmitting(false);
+    } finally {
+      clearTimeout(submitTimeout);
     }
   }
 

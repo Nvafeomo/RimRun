@@ -13,24 +13,26 @@ import { reencodeJpegWithoutExif } from '../lib/stripImageForUpload';
 import { validateDateOfBirthForSignup } from '../lib/agePolicy';
 import { resolveAvatarUriForDisplay } from '../lib/avatarUrls';
 import { useAuth } from './AuthContext';
+import { withTimeout } from '../lib/withTimeout';
 
-function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(
-      () => reject(new Error(`Profile fetch timed out after ${ms}ms`)),
-      ms,
-    );
-    Promise.resolve(promise).then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(t);
-        reject(e);
-      },
-    );
-  });
+function profileFromAuthMetadata(user: {
+  user_metadata?: Record<string, unknown>;
+  email?: string;
+}): Profile | null {
+  const metaDob = user.user_metadata?.date_of_birth;
+  if (typeof metaDob !== 'string' || !metaDob.trim()) return null;
+  const check = validateDateOfBirthForSignup(metaDob.trim());
+  if (!check.ok) return null;
+  const username =
+    typeof user.user_metadata?.username === 'string'
+      ? user.user_metadata.username
+      : null;
+  return {
+    date_of_birth: metaDob.trim(),
+    profile_image_url: null,
+    username,
+    email: user.email ?? null,
+  };
 }
 
 /** Row shape from `profiles` (privacy columns optional until migration is applied). */
@@ -75,6 +77,8 @@ export type Profile = {
 type ProfileContextValue = {
   profile: Profile;
   loading: boolean;
+  /** True when the last profile fetch failed (offline/timeout) — not "user has no DOB". */
+  profileFetchFailed: boolean;
   refreshProfile: () => Promise<void>;
   updateProfilePicture: () => void;
 };
@@ -93,16 +97,19 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile>(null);
   const [loading, setLoading] = useState(true);
+  const [profileFetchFailed, setProfileFetchFailed] = useState(false);
 
   const fetchProfile = useCallback(async (options?: { silent?: boolean }) => {
     if (!user?.id) {
       setProfile(null);
+      setProfileFetchFailed(false);
       setLoading(false);
       return;
     }
     if (!options?.silent) {
       setLoading(true);
     }
+    setProfileFetchFailed(false);
     try {
       // Sensitive columns (email, date_of_birth, role, ...) are not directly
       // selectable by the authenticated role; the owner reads their full row
@@ -110,6 +117,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       const { data, error } = await withTimeout(
         supabase.rpc('get_my_profile'),
         20_000,
+        'Profile fetch',
       );
 
       if (error) throw error;
@@ -144,7 +152,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error('Error fetching profile:', err);
-      setProfile(null);
+      setProfileFetchFailed(true);
+      const fallback = user ? profileFromAuthMetadata(user) : null;
+      setProfile(fallback);
     } finally {
       setLoading(false);
     }
@@ -257,6 +267,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const value: ProfileContextValue = {
     profile,
     loading,
+    profileFetchFailed,
     refreshProfile: () => fetchProfile({ silent: true }),
     updateProfilePicture,
   };

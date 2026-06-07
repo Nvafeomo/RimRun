@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { withTimeout } from '../lib/withTimeout';
 import { useAuth } from './useAuth';
 import { useProfile } from '../context/ProfileContext';
 import type { Message } from '../types/chat';
@@ -45,6 +46,7 @@ export function useConversationChat(conversationId: string | undefined) {
   const { profile } = useProfile();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [messagesLoadFailed, setMessagesLoadFailed] = useState(false);
   const [sending, setSending] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const [onlineUsers, setOnlineUsers] = useState<Record<string, unknown[]>>({});
@@ -54,67 +56,80 @@ export function useConversationChat(conversationId: string | undefined) {
     Map<string, { username: string | null; profile_image_url: string | null }>
   >(new Map());
 
-  // Fetch initial messages
+  const loadMessages = useCallback(async () => {
+    if (!conversationId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setMessagesLoadFailed(false);
+    try {
+      const { data, error } = await withTimeout(
+        supabase
+          .from('messages')
+          .select(
+            'id, conversation_id, sender_id, content, created_at, edited_at, deleted_at',
+          )
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: true }),
+        15_000,
+        'Messages fetch',
+      );
+
+      if (error) {
+        console.error('Error fetching messages:', error);
+        setMessages([]);
+        setMessagesLoadFailed(true);
+        return;
+      }
+
+      const senderIds = [...new Set((data ?? []).map((m) => m.sender_id))];
+      let senderMap: Record<string, { username: string | null; profile_image_url: string | null }> = {};
+
+      if (senderIds.length > 0) {
+        const { data: profiles } = await withTimeout(
+          supabase
+            .from('profiles')
+            .select('id, username, profile_image_url')
+            .in('id', senderIds),
+          10_000,
+          'Profiles fetch',
+        );
+
+        if (profiles) {
+          senderMap = Object.fromEntries(
+            profiles.map((p) => [p.id, { username: p.username ?? null, profile_image_url: p.profile_image_url ?? null }]),
+          );
+        }
+      }
+
+      const formatted: Message[] = (data ?? []).map((m) => ({
+        ...m,
+        sender: senderMap[m.sender_id],
+      }));
+      for (const m of formatted) {
+        if (m.sender) {
+          senderCacheRef.current.set(m.sender_id, m.sender);
+        }
+      }
+      setMessages(formatted);
+    } catch (err) {
+      console.error('Messages fetch failed:', err);
+      setMessages([]);
+      setMessagesLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [conversationId]);
+
   useEffect(() => {
     if (!conversationId) {
       setLoading(false);
       return;
     }
-
-    let mounted = true;
-
-    async function fetchMessages() {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('messages')
-        .select(
-          'id, conversation_id, sender_id, content, created_at, edited_at, deleted_at',
-        )
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
-
-      if (!mounted) return;
-
-      if (error) {
-        console.error('Error fetching messages:', error);
-        setMessages([]);
-      } else {
-        const senderIds = [...new Set((data ?? []).map((m) => m.sender_id))];
-        let senderMap: Record<string, { username: string | null; profile_image_url: string | null }> = {};
-
-        if (senderIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, username, profile_image_url')
-            .in('id', senderIds);
-
-          if (profiles) {
-            senderMap = Object.fromEntries(
-              profiles.map((p) => [p.id, { username: p.username ?? null, profile_image_url: p.profile_image_url ?? null }])
-            );
-          }
-        }
-
-        const formatted: Message[] = (data ?? []).map((m) => ({
-          ...m,
-          sender: senderMap[m.sender_id],
-        }));
-        for (const m of formatted) {
-          if (m.sender) {
-            senderCacheRef.current.set(m.sender_id, m.sender);
-          }
-        }
-        setMessages(formatted);
-      }
-      setLoading(false);
-    }
-
-    fetchMessages();
-    return () => {
-      mounted = false;
-      senderCacheRef.current.clear();
-    };
-  }, [conversationId]);
+    senderCacheRef.current.clear();
+    void loadMessages();
+  }, [conversationId, loadMessages]);
 
   // Realtime: postgres_changes, presence, broadcast
   useEffect(() => {
@@ -362,6 +377,8 @@ export function useConversationChat(conversationId: string | undefined) {
   return {
     messages,
     loading,
+    messagesLoadFailed,
+    retryLoadMessages: loadMessages,
     sending,
     typingUsers,
     onlineUsers,

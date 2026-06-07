@@ -17,6 +17,7 @@ import {
 import { mapProfileUsernameError } from '../lib/usernameRules';
 import { defaultUsernameSearchableForDob } from '../lib/usernameSearchPolicy';
 import { fetchBanAppealStatus, fetchIsUserBanned, submitBanAppeal } from '../lib/bans';
+import { withTimeout } from '../lib/withTimeout';
 
 type AuthContextValue = {
     user: User | null;
@@ -84,15 +85,30 @@ type AuthContextValue = {
         return;
       }
 
-      const banned = await fetchIsUserBanned(nextSession.user.id);
       setSession(nextSession);
       setUser(nextSession.user);
-      setBanBlocked(banned);
 
-      if (banned) {
-        const status = await fetchBanAppealStatus();
-        setBanAppealPending(status.pending);
-      } else {
+      try {
+        const banned = await withTimeout(
+          fetchIsUserBanned(nextSession.user.id),
+          8_000,
+          'Ban check',
+        );
+        setBanBlocked(banned);
+
+        if (banned) {
+          const status = await withTimeout(
+            fetchBanAppealStatus(),
+            8_000,
+            'Ban appeal status',
+          );
+          setBanAppealPending(status.pending);
+        } else {
+          setBanAppealPending(false);
+        }
+      } catch (err) {
+        console.warn('Ban check skipped (offline or timeout):', err);
+        setBanBlocked(false);
         setBanAppealPending(false);
       }
     }

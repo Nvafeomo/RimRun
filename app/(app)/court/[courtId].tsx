@@ -17,6 +17,7 @@ import {
 } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../../lib/supabase";
+import { withTimeout } from "../../../lib/withTimeout";
 import { useAuth } from "../../../context/AuthContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius, shadows, typography } from "../../../constants/theme";
@@ -110,49 +111,60 @@ export default function CourtDetailScreen() {
     if (!courtId) return;
     const load = async () => {
       setLoading(true);
-      const [courtRes, subRes, myVoteRes, subCountRes] = await Promise.all([
-        supabase
-          .from("courts")
-          .select(
-            "id, name, address, latitude, longitude, hoops, is_private, is_indoor, source, created_by, created_at, verified, flagged_for_review, verify_count, flag_count",
-          )
-          .eq("id", courtId)
-          .single(),
-        fetchSubscription(),
-        user?.id
-          ? supabase
-              .from("court_votes")
-              .select("vote_type")
-              .eq("court_id", courtId)
-              .eq("user_id", user.id)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-        supabase
-          .from("court_subscriptions")
-          .select("court_id", { count: "exact", head: true })
-          .eq("court_id", courtId),
-      ]);
+      try {
+        const [courtRes, subRes, myVoteRes, subCountRes] = await withTimeout(
+          Promise.all([
+            supabase
+              .from("courts")
+              .select(
+                "id, name, address, latitude, longitude, hoops, is_private, is_indoor, source, created_by, created_at, verified, flagged_for_review, verify_count, flag_count",
+              )
+              .eq("id", courtId)
+              .single(),
+            fetchSubscription(),
+            user?.id
+              ? supabase
+                  .from("court_votes")
+                  .select("vote_type")
+                  .eq("court_id", courtId)
+                  .eq("user_id", user.id)
+                  .maybeSingle()
+              : Promise.resolve({ data: null, error: null }),
+            supabase
+              .from("court_subscriptions")
+              .select("court_id", { count: "exact", head: true })
+              .eq("court_id", courtId),
+          ]),
+          15_000,
+          "Court detail fetch",
+        );
 
-      if (courtRes.error) {
-        console.error("Error fetching court:", courtRes.error);
+        if (courtRes.error) {
+          console.error("Error fetching court:", courtRes.error);
+          setCourt(null);
+          setVoteState(null);
+        } else {
+          setCourt(courtRes.data);
+          const subscribers = subCountRes.count ?? 0;
+          setVoteState(
+            buildCourtVoteState({
+              verified: courtRes.data.verified,
+              flagged_for_review: courtRes.data.flagged_for_review,
+              verify_count: courtRes.data.verify_count,
+              flag_count: courtRes.data.flag_count,
+              subscriberCount: subscribers,
+              myVote: (myVoteRes.data?.vote_type as VoteType) ?? null,
+            }),
+          );
+        }
+        setSubscribed(subRes);
+      } catch (err) {
+        console.error("Court detail fetch failed:", err);
         setCourt(null);
         setVoteState(null);
-      } else {
-        setCourt(courtRes.data);
-        const subscribers = subCountRes.count ?? 0;
-        setVoteState(
-          buildCourtVoteState({
-            verified: courtRes.data.verified,
-            flagged_for_review: courtRes.data.flagged_for_review,
-            verify_count: courtRes.data.verify_count,
-            flag_count: courtRes.data.flag_count,
-            subscriberCount: subscribers,
-            myVote: (myVoteRes.data?.vote_type as VoteType) ?? null,
-          }),
-        );
+      } finally {
+        setLoading(false);
       }
-      setSubscribed(subRes);
-      setLoading(false);
     };
     load();
   }, [courtId, fetchSubscription, user?.id]);

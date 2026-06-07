@@ -34,6 +34,14 @@ import {
   type LocationPickOption,
 } from "../../../lib/courtMapSearch";
 import { resolveUsStateCenter } from "../../../lib/usStateCentroids";
+import { withTimeout } from "../../../lib/withTimeout";
+import {
+  resolveDeviceCoordinates,
+  resolveRecenterCoordinates,
+  refineDeviceCoordinates,
+} from "../../../lib/deviceLocation";
+
+const COURTS_FETCH_TIMEOUT_MS = 15_000;
 
 const DEFAULT_REGION: Region = {
   latitude: 37.78825,
@@ -57,6 +65,17 @@ const MIN_REFETCH_INTERVAL_MS = 2500;
 
 /** Smooth pan/zoom when jumping to a search anchor or recentering (ms). */
 const MAP_FLY_DURATION_MS = 950;
+/** Search: snap on Android to avoid blank tile flash while tiles load mid-animation. */
+const MAP_FLY_DURATION_ANDROID_SEARCH_MS = 1;
+/** Relocate: glide like iOS, but slightly shorter on Android. */
+const MAP_FLY_DURATION_ANDROID_RECENTER_MS = 650;
+
+function getMapFlyDurationMs(smooth = false): number {
+  if (Platform.OS === "android") {
+    return smooth ? MAP_FLY_DURATION_ANDROID_RECENTER_MS : MAP_FLY_DURATION_ANDROID_SEARCH_MS;
+  }
+  return MAP_FLY_DURATION_MS;
+}
 
 /** Debounce GPS-driven refetch checks (ms). */
 const GPS_REFETCH_DEBOUNCE_MS = 3000;
@@ -451,6 +470,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.background,
   },
+  fetchErrorBanner: {
+    position: "absolute",
+    top: spacing.sm,
+    left: spacing.md,
+    right: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    zIndex: 11,
+  },
+  fetchErrorText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  fetchErrorRetry: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.primary,
+  },
   loadingOverlayWrap: {
     position: "absolute",
     top: spacing.sm,
@@ -555,7 +601,7 @@ const styles = StyleSheet.create({
 
 export default function CourtsScreen() {
   const { getDisplayName } = useCourtAliases();
-  const [region, setRegion] = useState<Region | null>(null);
+  const [region, setRegion] = useState<Region | null>(DEFAULT_REGION);
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -563,6 +609,9 @@ export default function CourtsScreen() {
   const [sortedCourts, setSortedCourts] = useState<Court[]>([]);
   const [visibleCourts, setVisibleCourts] = useState<Court[]>([]);
   const [courtsLoading, setCourtsLoading] = useState(false);
+  const [courtsFetchFailed, setCourtsFetchFailed] = useState(false);
+  const [gpsInitDone, setGpsInitDone] = useState(false);
+  const [recentering, setRecentering] = useState(false);
   /** Avoid flashing a loader on fast RPC responses; keeps map visible. */
   const [showCourtsLoadingUi, setShowCourtsLoadingUi] = useState(false);
   /** Android: native map callouts are unreliable; we show the same UI as a floating card. */
@@ -634,8 +683,8 @@ export default function CourtsScreen() {
     }
   }, []);
 
-  const beginMapFly = useCallback(() => {
-    mapFlyUntilRef.current = Date.now() + MAP_FLY_DURATION_MS;
+  const beginMapFly = useCallback((durationMs: number) => {
+    mapFlyUntilRef.current = Date.now() + durationMs;
     if (mapFlyEndTimerRef.current) {
       clearTimeout(mapFlyEndTimerRef.current);
     }
@@ -643,12 +692,14 @@ export default function CourtsScreen() {
       mapFlyEndTimerRef.current = null;
       mapFlyUntilRef.current = 0;
       commitAfterMapFly();
-    }, MAP_FLY_DURATION_MS);
+    }, durationMs);
   }, [commitAfterMapFly]);
 
   const applyCourtsToMap = useCallback((courts: Court[], requestId: number) => {
     const slice = courts.slice(0, MAX_COURTS_SHOWN);
-    if (Date.now() < mapFlyUntilRef.current) {
+    const deferForFly =
+      Platform.OS !== "android" && Date.now() < mapFlyUntilRef.current;
+    if (deferForFly) {
       pendingCourtsRef.current = slice;
       pendingCourtsRequestIdRef.current = requestId;
       return;
@@ -658,15 +709,21 @@ export default function CourtsScreen() {
   }, []);
 
   const flyMapToAnchor = useCallback(
-    (latitude: number, longitude: number, radiusMiles: number) => {
+    (
+      latitude: number,
+      longitude: number,
+      radiusMiles: number,
+      options?: { smooth?: boolean },
+    ) => {
+      const durationMs = getMapFlyDurationMs(options?.smooth ?? false);
       const next = regionForAnchor(latitude, longitude, radiusMiles);
       pendingRegionRef.current = next;
-      beginMapFly();
+      beginMapFly(durationMs);
       requestAnimationFrame(() => {
-        mapRef.current?.animateToRegion(next, MAP_FLY_DURATION_MS);
+        mapRef.current?.animateToRegion(next, durationMs);
       });
     },
-    [beginMapFly]
+    [beginMapFly],
   );
 
   useEffect(() => {
@@ -687,49 +744,57 @@ export default function CourtsScreen() {
       radiusMilesRef.current = radiusMiles;
 
       setCourtsLoading(true);
+      setCourtsFetchFailed(false);
       // Keep existing pins visible while fetching (stale-while-revalidate).
 
-      const { data: rpcData, error: rpcError } = await supabase.rpc(
-        "courts_within_radius_miles",
-        {
-          p_lat: centerLat,
-          p_lng: centerLng,
-          p_radius_miles: radiusMiles,
-        }
-      );
-
-      if (requestId !== fetchRequestIdRef.current) {
-        return false;
-      }
-
-      if (!rpcError && Array.isArray(rpcData)) {
-        applyCourtsToMap(rpcData as Court[], requestId);
-        return true;
-      }
-
-      if (rpcError) {
-        console.warn(
-          "courts_within_radius_miles unavailable (run scripts/courts-within-radius-rpc.sql); using bbox fallback:",
-          rpcError.message
+      try {
+        const { data: rpcData, error: rpcError } = await withTimeout(
+          supabase.rpc("courts_within_radius_miles", {
+            p_lat: centerLat,
+            p_lng: centerLng,
+            p_radius_miles: radiusMiles,
+          }),
+          COURTS_FETCH_TIMEOUT_MS,
+          "Courts fetch",
         );
-      }
 
-      {
+        if (requestId !== fetchRequestIdRef.current) {
+          return false;
+        }
+
+        if (!rpcError && Array.isArray(rpcData)) {
+          applyCourtsToMap(rpcData as Court[], requestId);
+          return true;
+        }
+
+        if (rpcError) {
+          console.warn(
+            "courts_within_radius_miles unavailable (run scripts/courts-within-radius-rpc.sql); using bbox fallback:",
+            rpcError.message,
+          );
+        }
+
         const { minLat, maxLat, minLng, maxLng } = boundingBoxForRadiusMiles(
           centerLat,
           centerLng,
           radiusMiles,
-          1.08
+          1.08,
         );
 
-        const { data, error } = await supabase
-          .from("courts")
-          .select("id, name, address, latitude, longitude, hoops, is_private, is_indoor, verified, flagged_for_review")
-          .gte("latitude", minLat)
-          .lte("latitude", maxLat)
-          .gte("longitude", minLng)
-          .lte("longitude", maxLng)
-          .limit(FETCH_ROW_CAP);
+        const { data, error } = await withTimeout(
+          supabase
+            .from("courts")
+            .select(
+              "id, name, address, latitude, longitude, hoops, is_private, is_indoor, verified, flagged_for_review",
+            )
+            .gte("latitude", minLat)
+            .lte("latitude", maxLat)
+            .gte("longitude", minLng)
+            .lte("longitude", maxLng)
+            .limit(FETCH_ROW_CAP),
+          COURTS_FETCH_TIMEOUT_MS,
+          "Courts fetch",
+        );
 
         if (requestId !== fetchRequestIdRef.current) {
           return false;
@@ -737,7 +802,7 @@ export default function CourtsScreen() {
 
         if (error) {
           console.error("Error fetching courts:", error);
-          setCourtsLoading(false);
+          setCourtsFetchFailed(true);
           return false;
         }
 
@@ -753,6 +818,16 @@ export default function CourtsScreen() {
 
         applyCourtsToMap(inRadius, requestId);
         return true;
+      } catch (err) {
+        console.error("Courts fetch failed:", err);
+        if (requestId === fetchRequestIdRef.current) {
+          setCourtsFetchFailed(true);
+        }
+        return false;
+      } finally {
+        if (requestId === fetchRequestIdRef.current) {
+          setCourtsLoading(false);
+        }
       }
     },
     [applyCourtsToMap]
@@ -815,9 +890,26 @@ export default function CourtsScreen() {
   const runCourtsSearchRef = useRef(runCourtsSearch);
   runCourtsSearchRef.current = runCourtsSearch;
 
-  /** First paint: same as blank search — current location (or map default) + miles field. */
+  const applyMapToCoordinates = useCallback(
+    (latitude: number, longitude: number, animate = true) => {
+      const next: Region = {
+        latitude,
+        longitude,
+        latitudeDelta: MAP_DELTA_NEAR_USER,
+        longitudeDelta: MAP_DELTA_NEAR_USER,
+      };
+      setUserLocation({ latitude, longitude });
+      setRegion(next);
+      requestAnimationFrame(() => {
+        mapRef.current?.animateToRegion(next, animate ? 350 : 0);
+      });
+    },
+    [],
+  );
+
+  /** First paint: wait for GPS attempt, then load courts at device location (or map default). */
   useEffect(() => {
-    if (!region || initialCourtsLoadStartedRef.current) {
+    if (!region || !gpsInitDone || initialCourtsLoadStartedRef.current) {
       return;
     }
     initialCourtsLoadStartedRef.current = true;
@@ -830,13 +922,12 @@ export default function CourtsScreen() {
       anchorLat: centerLat,
       anchorLng: centerLng,
       radiusMiles,
-      userAnchored: true,
+      userAnchored: Boolean(userLocation),
       animateMap: false,
       force: true,
     });
-    // Intentionally omit milesInput/userLocation: run once when map region is ready; GPS and region are set together when permission is granted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [region, runCourtsSearch]);
+  }, [region, gpsInitDone, userLocation, runCourtsSearch]);
 
   useEffect(() => {
     if (sortedCourts.length === 0) {
@@ -882,29 +973,19 @@ export default function CourtsScreen() {
   }, [courtsLoading]);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setRegion(DEFAULT_REGION);
-        return;
+      const coords = await resolveDeviceCoordinates();
+      if (cancelled) return;
+      if (coords) {
+        applyMapToCoordinates(coords.latitude, coords.longitude, true);
       }
-      try {
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        const { latitude, longitude } = loc.coords;
-        setUserLocation({ latitude, longitude });
-        setRegion({
-          latitude,
-          longitude,
-          latitudeDelta: MAP_DELTA_NEAR_USER,
-          longitudeDelta: MAP_DELTA_NEAR_USER,
-        });
-      } catch {
-        setRegion(DEFAULT_REGION);
-      }
+      setGpsInitDone(true);
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [applyMapToCoordinates]);
 
   useEffect(() => {
     (async () => {
@@ -1019,7 +1100,7 @@ export default function CourtsScreen() {
         return;
       }
 
-      const options = await enrichPickOptions(raw, userLocation);
+      const options = await enrichPickOptions(raw, userLocation, trimmed);
       if (options.length === 1) {
         const only = options[0];
         setLocationQuery(only.label);
@@ -1155,12 +1236,14 @@ export default function CourtsScreen() {
 
   const handleRecenter = useCallback(async () => {
     Keyboard.dismiss();
+    if (recentering) return;
+    setRecentering(true);
     const radiusMiles = parseMilesInput(milesInput);
 
     const moveAndRefetch = (latitude: number, longitude: number) => {
-      setUserLocation({ latitude, longitude });
       setLocationQuery("");
-      flyMapToAnchor(latitude, longitude, radiusMiles);
+      setUserLocation({ latitude, longitude });
+      flyMapToAnchor(latitude, longitude, radiusMiles, { smooth: true });
       void runCourtsSearch({
         anchorLat: latitude,
         anchorLng: longitude,
@@ -1172,32 +1255,32 @@ export default function CourtsScreen() {
     };
 
     try {
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy:
-          Platform.OS === "android"
-            ? Location.Accuracy.Low
-            : Location.Accuracy.Balanced,
-      });
-      moveAndRefetch(loc.coords.latitude, loc.coords.longitude);
-    } catch {
-      try {
-        const last = await Location.getLastKnownPositionAsync({
-          maxAge: 120_000,
-        });
-        if (last) {
-          moveAndRefetch(last.coords.latitude, last.coords.longitude);
-          return;
+      const coords = await resolveRecenterCoordinates();
+      if (coords) {
+        moveAndRefetch(coords.latitude, coords.longitude);
+        if (!coords.fresh) {
+          void refineDeviceCoordinates(coords).then((refined) => {
+            if (refined) {
+              moveAndRefetch(refined.latitude, refined.longitude);
+            }
+          });
         }
-      } catch {
-        /* ignore */
+        return;
       }
       if (userLocation) {
         moveAndRefetch(userLocation.latitude, userLocation.longitude);
+        return;
       }
+      Alert.alert(
+        "Location unavailable",
+        "Allow location access for RimRun in your device settings, then try again.",
+      );
+    } finally {
+      setRecentering(false);
     }
-  }, [milesInput, runCourtsSearch, userLocation, flyMapToAnchor]);
+  }, [milesInput, recentering, runCourtsSearch, userLocation, flyMapToAnchor]);
 
-  if (region && !mapInitialRegionRef.current) {
+  if (gpsInitDone && region && !mapInitialRegionRef.current) {
     mapInitialRegionRef.current = region;
   }
 
@@ -1326,9 +1409,7 @@ export default function CourtsScreen() {
           initialRegion={mapInitialRegionRef.current ?? region}
           showsUserLocation={false}
           userInterfaceStyle="dark"
-          loadingEnabled={Platform.OS === "android"}
-          loadingBackgroundColor={colors.background}
-          loadingIndicatorColor={colors.primary}
+          loadingEnabled={false}
           onPress={
             Platform.OS === "android" ? clearAndroidCourtSelection : undefined
           }
@@ -1357,6 +1438,28 @@ export default function CourtsScreen() {
             />
           ))}
         </MapView>
+
+        {courtsFetchFailed && !courtsLoading && (
+          <View style={styles.fetchErrorBanner}>
+            <Text style={styles.fetchErrorText}>Couldn&apos;t load courts. Check your connection.</Text>
+            <Pressable
+              onPress={() => {
+                if (region) {
+                  void runCourtsSearch({
+                    anchorLat: region.latitude,
+                    anchorLng: region.longitude,
+                    radiusMiles: radiusMilesRef.current,
+                    userAnchored: false,
+                    animateMap: false,
+                    force: true,
+                  });
+                }
+              }}
+            >
+              <Text style={styles.fetchErrorRetry}>Retry</Text>
+            </Pressable>
+          </View>
+        )}
 
         {showCourtsLoadingUi && (
           <View style={styles.loadingOverlayWrap} pointerEvents="none">
@@ -1408,8 +1511,18 @@ export default function CourtsScreen() {
             </View>
           )}
 
-        <Pressable onPress={handleRecenter} style={styles.recenterButton}>
-          <Ionicons name="locate" size={24} color={colors.text} />
+        <Pressable
+          onPress={() => void handleRecenter()}
+          style={styles.recenterButton}
+          disabled={recentering}
+          accessibilityRole="button"
+          accessibilityLabel="Relocate to my position"
+        >
+          {recentering ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Ionicons name="locate" size={24} color={colors.text} />
+          )}
         </Pressable>
         <Pressable onPress={handleAddCourt} style={styles.addCourtButton}>
           <Ionicons

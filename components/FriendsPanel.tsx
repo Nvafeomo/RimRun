@@ -20,6 +20,7 @@ import { blockUser, unblockUser } from "../lib/blocking";
 import { ReportUserModal } from "./ReportUserModal";
 import { useAuth } from "../context/AuthContext";
 import { colors, spacing, borderRadius } from "../constants/theme";
+import { withTimeout } from "../lib/withTimeout";
 
 export type ProfileRow = {
   id: string;
@@ -173,13 +174,19 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
   }, [user?.id]);
 
   const loadAll = useCallback(async () => {
-    await Promise.all([fetchFriends(), fetchRequests(), fetchBlocked()]);
+    await withTimeout(
+      Promise.all([fetchFriends(), fetchRequests(), fetchBlocked()]),
+      15_000,
+      'Friends fetch',
+    );
   }, [fetchFriends, fetchRequests, fetchBlocked]);
 
   useEffect(() => {
     if (!user?.id) return;
     setLoading(true);
-    loadAll().finally(() => setLoading(false));
+    loadAll()
+      .catch((err) => console.error('Friends panel load failed:', err))
+      .finally(() => setLoading(false));
   }, [user?.id, loadAll]);
 
   const searchUsers = useCallback(async () => {
