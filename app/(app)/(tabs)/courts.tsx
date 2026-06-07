@@ -65,16 +65,31 @@ const MIN_REFETCH_INTERVAL_MS = 2500;
 
 /** Smooth pan/zoom when jumping to a search anchor or recentering (ms). */
 const MAP_FLY_DURATION_MS = 950;
-/** Search: snap on Android to avoid blank tile flash while tiles load mid-animation. */
-const MAP_FLY_DURATION_ANDROID_SEARCH_MS = 1;
-/** Relocate: glide like iOS, but slightly shorter on Android. */
-const MAP_FLY_DURATION_ANDROID_RECENTER_MS = 650;
+/** Android map glide (search + relocate); slightly shorter than iOS. */
+const MAP_FLY_DURATION_ANDROID_MS = 650;
+const MAP_TILE_BG = "#1e2836";
+const MAP_VEIL_FALLBACK_MS = 900;
+/** Cross-region search: snap instead of gliding over unloaded tiles. */
+const LONG_HOP_SNAP_MILES = 300;
 
-function getMapFlyDurationMs(smooth = false): number {
+function getMapFlyDurationMs(smooth = true): number {
   if (Platform.OS === "android") {
-    return smooth ? MAP_FLY_DURATION_ANDROID_RECENTER_MS : MAP_FLY_DURATION_ANDROID_SEARCH_MS;
+    return smooth ? MAP_FLY_DURATION_ANDROID_MS : 1;
   }
   return MAP_FLY_DURATION_MS;
+}
+
+function resolveFlyDurationMs(
+  smooth: boolean,
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+): number {
+  if (!smooth) return getMapFlyDurationMs(false);
+  const hopMiles = haversineMiles(fromLat, fromLng, toLat, toLng);
+  if (hopMiles >= LONG_HOP_SNAP_MILES) return 1;
+  return getMapFlyDurationMs(true);
 }
 
 /** Debounce GPS-driven refetch checks (ms). */
@@ -235,6 +250,8 @@ type Court = {
   is_indoor: boolean | null;
   verified?: boolean;
   flagged_for_review?: boolean;
+  source?: string | null;
+  created_at?: string | null;
 };
 
 const styles = StyleSheet.create({
@@ -497,6 +514,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.primary,
   },
+  mapTileVeil: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: MAP_TILE_BG,
+    zIndex: 5,
+  },
   loadingOverlayWrap: {
     position: "absolute",
     top: spacing.sm,
@@ -612,6 +634,9 @@ export default function CourtsScreen() {
   const [courtsFetchFailed, setCourtsFetchFailed] = useState(false);
   const [gpsInitDone, setGpsInitDone] = useState(false);
   const [recentering, setRecentering] = useState(false);
+  const [mapVeilVisible, setMapVeilVisible] = useState(false);
+  const mapVeilPendingClearRef = useRef(false);
+  const mapVeilFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Avoid flashing a loader on fast RPC responses; keeps map visible. */
   const [showCourtsLoadingUi, setShowCourtsLoadingUi] = useState(false);
   /** Android: native map callouts are unreliable; we show the same UI as a floating card. */
@@ -683,17 +708,40 @@ export default function CourtsScreen() {
     }
   }, []);
 
-  const beginMapFly = useCallback((durationMs: number) => {
-    mapFlyUntilRef.current = Date.now() + durationMs;
-    if (mapFlyEndTimerRef.current) {
-      clearTimeout(mapFlyEndTimerRef.current);
+  const clearMapVeil = useCallback(() => {
+    mapVeilPendingClearRef.current = false;
+    if (mapVeilFallbackTimerRef.current) {
+      clearTimeout(mapVeilFallbackTimerRef.current);
+      mapVeilFallbackTimerRef.current = null;
     }
-    mapFlyEndTimerRef.current = setTimeout(() => {
-      mapFlyEndTimerRef.current = null;
-      mapFlyUntilRef.current = 0;
-      commitAfterMapFly();
-    }, durationMs);
-  }, [commitAfterMapFly]);
+    setMapVeilVisible(false);
+  }, []);
+
+  const beginMapFly = useCallback(
+    (durationMs: number, showSnapVeil: boolean) => {
+      mapFlyUntilRef.current = Date.now() + durationMs;
+      if (mapFlyEndTimerRef.current) {
+        clearTimeout(mapFlyEndTimerRef.current);
+      }
+      if (mapVeilFallbackTimerRef.current) {
+        clearTimeout(mapVeilFallbackTimerRef.current);
+        mapVeilFallbackTimerRef.current = null;
+      }
+      mapFlyEndTimerRef.current = setTimeout(() => {
+        mapFlyEndTimerRef.current = null;
+        mapFlyUntilRef.current = 0;
+        commitAfterMapFly();
+        if (showSnapVeil) {
+          mapVeilPendingClearRef.current = true;
+          mapVeilFallbackTimerRef.current = setTimeout(() => {
+            mapVeilFallbackTimerRef.current = null;
+            clearMapVeil();
+          }, MAP_VEIL_FALLBACK_MS);
+        }
+      }, durationMs);
+    },
+    [commitAfterMapFly, clearMapVeil],
+  );
 
   const applyCourtsToMap = useCallback((courts: Court[], requestId: number) => {
     const slice = courts.slice(0, MAX_COURTS_SHOWN);
@@ -715,21 +763,36 @@ export default function CourtsScreen() {
       radiusMiles: number,
       options?: { smooth?: boolean },
     ) => {
-      const durationMs = getMapFlyDurationMs(options?.smooth ?? false);
+      const fromLat = region?.latitude ?? latitude;
+      const fromLng = region?.longitude ?? longitude;
+      const durationMs = resolveFlyDurationMs(
+        options?.smooth ?? false,
+        fromLat,
+        fromLng,
+        latitude,
+        longitude,
+      );
+      const isSnap = durationMs <= 50;
+
       const next = regionForAnchor(latitude, longitude, radiusMiles);
       pendingRegionRef.current = next;
-      beginMapFly(durationMs);
+      mapVeilPendingClearRef.current = false;
+      setMapVeilVisible(isSnap);
+      beginMapFly(durationMs, isSnap);
       requestAnimationFrame(() => {
         mapRef.current?.animateToRegion(next, durationMs);
       });
     },
-    [beginMapFly],
+    [beginMapFly, region],
   );
 
   useEffect(() => {
     return () => {
       if (mapFlyEndTimerRef.current) {
         clearTimeout(mapFlyEndTimerRef.current);
+      }
+      if (mapVeilFallbackTimerRef.current) {
+        clearTimeout(mapVeilFallbackTimerRef.current);
       }
     };
   }, []);
@@ -785,7 +848,7 @@ export default function CourtsScreen() {
           supabase
             .from("courts")
             .select(
-              "id, name, address, latitude, longitude, hoops, is_private, is_indoor, verified, flagged_for_review",
+              "id, name, address, latitude, longitude, hoops, is_private, is_indoor, verified, flagged_for_review, source, created_at",
             )
             .gte("latitude", minLat)
             .lte("latitude", maxLat)
@@ -859,7 +922,7 @@ export default function CourtsScreen() {
       }
 
       if (opts.animateMap) {
-        flyMapToAnchor(opts.anchorLat, opts.anchorLng, opts.radiusMiles);
+        flyMapToAnchor(opts.anchorLat, opts.anchorLng, opts.radiusMiles, { smooth: true });
       }
 
       const requestId = ++fetchRequestIdRef.current;
@@ -1409,7 +1472,14 @@ export default function CourtsScreen() {
           initialRegion={mapInitialRegionRef.current ?? region}
           showsUserLocation={false}
           userInterfaceStyle="dark"
-          loadingEnabled={false}
+          loadingEnabled={Platform.OS === "android"}
+          loadingBackgroundColor={MAP_TILE_BG}
+          loadingIndicatorColor={colors.primary}
+          onRegionChangeComplete={() => {
+            if (mapVeilPendingClearRef.current) {
+              clearMapVeil();
+            }
+          }}
           onPress={
             Platform.OS === "android" ? clearAndroidCourtSelection : undefined
           }
@@ -1438,6 +1508,10 @@ export default function CourtsScreen() {
             />
           ))}
         </MapView>
+
+        {mapVeilVisible && (
+          <View style={styles.mapTileVeil} pointerEvents="none" />
+        )}
 
         {courtsFetchFailed && !courtsLoading && (
           <View style={styles.fetchErrorBanner}>

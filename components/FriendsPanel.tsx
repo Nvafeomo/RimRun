@@ -16,9 +16,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../lib/supabase";
 import { AvatarImage } from "./AvatarImage";
 import { removeFriendship } from "../lib/friendshipActions";
-import { blockUser, unblockUser } from "../lib/blocking";
+import {
+  blockUser,
+  unblockUser,
+  fetchBlockedUserDisplayList,
+  sendFriendRequest as sendFriendRequestRpc,
+} from "../lib/blocking";
 import { ReportUserModal } from "./ReportUserModal";
 import { useAuth } from "../context/AuthContext";
+import { useBlockedUserIds } from "../hooks/useBlockedUserIds";
 import { colors, spacing, borderRadius } from "../constants/theme";
 import { withTimeout } from "../lib/withTimeout";
 
@@ -51,6 +57,7 @@ export type FriendsPanelProps = {
 export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
   const router = useRouter();
   const { user } = useAuth();
+  const { refresh: refreshBlockedIds } = useBlockedUserIds();
   const [friendSubTab, setFriendSubTab] = useState<
     "all" | "requests" | "add" | "blocked"
   >("all");
@@ -99,26 +106,8 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
 
   const fetchBlocked = useCallback(async () => {
     if (!user?.id) return;
-    const { data: rows } = await supabase
-      .from("user_blocks")
-      .select("blocked_id")
-      .eq("blocker_id", user.id)
-      .order("created_at", { ascending: false });
-    if (!rows?.length) {
-      setBlockedUsers([]);
-      return;
-    }
-    const ids = rows.map((r) => r.blocked_id);
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, username, profile_image_url")
-      .in("id", ids);
-    const order = new Map(ids.map((id, i) => [id, i]));
-    setBlockedUsers(
-      (profiles ?? []).sort(
-        (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
-      ),
-    );
+    const rows = await fetchBlockedUserDisplayList();
+    setBlockedUsers(rows);
   }, [user?.id]);
 
   const fetchRequests = useCallback(async () => {
@@ -232,20 +221,13 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
   const sendFriendRequest = async (receiverId: string) => {
     if (!user?.id) return;
     setActioningId(receiverId);
-    const { error } = await supabase.from("friend_requests").insert({
-      sender_id: user.id,
-      receiver_id: receiverId,
-      status: "pending",
-    });
+    const { error } = await sendFriendRequestRpc(receiverId);
     setActioningId(null);
     if (error) {
-      if (error.code === "23505")
-        Alert.alert("Already sent", "Friend request already sent.");
-      else
-        Alert.alert(
-          "Cannot send request",
-          error.message || "Something went wrong."
-        );
+      Alert.alert(
+        "Cannot send request",
+        error.message || "Something went wrong.",
+      );
       return;
     }
     fetchRequests();
@@ -300,6 +282,7 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
       Alert.alert("Could not block", error.message);
       return;
     }
+    await refreshBlockedIds();
     await loadAll();
   };
 
@@ -307,7 +290,7 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     const name = p.username ?? "this user";
     Alert.alert(
       `Block ${name}?`,
-      "They won't be able to interact with you or appear in your discovery search. You can unblock later from the Blocked tab.",
+      "Their messages will be hidden and they won't appear in search or DMs. Unblock anytime from Friends → Blocked.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -327,6 +310,7 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
       Alert.alert("Could not unblock", error.message);
       return;
     }
+    await refreshBlockedIds();
     await loadAll();
   };
 
@@ -400,7 +384,7 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     const title = other?.username ?? "Chat";
     router.push({
       pathname: "/(app)/chat/[conversationId]",
-      params: { conversationId: convId, title },
+      params: { conversationId: convId, title, otherUserId },
     });
   };
 
@@ -592,15 +576,20 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     const busy = actioningId === p.id;
     return (
       <View style={styles.blockedRow}>
-        <AvatarImage
-          userId={p.id}
-          username={p.username}
-          profileImageUrl={p.profile_image_url}
-          size={44}
-        />
-        <Text style={styles.friendName} numberOfLines={1}>
-          {p.username ?? "Unknown"}
-        </Text>
+        <Pressable
+          style={styles.blockedRowProfile}
+          onPress={() => router.push(`/(app)/user/${p.id}`)}
+        >
+          <AvatarImage
+            userId={p.id}
+            username={p.username}
+            profileImageUrl={p.profile_image_url}
+            size={44}
+          />
+          <Text style={styles.friendName} numberOfLines={1}>
+            {p.username ?? "Unknown"}
+          </Text>
+        </Pressable>
         <Pressable
           style={styles.unblockBtn}
           onPress={() => executeUnblock(p.id)}
@@ -1096,6 +1085,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  blockedRowProfile: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+    gap: spacing.md,
   },
   unblockBtn: {
     paddingHorizontal: spacing.md,

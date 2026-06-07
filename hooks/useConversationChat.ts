@@ -8,6 +8,17 @@ import {
   checkMessageClient,
   parseMessageInsertModerationError,
 } from '../lib/chatModeration';
+import {
+  fetchChatSenderProfiles,
+  fetchConversationParticipantIds,
+  type ChatSenderProfile,
+} from '../lib/chatSenderProfiles';
+import {
+  filterMessagesExcludingBlocked,
+  isBlockedUser,
+  parseBlockedSendError,
+} from '../lib/blocking';
+import { useBlockedUserIds } from './useBlockedUserIds';
 
 export type SendMessageResult =
   | { ok: true }
@@ -41,9 +52,21 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, delay: number):
 
 const TYPING_TIMEOUT_MS = 4000;
 
-export function useConversationChat(conversationId: string | undefined) {
+type UseConversationChatOptions = {
+  /** DM partner / known peers — avoids "Unknown" before profile RPC catches up. */
+  knownPeers?: Record<string, ChatSenderProfile>;
+};
+
+export function useConversationChat(
+  conversationId: string | undefined,
+  options?: UseConversationChatOptions,
+) {
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { blockedIds, refresh: refreshBlockedIds } = useBlockedUserIds();
+  const blockedIdsRef = useRef(blockedIds);
+  blockedIdsRef.current = blockedIds;
+  const prevBlockedIdsRef = useRef<Set<string>>(new Set());
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [messagesLoadFailed, setMessagesLoadFailed] = useState(false);
@@ -55,6 +78,8 @@ export function useConversationChat(conversationId: string | undefined) {
   const senderCacheRef = useRef<
     Map<string, { username: string | null; profile_image_url: string | null }>
   >(new Map());
+  const knownPeersRef = useRef(options?.knownPeers);
+  knownPeersRef.current = options?.knownPeers;
 
   const loadMessages = useCallback(async () => {
     if (!conversationId) {
@@ -84,35 +109,41 @@ export function useConversationChat(conversationId: string | undefined) {
       }
 
       const senderIds = [...new Set((data ?? []).map((m) => m.sender_id))];
-      let senderMap: Record<string, { username: string | null; profile_image_url: string | null }> = {};
+      const participantIds = await fetchConversationParticipantIds(conversationId);
+      const profileIds = [...new Set([...senderIds, ...participantIds])];
 
-      if (senderIds.length > 0) {
-        const { data: profiles } = await withTimeout(
-          supabase
-            .from('profiles')
-            .select('id, username, profile_image_url')
-            .in('id', senderIds),
+      let senderMap: Record<string, ChatSenderProfile> = {
+        ...(knownPeersRef.current ?? {}),
+      };
+      for (const [id, peer] of Object.entries(senderMap)) {
+        senderCacheRef.current.set(id, peer);
+      }
+
+      if (profileIds.length > 0) {
+        const fetched = await withTimeout(
+          fetchChatSenderProfiles(profileIds),
           10_000,
           'Profiles fetch',
         );
-
-        if (profiles) {
-          senderMap = Object.fromEntries(
-            profiles.map((p) => [p.id, { username: p.username ?? null, profile_image_url: p.profile_image_url ?? null }]),
-          );
-        }
+        senderMap = { ...senderMap, ...fetched };
       }
 
       const formatted: Message[] = (data ?? []).map((m) => ({
         ...m,
-        sender: senderMap[m.sender_id],
+        sender: senderMap[m.sender_id] ?? senderCacheRef.current.get(m.sender_id),
       }));
       for (const m of formatted) {
         if (m.sender) {
           senderCacheRef.current.set(m.sender_id, m.sender);
         }
       }
-      setMessages(formatted);
+      setMessages(
+        filterMessagesExcludingBlocked(
+          formatted,
+          blockedIdsRef.current,
+          user?.id,
+        ),
+      );
     } catch (err) {
       console.error('Messages fetch failed:', err);
       setMessages([]);
@@ -120,7 +151,38 @@ export function useConversationChat(conversationId: string | undefined) {
     } finally {
       setLoading(false);
     }
-  }, [conversationId]);
+  }, [conversationId, user?.id]);
+
+  useEffect(() => {
+    const prev = prevBlockedIdsRef.current;
+    let blockListChanged = prev.size !== blockedIds.size;
+    if (!blockListChanged) {
+      for (const id of prev) {
+        if (!blockedIds.has(id)) {
+          blockListChanged = true;
+          break;
+        }
+      }
+      if (!blockListChanged) {
+        for (const id of blockedIds) {
+          if (!prev.has(id)) {
+            blockListChanged = true;
+            break;
+          }
+        }
+      }
+    }
+    prevBlockedIdsRef.current = new Set(blockedIds);
+
+    setMessages((prevMessages) =>
+      filterMessagesExcludingBlocked(prevMessages, blockedIds, user?.id),
+    );
+
+    // After unblock, filtered-out messages are gone from local state — refetch from server.
+    if (conversationId && blockListChanged && prev.size > 0) {
+      void loadMessages();
+    }
+  }, [blockedIds, user?.id, conversationId, loadMessages]);
 
   useEffect(() => {
     if (!conversationId) {
@@ -128,8 +190,26 @@ export function useConversationChat(conversationId: string | undefined) {
       return;
     }
     senderCacheRef.current.clear();
+    for (const [id, peer] of Object.entries(knownPeersRef.current ?? {})) {
+      senderCacheRef.current.set(id, peer);
+    }
     void loadMessages();
   }, [conversationId, loadMessages]);
+
+  useEffect(() => {
+    const peers = options?.knownPeers;
+    if (!peers) return;
+    for (const [id, peer] of Object.entries(peers)) {
+      senderCacheRef.current.set(id, peer);
+    }
+    setMessages((prev) =>
+      prev.map((m) => {
+        const peer = peers[m.sender_id];
+        if (!peer || m.sender?.username) return m;
+        return { ...m, sender: peer };
+      }),
+    );
+  }, [options?.knownPeers]);
 
   // Realtime: postgres_changes, presence, broadcast
   useEffect(() => {
@@ -151,20 +231,18 @@ export function useConversationChat(conversationId: string | undefined) {
         },
         async (payload) => {
           const newMsg = payload.new as MessageRow;
+          if (
+            isBlockedUser(blockedIdsRef.current, newMsg.sender_id) &&
+            newMsg.sender_id !== user.id
+          ) {
+            return;
+          }
 
           let sender = senderCacheRef.current.get(newMsg.sender_id);
           if (!sender) {
-            const { data: profileRow } = await supabase
-              .from('profiles')
-              .select('username, profile_image_url')
-              .eq('id', newMsg.sender_id)
-              .maybeSingle();
-
-            if (profileRow) {
-              sender = {
-                username: profileRow.username ?? null,
-                profile_image_url: profileRow.profile_image_url ?? null,
-              };
+            const profileMap = await fetchChatSenderProfiles([newMsg.sender_id]);
+            sender = profileMap[newMsg.sender_id];
+            if (sender) {
               senderCacheRef.current.set(newMsg.sender_id, sender);
             }
           }
@@ -262,6 +340,10 @@ export function useConversationChat(conversationId: string | undefined) {
 
       if (error) {
         console.error('Error sending message:', error);
+        const blockReason = parseBlockedSendError(error.message ?? '');
+        if (blockReason) {
+          return { ok: false, blocked: true, reason: blockReason.reason };
+        }
         const moderation = parseMessageInsertModerationError(error);
         if (moderation.blocked) {
           return { ok: false, blocked: true, reason: moderation.reason };
@@ -374,11 +456,17 @@ export function useConversationChat(conversationId: string | undefined) {
     [user?.id, profile?.username]
   );
 
+  const retryLoadMessages = useCallback(async () => {
+    await refreshBlockedIds();
+    await loadMessages();
+  }, [loadMessages, refreshBlockedIds]);
+
   return {
     messages,
     loading,
     messagesLoadFailed,
-    retryLoadMessages: loadMessages,
+    retryLoadMessages,
+    refreshBlockedIds,
     sending,
     typingUsers,
     onlineUsers,

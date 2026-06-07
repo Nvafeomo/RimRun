@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Platform,
   Alert,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { subscribeAndroidKeyboardOverlap } from "../lib/androidKeyboardInset";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -22,10 +24,14 @@ import { colors, spacing, borderRadius } from "../constants/theme";
 import { checkMessageClient } from "../lib/chatModeration";
 import { canEditMessage, canUnsendMessage } from "../lib/chatMessageActions";
 import type { Message } from "../types/chat";
+import type { ChatSenderProfile } from "../lib/chatSenderProfiles";
 
 type ChatScreenProps = {
   conversationId: string;
   title?: string;
+  knownPeers?: Record<string, ChatSenderProfile>;
+  composerLocked?: boolean;
+  composerLockedMessage?: string;
 };
 
 /** First letter for avatar placeholder: username, else optional email local part, else "?". */
@@ -40,7 +46,13 @@ function avatarPlaceholderLetter(
   return "?";
 }
 
-export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) {
+export function ChatScreen({
+  conversationId,
+  title = "Chat",
+  knownPeers,
+  composerLocked = false,
+  composerLockedMessage,
+}: ChatScreenProps) {
   const router = useRouter();
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -55,11 +67,25 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
     editMessage,
     unsendMessage,
     sendTyping,
-  } = useConversationChat(conversationId);
+  } = useConversationChat(conversationId, { knownPeers });
   const [inputText, setInputText] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [androidKeyboardOverlap, setAndroidKeyboardOverlap] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const insets = useSafeAreaInsets();
+  const keyboardOpenOnAndroid = Platform.OS === "android" && androidKeyboardOverlap > 0;
+
+  useEffect(() => {
+    return subscribeAndroidKeyboardOverlap((overlapPx) => {
+      setAndroidKeyboardOverlap(overlapPx);
+      if (overlapPx > 0) {
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        });
+      }
+    });
+  }, []);
 
   const cancelEditing = () => {
     setEditingMessage(null);
@@ -335,7 +361,10 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[
+        styles.container,
+        keyboardOpenOnAndroid && { paddingBottom: androidKeyboardOverlap },
+      ]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
@@ -358,6 +387,7 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
 
       <FlatList
         ref={flatListRef}
+        style={styles.messageListScroll}
         data={messages}
         renderItem={renderMessage}
         keyExtractor={(item) => item.id}
@@ -382,60 +412,85 @@ export function ChatScreen({ conversationId, title = "Chat" }: ChatScreenProps) 
         }
       />
 
-      {sendError ? (
-        <View style={styles.sendErrorBar}>
-          <Ionicons name="alert-circle" size={16} color={colors.error} />
-          <Text style={styles.sendErrorText}>{sendError}</Text>
-          <Pressable onPress={() => setSendError(null)} hitSlop={8}>
-            <Ionicons name="close" size={16} color={colors.error} />
-          </Pressable>
-        </View>
-      ) : null}
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: keyboardOpenOnAndroid
+              ? spacing.sm
+              : Math.max(insets.bottom, spacing.sm),
+          },
+        ]}
+      >
+        {sendError ? (
+          <View style={styles.sendErrorBar}>
+            <Ionicons name="alert-circle" size={16} color={colors.error} />
+            <Text style={styles.sendErrorText}>{sendError}</Text>
+            <Pressable onPress={() => setSendError(null)} hitSlop={8}>
+              <Ionicons name="close" size={16} color={colors.error} />
+            </Pressable>
+          </View>
+        ) : null}
 
-      {editingMessage ? (
-        <View style={styles.editingBar}>
-          <Ionicons name="pencil" size={16} color={colors.primary} />
-          <Text style={styles.editingBarText} numberOfLines={1}>
-            Editing: {editingMessage.content}
-          </Text>
-          <Pressable onPress={cancelEditing} hitSlop={8}>
-            <Ionicons name="close" size={16} color={colors.textMuted} />
-          </Pressable>
-        </View>
-      ) : null}
+        {editingMessage ? (
+          <View style={styles.editingBar}>
+            <Ionicons name="pencil" size={16} color={colors.primary} />
+            <Text style={styles.editingBarText} numberOfLines={1}>
+              Editing: {editingMessage.content}
+            </Text>
+            <Pressable onPress={cancelEditing} hitSlop={8}>
+              <Ionicons name="close" size={16} color={colors.textMuted} />
+            </Pressable>
+          </View>
+        ) : null}
 
-      <View style={styles.inputBar}>
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.input}
-            placeholder={editingMessage ? "Edit message..." : "Message…"}
-            placeholderTextColor={colors.textMuted}
-            value={inputText}
-            onChangeText={handleChangeText}
-            multiline
-            maxLength={2000}
-            editable={!sending && !chatSuspended}
-          />
-          <Pressable
-            onPress={handleSend}
-            style={({ pressed }) => [
-              styles.sendButton,
-              (!inputText.trim() || sending || chatSuspended) &&
-                styles.sendButtonDisabled,
-              pressed && styles.sendButtonPressed,
-            ]}
-            disabled={!inputText.trim() || sending || chatSuspended}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={colors.text} />
-            ) : (
-              <Ionicons
-                name={editingMessage ? "checkmark" : "send"}
-                size={20}
-                color={colors.text}
-              />
-            )}
-          </Pressable>
+        <View style={styles.inputBar}>
+          {composerLocked ? (
+            <View style={styles.composerLocked}>
+              <Ionicons name="ban-outline" size={18} color={colors.textMuted} />
+              <Text style={styles.composerLockedText}>
+                {composerLockedMessage ?? "Messaging is unavailable for this chat."}
+              </Text>
+            </View>
+          ) : (
+          <View style={styles.composer}>
+            <TextInput
+              style={styles.input}
+              placeholder={editingMessage ? "Edit message..." : "Message…"}
+              placeholderTextColor={colors.textMuted}
+              value={inputText}
+              onChangeText={handleChangeText}
+              multiline
+              maxLength={2000}
+              editable={!sending && !chatSuspended}
+              {...(Platform.OS === "android"
+                ? { includeFontPadding: false, textAlignVertical: "top" }
+                : {})}
+            />
+            <View style={styles.sendButtonWrap}>
+              <Pressable
+                onPress={handleSend}
+                style={({ pressed }) => [
+                  styles.sendButton,
+                  (!inputText.trim() || sending || chatSuspended) &&
+                    styles.sendButtonDisabled,
+                  pressed && styles.sendButtonPressed,
+                ]}
+                disabled={!inputText.trim() || sending || chatSuspended}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color={colors.text} />
+                ) : (
+                  <Ionicons
+                    name={editingMessage ? "checkmark" : "send"}
+                    size={20}
+                    color={colors.text}
+                  />
+                )}
+              </Pressable>
+            </View>
+          </View>
+          )}
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -503,6 +558,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     lineHeight: 18,
+  },
+  messageListScroll: {
+    flex: 1,
   },
   messageList: {
     flexGrow: 1,
@@ -685,38 +743,67 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
   },
-  inputBar: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
+  footer: {
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+  inputBar: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  composerLocked: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  composerLockedText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textSecondary,
+  },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: spacing.xs,
+    gap: spacing.sm,
     backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     paddingLeft: spacing.md,
     paddingRight: spacing.xs,
+    minHeight: 48,
     paddingVertical: spacing.xs,
   },
   input: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 36,
     maxHeight: 120,
     paddingHorizontal: 0,
-    paddingVertical: spacing.sm,
+    paddingVertical: Platform.OS === "android" ? 6 : spacing.sm,
     fontSize: 16,
+    lineHeight: 22,
     color: colors.text,
   },
+  sendButtonWrap: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginBottom: Platform.OS === "android" ? 1 : 2,
+  },
   sendButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: borderRadius.full,
     backgroundColor: colors.primary,
     justifyContent: "center",

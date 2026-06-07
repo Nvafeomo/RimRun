@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -22,14 +22,25 @@ import { useAuth } from "../../../context/AuthContext";
 import { useProfile } from "../../../context/ProfileContext";
 import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius, shadows } from "../../../constants/theme";
+import type { ChatSenderProfile } from "../../../lib/chatSenderProfiles";
+import {
+  blockUser,
+  unblockUser,
+  isBlockedUser,
+  fetchUserBlockStatus,
+  type UserBlockStatus,
+} from "../../../lib/blocking";
+import { useBlockedUserIds } from "../../../hooks/useBlockedUserIds";
 
 export default function ChatRouteScreen() {
-  const { conversationId, title, courtId, courtName } = useLocalSearchParams<{
-    conversationId: string;
-    title?: string;
-    courtId?: string;
-    courtName?: string;
-  }>();
+  const { conversationId, title, courtId, courtName, otherUserId } =
+    useLocalSearchParams<{
+      conversationId: string;
+      title?: string;
+      courtId?: string;
+      courtName?: string;
+      otherUserId?: string;
+    }>();
   const { user } = useAuth();
   const { refreshProfile } = useProfile();
   const { getDisplayName, refresh } = useCourtAliases();
@@ -42,13 +53,102 @@ export default function ChatRouteScreen() {
   const [dmOtherUserId, setDmOtherUserId] = useState<string | null>(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [blockingPartner, setBlockingPartner] = useState(false);
+  const [partnerBlockStatus, setPartnerBlockStatus] =
+    useState<UserBlockStatus | null>(null);
+  const { blockedIds, refresh: refreshBlockedIds } = useBlockedUserIds();
+  const displayTitle = title ?? "Chat";
+  const resolvedOtherUserId =
+    typeof otherUserId === "string"
+      ? otherUserId
+      : Array.isArray(otherUserId)
+        ? otherUserId[0]
+        : undefined;
+  const dmPeerId = resolvedOtherUserId || dmOtherUserId;
 
   useFocusEffect(
     useCallback(() => {
       void refreshProfile();
-    }, [refreshProfile]),
+      void refreshBlockedIds();
+      if (dmPeerId) {
+        void fetchUserBlockStatus(dmPeerId).then(setPartnerBlockStatus);
+      }
+    }, [refreshProfile, refreshBlockedIds, dmPeerId]),
   );
-  const displayTitle = title ?? "Chat";
+  const dmPartnerBlockedByMe =
+    !!dmPeerId && isBlockedUser(blockedIds, dmPeerId);
+  const dmPartnerBlockedByThem = Boolean(partnerBlockStatus?.blockedByThem);
+  const dmMessagingBlocked =
+    dmPartnerBlockedByMe || dmPartnerBlockedByThem;
+  const knownPeers = useMemo((): Record<string, ChatSenderProfile> | undefined => {
+    if (!dmPeerId || displayTitle === "Chat") return undefined;
+    return {
+      [dmPeerId]: {
+        username: displayTitle,
+        profile_image_url: null,
+      },
+    };
+  }, [dmPeerId, displayTitle]);
+
+  const promptBlockPartner = () => {
+    if (!dmPeerId) return;
+    const name = displayTitle.trim() || "this user";
+    Alert.alert(
+      `Block ${name}?`,
+      "Their messages will be hidden and this chat will leave your inbox. Unblock later from Friends → Blocked.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: () => void executeBlockPartner(),
+        },
+      ],
+    );
+  };
+
+  const executeBlockPartner = async () => {
+    if (!dmPeerId) return;
+    setBlockingPartner(true);
+    const { error } = await blockUser(dmPeerId);
+    setBlockingPartner(false);
+    if (error) {
+      Alert.alert("Could not block", error.message);
+      return;
+    }
+    await refreshBlockedIds();
+    router.back();
+  };
+
+  const executeUnblockPartner = async () => {
+    if (!dmPeerId) return;
+    setBlockingPartner(true);
+    const { error } = await unblockUser(dmPeerId);
+    setBlockingPartner(false);
+    if (error) {
+      Alert.alert("Could not unblock", error.message);
+      return;
+    }
+    await refreshBlockedIds();
+    if (dmPeerId) {
+      setPartnerBlockStatus(await fetchUserBlockStatus(dmPeerId));
+    }
+  };
+
+  useEffect(() => {
+    if (!dmPeerId) {
+      setPartnerBlockStatus(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchUserBlockStatus(dmPeerId).then((status) => {
+      if (!cancelled) setPartnerBlockStatus(status);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dmPeerId, blockedIds]);
+
   const resolvedCourtId = courtId ?? "";
   const resolvedCourtName = courtName ?? "Court";
   const canRename = !!resolvedCourtId && !!user?.id;
@@ -138,8 +238,8 @@ export default function ChatRouteScreen() {
   }, [conversationId, resolvedCourtId, user?.id]);
 
   const openDmPartnerProfile = () => {
-    if (dmOtherUserId) {
-      router.push(`/(app)/user/${dmOtherUserId}`);
+    if (dmPeerId) {
+      router.push(`/(app)/user/${dmPeerId}`);
     }
   };
 
@@ -215,7 +315,7 @@ export default function ChatRouteScreen() {
               <Text style={styles.headerSubtitle}>Court chat</Text>
             </View>
           </Pressable>
-        ) : dmOtherUserId ? (
+        ) : dmPeerId ? (
           <Pressable
             onPress={openDmPartnerProfile}
             style={styles.headerTitleBlock}
@@ -236,7 +336,18 @@ export default function ChatRouteScreen() {
         )}
 
         <View style={styles.headerActions}>
-          {(!!dmOtherUserId || isCourtChat) && (
+          {dmPeerId && !dmMessagingBlocked && chatKind === "dm" && (
+            <Pressable
+              hitSlop={10}
+              onPress={promptBlockPartner}
+              style={styles.headerIconButton}
+              accessibilityLabel="Block user"
+              disabled={blockingPartner}
+            >
+              <Ionicons name="ban-outline" size={20} color={colors.textMuted} />
+            </Pressable>
+          )}
+          {(!!dmPeerId || isCourtChat) && (
             <Pressable
               hitSlop={10}
               onPress={() => setReportOpen(true)}
@@ -310,7 +421,45 @@ export default function ChatRouteScreen() {
         </Pressable>
       ) : null}
 
-      <ChatScreen conversationId={conversationId} title={displayTitle} />
+      {dmMessagingBlocked ? (
+        <View style={styles.blockedChatBanner}>
+          <Ionicons
+            name={dmPartnerBlockedByThem ? "hand-left-outline" : "eye-off-outline"}
+            size={18}
+            color={colors.textSecondary}
+          />
+          <Text style={styles.blockedChatBannerText}>
+            {dmPartnerBlockedByThem
+              ? `${displayTitle} has you blocked. You can't send messages.`
+              : `You blocked ${displayTitle}. Their messages are hidden.`}
+          </Text>
+          {dmPartnerBlockedByMe ? (
+            <Pressable
+              onPress={() => void executeUnblockPartner()}
+              disabled={blockingPartner}
+              hitSlop={8}
+            >
+              <Text style={styles.blockedChatUnblock}>
+                {blockingPartner ? "…" : "Unblock"}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      <ChatScreen
+        conversationId={conversationId}
+        title={displayTitle}
+        knownPeers={knownPeers}
+        composerLocked={dmMessagingBlocked}
+        composerLockedMessage={
+          dmPartnerBlockedByThem
+            ? "This person has you blocked."
+            : dmPartnerBlockedByMe
+              ? `Unblock ${displayTitle} to send messages.`
+              : undefined
+        }
+      />
 
       <Modal
         visible={editing}
@@ -363,7 +512,7 @@ export default function ChatRouteScreen() {
       <ReportUserModal
         visible={reportOpen}
         onClose={() => setReportOpen(false)}
-        reportedUserId={dmOtherUserId}
+        reportedUserId={dmPeerId}
         conversationId={conversationId}
         courtId={resolvedCourtId || null}
         contextLabel={
@@ -468,6 +617,30 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
+  },
+  blockedChatBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  blockedChatBannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
+  },
+  blockedChatUnblock: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.primary,
   },
   courtChatStripText: {
     flex: 1,

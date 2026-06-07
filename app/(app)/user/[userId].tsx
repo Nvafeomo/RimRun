@@ -13,9 +13,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../context/AuthContext";
+import { useBlockedUserIds } from "../../../hooks/useBlockedUserIds";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
 import { supabase } from "../../../lib/supabase";
-import { blockUser, unblockUser } from "../../../lib/blocking";
+import {
+  blockUser,
+  unblockUser,
+  fetchBlockedUserDisplay,
+  sendFriendRequest as sendFriendRequestRpc,
+} from "../../../lib/blocking";
 import { AvatarImage } from "../../../components/AvatarImage";
 import { ReportUserModal } from "../../../components/ReportUserModal";
 
@@ -182,6 +188,7 @@ export default function PublicUserProfileScreen() {
   const router = useRouter();
   const { userId: rawId } = useLocalSearchParams<{ userId: string }>();
   const { user } = useAuth();
+  const { refresh: refreshBlockedIds } = useBlockedUserIds();
   const userId = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : "";
 
   const [summary, setSummary] = useState<PublicProfileSummary | null>(null);
@@ -189,12 +196,16 @@ export default function PublicUserProfileScreen() {
   const [actioning, setActioning] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const [blockedByMe, setBlockedByMe] = useState(false);
+  const [incomingRequestId, setIncomingRequestId] = useState<string | null>(
+    null,
+  );
   const [reportOpen, setReportOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id || !userId) {
       setSummary(null);
       setBlockedByMe(false);
+      setIncomingRequestId(null);
       setLoading(false);
       return;
     }
@@ -203,6 +214,33 @@ export default function PublicUserProfileScreen() {
       return;
     }
     setLoading(true);
+
+    const { data: blockRow } = await supabase
+      .from("user_blocks")
+      .select("blocked_id")
+      .eq("blocker_id", user.id)
+      .eq("blocked_id", userId)
+      .maybeSingle();
+    const blocked = !!blockRow;
+    setBlockedByMe(blocked);
+
+    if (blocked) {
+      const blockedProfile = await fetchBlockedUserDisplay(userId);
+      setSummary({
+        user_id: userId,
+        username: blockedProfile?.username ?? null,
+        profile_image_url: blockedProfile?.profile_image_url ?? null,
+        friends_count: null,
+        courts_joined_count: null,
+        courts_added_count: null,
+        friendship_status: "none",
+        can_open_dm: false,
+      });
+      setIncomingRequestId(null);
+      setLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase.rpc("get_public_profile_summary", {
       p_user_id: userId,
     });
@@ -213,7 +251,6 @@ export default function PublicUserProfileScreen() {
       } else {
         console.error("get_public_profile_summary", error);
         setSummary(null);
-        setBlockedByMe(false);
         setLoading(false);
         return;
       }
@@ -221,17 +258,20 @@ export default function PublicUserProfileScreen() {
       next = parseSummary(data);
     }
     setSummary(next);
-    if (next) {
-      const { data: blockRow } = await supabase
-        .from("user_blocks")
-        .select("blocked_id")
-        .eq("blocker_id", user.id)
-        .eq("blocked_id", userId)
+
+    if (next?.friendship_status === "pending_incoming") {
+      const { data: req } = await supabase
+        .from("friend_requests")
+        .select("id")
+        .eq("sender_id", userId)
+        .eq("receiver_id", user.id)
+        .eq("status", "pending")
         .maybeSingle();
-      setBlockedByMe(!!blockRow);
+      setIncomingRequestId(req?.id ?? null);
     } else {
-      setBlockedByMe(false);
+      setIncomingRequestId(null);
     }
+
     setLoading(false);
   }, [user?.id, userId, router]);
 
@@ -255,21 +295,53 @@ export default function PublicUserProfileScreen() {
     const title = summary?.username?.trim() || "Chat";
     router.push({
       pathname: "/(app)/chat/[conversationId]",
-      params: { conversationId: convId as string, title },
+      params: {
+        conversationId: convId as string,
+        title,
+        otherUserId: userId,
+      },
     });
   };
 
   const sendFriendRequest = async () => {
     if (!user?.id || !userId || blockedByMe) return;
     setActioning(true);
-    const { error } = await supabase.from("friend_requests").insert({
-      sender_id: user.id,
-      receiver_id: userId,
-      status: "pending",
-    });
+    const { error } = await sendFriendRequestRpc(userId);
     setActioning(false);
     if (error) {
       Alert.alert("Could not send request", error.message);
+      return;
+    }
+    void load();
+  };
+
+  const acceptIncomingRequest = async () => {
+    if (!incomingRequestId) return;
+    setActioning(true);
+    const { error } = await supabase.rpc("accept_friend_request", {
+      p_request_id: incomingRequestId,
+    });
+    setActioning(false);
+    if (error) {
+      Alert.alert(
+        "Cannot accept request",
+        error.message || "Could not accept request.",
+      );
+      return;
+    }
+    void load();
+  };
+
+  const declineIncomingRequest = async () => {
+    if (!incomingRequestId) return;
+    setActioning(true);
+    const { error } = await supabase
+      .from("friend_requests")
+      .update({ status: "declined" })
+      .eq("id", incomingRequestId);
+    setActioning(false);
+    if (error) {
+      Alert.alert("Could not decline", error.message);
       return;
     }
     void load();
@@ -279,7 +351,7 @@ export default function PublicUserProfileScreen() {
     const name = summary?.username?.trim() || "User";
     Alert.alert(
       `Block ${name}?`,
-      "They won't be able to interact with you or appear in your discovery search. You can unblock later from Friends → Blocked.",
+      "Their messages will be hidden and they won't appear in search or DMs. Unblock anytime from Friends → Blocked.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -300,6 +372,7 @@ export default function PublicUserProfileScreen() {
       Alert.alert("Could not block", error.message);
       return;
     }
+    await refreshBlockedIds();
     router.back();
   };
 
@@ -312,6 +385,7 @@ export default function PublicUserProfileScreen() {
       Alert.alert("Could not unblock", error.message);
       return;
     }
+    await refreshBlockedIds();
     setBlockedByMe(false);
     void load();
   };
@@ -433,12 +507,6 @@ export default function PublicUserProfileScreen() {
           </View>
         </View>
 
-        {st === "pending_incoming" && (
-          <Text style={styles.statusNote}>
-            Open <Text style={styles.statusNoteEm}>Friends</Text> to accept or decline.
-          </Text>
-        )}
-
         {blockedByMe ? (
           <View style={styles.blockedBanner}>
             <Ionicons name="ban-outline" size={18} color={colors.textSecondary} />
@@ -449,6 +517,32 @@ export default function PublicUserProfileScreen() {
         ) : null}
 
         <View style={styles.actions}>
+          {st === "pending_incoming" && !blockedByMe && incomingRequestId ? (
+            <View style={styles.incomingRequestActions}>
+              <Pressable
+                style={styles.primaryBtn}
+                onPress={() => void acceptIncomingRequest()}
+                disabled={actioning}
+              >
+                {actioning ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                    <Text style={styles.primaryBtnText}>Accept request</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable
+                style={styles.declineRequestBtn}
+                onPress={() => void declineIncomingRequest()}
+                disabled={actioning}
+              >
+                <Text style={styles.declineRequestBtnText}>Decline</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {st === "none" && !blockedByMe && (
             <Pressable
               style={styles.primaryBtn}
@@ -737,6 +831,23 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: spacing.md,
+  },
+  incomingRequestActions: {
+    gap: spacing.sm,
+  },
+  declineRequestBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  declineRequestBtnText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textSecondary,
   },
   primaryBtn: {
     flexDirection: "row",

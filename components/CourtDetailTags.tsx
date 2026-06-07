@@ -1,5 +1,9 @@
 import { View, Text, StyleSheet } from "react-native";
 import { colors, spacing, borderRadius } from "../constants/theme";
+import {
+  buildCourtProvenanceTags,
+  type CourtProvenanceFields,
+} from "../lib/courtProvenance";
 
 export type CourtDetailTagVariant =
   | "default"
@@ -85,13 +89,16 @@ export function CourtDetailTags({ tags }: Props) {
 }
 
 /** Tags from community `verified` / `flagged_for_review` columns on courts. */
-export function buildCoreCourtDetailTags(court: {
-  verified?: boolean | null;
-  flagged_for_review?: boolean | null;
-  is_private: boolean | null;
-  is_indoor: boolean | null;
-}): CourtDetailTagItem[] {
+export function buildCoreCourtDetailTags(
+  court: CourtProvenanceFields & {
+    verified?: boolean | null;
+    flagged_for_review?: boolean | null;
+    is_private: boolean | null;
+    is_indoor: boolean | null;
+  },
+): CourtDetailTagItem[] {
   const tags: CourtDetailTagItem[] = [
+    ...buildCourtProvenanceTags(court),
     {
       key: 'verified',
       label: court.verified ? 'Verified' : 'Unverified',

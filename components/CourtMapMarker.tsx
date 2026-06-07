@@ -12,6 +12,10 @@ import {
 import { Marker, Callout } from "react-native-maps";
 import { router } from "expo-router";
 import { colors, spacing, borderRadius } from "../constants/theme";
+import {
+  isCourtRecentlyAdded,
+  isCourtUserAdded,
+} from "../lib/courtProvenance";
 
 export type CourtMapMarkerCourt = {
   id: string;
@@ -24,6 +28,8 @@ export type CourtMapMarkerCourt = {
   is_indoor: boolean | null;
   verified?: boolean;
   flagged_for_review?: boolean;
+  source?: string | null;
+  created_at?: string | null;
 };
 
 type BubbleStyles = {
@@ -71,6 +77,16 @@ export function CourtCalloutBubbleContent({
     >
       <Text style={calloutTitle}>{displayName}</Text>
       <View style={calloutTagStyles.tagRow}>
+        {isCourtRecentlyAdded(court.created_at) ? (
+          <View style={[calloutTagStyles.pill, calloutTagStyles.pillRecent]}>
+            <Text style={calloutTagStyles.pillTextDark}>Recently added</Text>
+          </View>
+        ) : null}
+        {isCourtUserAdded(court.source) ? (
+          <View style={[calloutTagStyles.pill, calloutTagStyles.pillUserAdded]}>
+            <Text style={calloutTagStyles.pillText}>User added</Text>
+          </View>
+        ) : null}
         <CourtCalloutVenueTag isIndoor={Boolean(court.is_indoor)} />
         {court.flagged_for_review ? (
           <View style={[calloutTagStyles.pill, calloutTagStyles.pillFlagged]}>
@@ -223,6 +239,14 @@ const calloutTagStyles = StyleSheet.create({
   pillFlagged: {
     backgroundColor: colors.error,
     borderColor: colors.error,
+  },
+  pillRecent: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  pillUserAdded: {
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.border,
   },
   pillText: {
     fontSize: 11,

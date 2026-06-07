@@ -17,6 +17,12 @@ import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius, shadows, typography } from "../../../constants/theme";
 import { formatChatListTime } from "../../../lib/formatRelativeTime";
 import { fetchLastMessagesByConversation } from "../../../lib/chatLastMessages";
+import { fetchChatSenderProfiles } from "../../../lib/chatSenderProfiles";
+import {
+  fetchBlockedUserIds,
+  invalidateBlockedUserIdsCache,
+  isBlockedUser,
+} from "../../../lib/blocking";
 import { clearConversationAndLeave } from "../../../lib/chatDeletion";
 import { FriendsPanel } from "../../../components/FriendsPanel";
 import { NewGroupChatModal } from "../../../components/NewGroupChatModal";
@@ -183,6 +189,7 @@ export default function ChatsScreen() {
       return;
     }
     try {
+      invalidateBlockedUserIdsCache();
       const { data: myParts } = await supabase
         .from("conversation_participants")
         .select("conversation_id")
@@ -206,7 +213,7 @@ export default function ChatsScreen() {
       const groupConvIdSet = new Set(groupConvIds);
       const threadConvIds = [...groupConvIds, ...dmIds];
 
-      const [lastByConv, partsResult] = await Promise.all([
+      const [lastByConv, partsResult, blockedIds] = await Promise.all([
         fetchLastMessagesByConversation(threadConvIds),
         threadConvIds.length > 0
           ? supabase
@@ -214,6 +221,7 @@ export default function ChatsScreen() {
               .select("conversation_id, user_id")
               .in("conversation_id", threadConvIds)
           : Promise.resolve({ data: [] as { conversation_id: string; user_id: string }[] }),
+        fetchBlockedUserIds(user.id),
       ]);
 
       const allParts = partsResult.data ?? [];
@@ -241,22 +249,16 @@ export default function ChatsScreen() {
       const dmOtherIds = [...new Set([...otherByDmConv.values()])];
       const profileIds = [...new Set([...groupMemberIds, ...dmOtherIds])];
 
-      const { data: profiles } =
+      const profileById =
         profileIds.length > 0
-          ? await supabase
-              .from("profiles")
-              .select("id, username, profile_image_url")
-              .in("id", profileIds)
-          : {
-              data: [] as {
-                id: string;
+          ? await fetchChatSenderProfiles(profileIds)
+          : ({} as Record<
+              string,
+              {
                 username: string | null;
                 profile_image_url: string | null;
-              }[],
-            };
-      const profileById = Object.fromEntries(
-        (profiles ?? []).map((p) => [p.id, p]),
-      );
+              }
+            >);
 
       const groupItems: MessageThreadItem[] = groupConvs.map((c) => {
         const otherIds = othersByGroupConv.get(c.id) ?? [];
@@ -279,6 +281,7 @@ export default function ChatsScreen() {
       for (const cid of dmIds) {
         const otherId = otherByDmConv.get(cid);
         if (!otherId) continue;
+        if (isBlockedUser(blockedIds, otherId)) continue;
         const last = lastByConv.get(cid);
         const otherProfile = profileById[otherId];
         dmItems.push({
@@ -342,10 +345,17 @@ export default function ChatsScreen() {
   const openMessageThread = (item: MessageThreadItem) => {
     router.push({
       pathname: "/(app)/chat/[conversationId]",
-      params: {
-        conversationId: item.conversationId,
-        title: item.kind === "dm" ? item.otherUsername : item.title,
-      },
+      params:
+        item.kind === "dm"
+          ? {
+              conversationId: item.conversationId,
+              title: item.otherUsername,
+              otherUserId: item.otherUserId,
+            }
+          : {
+              conversationId: item.conversationId,
+              title: item.title,
+            },
     });
   };
 
