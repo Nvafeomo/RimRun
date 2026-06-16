@@ -16,6 +16,7 @@
     "prune-indoor-courts:overpass": "node scripts/prune-indoor-courts.js --overpass",
     "prune-indoor-courts:overpass:execute": "node scripts/prune-indoor-courts.js --overpass --execute",
     "sync-privacy-policy": "node scripts/sync-privacy-policy.js",
+    "generate-feature-graphic": "node scripts/generate-feature-graphic.js",
     "eas:init": "eas init",
     "build:dev:ios": "eas build --platform ios --profile development",
     "build:dev:android": "eas build --platform android --profile development",

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="RimRun — find pickup basketball courts, connect with players, and chat. Join the waitlist for pre-release updates and launch." />
+  <meta name="description" content="RimRun — find pickup basketball courts, connect with players, and chat. Download on iOS and Android. Support, demos, and legal info." />
   <title>RimRun — Pickup basketball, courts &amp; community</title>
   <link rel="icon" href="assets/rimrun-logo.png" type="image/png" />
   <link rel="stylesheet" href="css/site.css" />
@@ -18,9 +18,8 @@
       <div class="nav-links">
         <a href="#demos">Demos</a>
         <a href="#features">Features</a>
-        <a href="#signup">Sign up</a>
-        <a href="android-testing.html">Android testing</a>
-        <a href="ios-testing.html">iOS testing</a>
+        <a href="#support">Support</a>
+        <a href="privacy/privacy-policy.html">Privacy</a>
       </div>
     </div>
   </nav>
@@ -28,15 +27,20 @@
   <main>
     <header class="hero wrap">
       <img class="hero-logo" src="assets/rimrun-logo.png" alt="RimRun logo" width="120" height="120" />
+      <p class="hero-eyebrow">Pickup basketball, courts &amp; community</p>
       <h1>Find courts. Run the rim.</h1>
       <p class="lead">
         RimRun is a mobile app for pickup basketball — browse courts on a map, subscribe to your spots,
         and coordinate with players through DMs and court chats.
       </p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="#signup">Join the list</a>
-        <a class="btn btn-secondary" href="#demos">Watch demos</a>
+      <div class="hero-actions store-badges">
+        <a class="btn btn-primary" id="app-store-btn" href="#support">Download on the App Store</a>
+        <a class="btn btn-primary" id="play-store-btn" href="#support">Get it on Google Play</a>
       </div>
+      <p class="hero-note">
+        <a href="#demos">Watch demos</a> ·
+        <a href="#support">Get help</a>
+      </p>
     </header>
 
     <section id="demos" class="wrap">
@@ -92,50 +96,52 @@
       </div>
     </section>
 
-    <section id="signup" class="wrap">
-      <h2>Stay in the loop</h2>
-      <p class="section-lead">Get emails about beta builds and be notified when RimRun hits the stores.</p>
-      <div class="signup-layout">
-        <div>
-          <p style="color: var(--muted); margin: 0 0 1rem;">
-            <strong style="color: var(--text);">Pre-release updates</strong> — test invites, build notes, and what to try next.<br /><br />
-            <strong style="color: var(--text);">Release waitlist</strong> — one email when the app is publicly available on iOS and Android.
-          </p>
-          <p style="color: var(--muted); font-size: 0.9rem; margin: 0;">
-            Want to test early? After you sign up, see
-            <a href="android-testing.html">Android testing</a> or
-            <a href="ios-testing.html">iOS testing</a>.
+    <section id="support" class="wrap">
+      <h2>Support</h2>
+      <p class="section-lead">
+        Questions, account help, or feedback? We read every message.
+        Email <a href="mailto:rimrun.support@gmail.com">rimrun.support@gmail.com</a>.
+      </p>
+      <div class="support-grid">
+        <div class="feature-card">
+          <h3>Account &amp; sign-in</h3>
+          <p>
+            Trouble signing in with email, Google, or Apple? Include your username and the sign-in method you use.
+            Password reset is available from the login screen in the app.
           </p>
         </div>
-        <form id="waitlist-form" class="signup-panel" novalidate>
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@example.com" />
-
-          <label class="checkbox-row">
-            <input type="checkbox" name="pre_release" value="yes" />
-            <span>Send me pre-release updates (beta builds &amp; testing news)</span>
-          </label>
-          <label class="checkbox-row">
-            <input type="checkbox" name="release_waitlist" value="yes" />
-            <span>Notify me when RimRun is released on the App Store &amp; Play Store</span>
-          </label>
-
-          <button type="submit" class="btn btn-primary" style="width: 100%;">Sign up</button>
-          <p class="form-note">
-            We only use your email for RimRun updates. See our
-            <a href="privacy/privacy-policy.html">Privacy Policy</a>.
+        <div class="feature-card">
+          <h3>Location &amp; courts</h3>
+          <p>
+            If the map looks empty, check that RimRun has location permission while you use the app.
+            To report a wrong court or suggest an edit, use in-app flagging or email us with the court name.
           </p>
-          <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
-        </form>
+        </div>
+        <div class="feature-card">
+          <h3>Safety &amp; moderation</h3>
+          <p>
+            Report users or messages in the app. To appeal a moderation action, use the in-app appeal flow
+            or email support with your username and what happened.
+          </p>
+        </div>
+        <div class="feature-card">
+          <h3>Privacy &amp; your data</h3>
+          <p>
+            Manage visibility and messaging settings under Profile in the app.
+            Read our <a href="privacy/privacy-policy.html">Privacy Policy</a> for how we handle data,
+            including how to delete your account.
+          </p>
+        </div>
       </div>
-    </section>
 
-    <section class="wrap" style="padding-top: 0;">
-      <h2>Beta testers</h2>
-      <p class="section-lead">Already invited? Follow the platform guide.</p>
-      <div class="hero-actions" style="justify-content: flex-start;">
-        <a class="btn btn-secondary" href="android-testing.html">Android (Play internal testing)</a>
-        <a class="btn btn-secondary" href="ios-testing.html">iOS (TestFlight)</a>
+      <div class="support-contact callout">
+        <strong>Contact RimRun support</strong>
+        <p style="margin: 0.75rem 0 0;">
+          <a class="btn btn-primary" href="mailto:rimrun.support@gmail.com?subject=RimRun%20support">Email support</a>
+        </p>
+        <p class="form-note" style="margin-top: 1rem;">
+          Include your device (iOS or Android), app version if you know it, and a short description of the issue.
+        </p>
       </div>
     </section>
   </main>
@@ -143,6 +149,7 @@
   <footer class="site-footer wrap">
     <p>
       <strong>RimRun</strong> ·
+      <a href="#support">Support</a> ·
       <a href="privacy/privacy-policy.html">Privacy</a> ·
       <a href="termsofservice/">Terms</a> ·
       <a href="Demo/Screenshots/demo.html">Demos</a> ·
@@ -151,6 +158,6 @@
   </footer>
 
   <script src="site-config.js"></script>
-  <script src="js/waitlist.js"></script>
+  <script src="js/site.js"></script>
 </body>
 </html>

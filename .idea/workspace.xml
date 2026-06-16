@@ -5,10 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="87a0e9ac-58cf-4d2d-8ac8-bbab96942908" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/app/(app)/admin/moderation.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(app)/admin/moderation.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ReportUserModal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ReportUserModal.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/moderation.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/moderation.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/reports.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/reports.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
