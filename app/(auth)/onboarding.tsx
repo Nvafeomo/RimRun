@@ -107,9 +107,10 @@ import {
     };
 
     const needsUsername = !profile?.username?.trim();
-    /** Optional in onboarding — add a real email later under Account (Apple relay does not count). */
-    const needsEmail =
-      !isUsableContactEmail(profile?.email) && !isUsableContactEmail(user?.email);
+    /** Only require email if user has none from auth provider (even Apple relay is acceptable for profile storage).
+     *  After OAuth sign-in (Apple/Google), user already has an email address. Optional real contact email can be added later under Account.
+     */
+    const needsEmail = !user?.email && !isUsableContactEmail(profile?.email);
     const needsLegacyDob = !profile?.date_of_birth;
     const hasProfileRow = profile !== null;
 
@@ -178,6 +179,9 @@ import {
                 return;
             }
             resolvedEmail = email.trim();
+        } else if (!resolvedEmail && user?.email) {
+            // User signed in via OAuth and has an email (even if relay), use it for profile
+            resolvedEmail = user.email.trim();
         }
 
         setError('');
