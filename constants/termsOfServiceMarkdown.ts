@@ -2,6 +2,8 @@ export const TERMS_OF_SERVICE_MARKDOWN = `# Terms of Service
 
 **Effective:** June 6, 2026
 
+**Zero tolerance for objectionable content.** RimRun has **no tolerance** for harassment, hate, sexual content, threats, spam, or other abusive behavior in chats, profiles, or court listings. Violations may result in immediate content removal, chat suspension, or permanent account termination.
+
 **Please read these Terms carefully before using RimRun.** By downloading, installing, or using the app, you agree to be bound by these Terms. If you do not agree, do not use the app.
 
 These Terms of Service ("**Terms**") govern your use of the RimRun mobile application and any related services (collectively, the "**Services**") operated by **RimRun** ("**we**," "**us**," or "**our**"). For questions, contact [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com).
@@ -59,7 +61,7 @@ To access most features of RimRun, you must register for an account. You agree t
 - Notify us promptly at [rimrun.support@gmail.com](mailto:rimrun.support@gmail.com) if you suspect unauthorized access to your account.
 - Maintain only one account per person. Creating multiple accounts to evade a suspension or ban is prohibited.
 
-You may register using an email address and password, **Google Sign-In**, or **Sign in with Apple** (iOS). By using a third-party sign-in provider, you also agree to that provider's terms of service.
+You may register using an email address and password. You must agree to these Terms (including our zero-tolerance rules for objectionable content) before creating an account.
 
 We reserve the right to suspend or terminate accounts that violate these Terms, contain false information, or were created to circumvent enforcement actions.
 
@@ -147,7 +149,7 @@ By using chat features, you agree that:
 
 **Message editing and unsending.** You may **edit** your own messages within **15 minutes**. You may **unsend** your own messages at any time before they are deleted. Unsent messages are marked as deleted but a record may be retained for moderation and safety purposes.
 
-**Blocking.** You may block other users from their profile. Blocked users cannot message you or interact with you through certain features. You can unblock users from **Friends → Blocked**.
+**Blocking.** You may block other users from their profile, a chat, or your friends list. Blocking immediately removes that user's content from your view and sends an automated report to our moderation team. Blocked users cannot message you or interact with you through certain features. You can unblock users from **Friends → Blocked**.
 
 **DM restrictions.** You may configure your account so that only friends can start a new DM with you. See **Your privacy settings** (Section 8). Even with this setting on, users you interact with in court chats may still appear in shared spaces.
 

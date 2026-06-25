@@ -16,7 +16,6 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
-import { SocialAuthButtons } from '../../components/SocialAuthButtons';
 import { DateOfBirthPickerField } from '../../components/DateOfBirthPickerField';
 import { validateDateOfBirthForSignup } from '../../lib/agePolicy';
 import {
@@ -24,6 +23,7 @@ import {
   validateUsernameInput,
   USERNAME_RULES_USER_HINT,
 } from '../../lib/usernameRules';
+import { TermsAcceptanceRow } from '../../components/TermsAcceptanceRow';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -33,10 +33,9 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [error, setError] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [appleLoading, setAppleLoading] = useState(false);
-  const { signUp, signInWithGoogle, signInWithApple } = useAuth();
+  const { signUp } = useAuth();
 
   function validateUsername(value: string): string | null {
     return validateUsernameInput(value);
@@ -83,6 +82,10 @@ export default function SignupScreen() {
       );
       return;
     }
+    if (!acceptedTerms) {
+      setError('You must agree to the Terms of Service to create an account.');
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -105,38 +108,6 @@ export default function SignupScreen() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Sign up failed');
       setSubmitting(false);
-    }
-  }
-
-  async function handleGoogle() {
-    setError('');
-    setGoogleLoading(true);
-    try {
-      await signInWithGoogle();
-      // Auth layout redirects to onboarding or app once session is set.
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Google sign-in failed';
-      if (!msg.toLowerCase().includes('cancel')) {
-        setError(msg);
-      }
-    } finally {
-      setGoogleLoading(false);
-    }
-  }
-
-  async function handleApple() {
-    setError('');
-    setAppleLoading(true);
-    try {
-      await signInWithApple();
-      // Auth layout redirects to onboarding or app once session is set.
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Apple sign-in failed';
-      if (!msg.toLowerCase().includes('cancel')) {
-        setError(msg);
-      }
-    } finally {
-      setAppleLoading(false);
     }
   }
 
@@ -222,10 +193,15 @@ export default function SignupScreen() {
               onChangeText={setConfirmPassword}
             />
 
+            <TermsAcceptanceRow
+              checked={acceptedTerms}
+              onToggle={setAcceptedTerms}
+            />
+
             <TouchableOpacity
               style={styles.button}
               onPress={handleSignUp}
-              disabled={submitting || googleLoading}
+              disabled={submitting}
               activeOpacity={0.8}
             >
               {submitting ? (
@@ -234,14 +210,6 @@ export default function SignupScreen() {
                 <Text style={styles.buttonText}>Sign Up</Text>
               )}
             </TouchableOpacity>
-
-            <SocialAuthButtons
-              onGooglePress={handleGoogle}
-              onApplePress={handleApple}
-              disabled={submitting}
-              loading={googleLoading}
-              appleLoading={appleLoading}
-            />
           </View>
 
           <TouchableOpacity

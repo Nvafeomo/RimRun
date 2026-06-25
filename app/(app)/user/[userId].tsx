@@ -17,7 +17,7 @@ import { useBlockedUserIds } from "../../../hooks/useBlockedUserIds";
 import { colors, spacing, borderRadius } from "../../../constants/theme";
 import { supabase } from "../../../lib/supabase";
 import {
-  blockUser,
+  blockUserWithDeveloperNotification,
   unblockUser,
   fetchBlockedUserDisplay,
   sendFriendRequest as sendFriendRequestRpc,
@@ -351,7 +351,7 @@ export default function PublicUserProfileScreen() {
     const name = summary?.username?.trim() || "User";
     Alert.alert(
       `Block ${name}?`,
-      "Their messages will be hidden and they won't appear in search or DMs. Unblock anytime from Friends → Blocked.",
+      "Their content will be hidden immediately and our moderation team will be notified. Unblock anytime from Friends → Blocked.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -366,7 +366,11 @@ export default function PublicUserProfileScreen() {
   const executeBlock = async () => {
     if (!user?.id || !userId) return;
     setBlocking(true);
-    const { error } = await blockUser(userId);
+    const { error } = await blockUserWithDeveloperNotification(
+      userId,
+      "profile",
+      summary?.username ?? undefined,
+    );
     setBlocking(false);
     if (error) {
       Alert.alert("Could not block", error.message);

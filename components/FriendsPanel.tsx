@@ -17,7 +17,7 @@ import { supabase } from "../lib/supabase";
 import { AvatarImage } from "./AvatarImage";
 import { removeFriendship } from "../lib/friendshipActions";
 import {
-  blockUser,
+  blockUserWithDeveloperNotification,
   unblockUser,
   fetchBlockedUserDisplayList,
   sendFriendRequest as sendFriendRequestRpc,
@@ -273,10 +273,14 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     await loadAll();
   };
 
-  const executeBlock = async (targetId: string) => {
+  const executeBlock = async (targetId: string, username?: string | null) => {
     if (!user?.id) return;
     setActioningId(targetId);
-    const { error } = await blockUser(targetId);
+    const { error } = await blockUserWithDeveloperNotification(
+      targetId,
+      "friends",
+      username ?? undefined,
+    );
     setActioningId(null);
     if (error) {
       Alert.alert("Could not block", error.message);
@@ -290,13 +294,13 @@ export function FriendsPanel({ embedded = false }: FriendsPanelProps) {
     const name = p.username ?? "this user";
     Alert.alert(
       `Block ${name}?`,
-      "Their messages will be hidden and they won't appear in search or DMs. Unblock anytime from Friends → Blocked.",
+      "Their content will be hidden immediately and our moderation team will be notified. Unblock anytime from Friends → Blocked.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Block",
           style: "destructive",
-          onPress: () => void executeBlock(p.id),
+          onPress: () => void executeBlock(p.id, p.username),
         },
       ],
     );

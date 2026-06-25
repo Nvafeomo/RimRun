@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../constants/theme';
 import { TermsOfServiceDocument } from '../../components/TermsOfServiceDocument';
 
-export default function TermsOfServiceScreen() {
+export default function AuthTermsOfServiceScreen() {
   const router = useRouter();
 
   return (

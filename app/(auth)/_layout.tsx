@@ -28,8 +28,13 @@ export default function AuthLayout() {
   const isOnAuthScreen = segments[0] === '(auth)' && currentScreen !== '';
   const isOnOnboarding = currentScreen === 'onboarding';
   const isOnResetPassword = currentScreen === 'reset-password';
+  const isOnTermsOfService = currentScreen === 'terms-of-service';
   const shouldLeaveAuthScreen =
-    user && isOnAuthScreen && !isOnOnboarding && !isOnResetPassword;
+    user &&
+    isOnAuthScreen &&
+    !isOnOnboarding &&
+    !isOnResetPassword &&
+    !isOnTermsOfService;
 
   // If not logged in and trying to access onboarding, redirect to login
   const shouldRedirectToLogin = !user && isOnOnboarding;
@@ -57,6 +62,7 @@ export default function AuthLayout() {
       <Stack.Screen name="signup" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="reset-password" />
+      <Stack.Screen name="terms-of-service" />
     </Stack>
   );
 }

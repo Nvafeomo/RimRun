@@ -349,7 +349,7 @@
 
   <p><strong>Do we process sensitive personal information?</strong> We collect date of birth for age verification only. We do not process other categories of sensitive personal information.</p>
 
-  <p><strong>Do we collect information from third parties?</strong> If you sign in with Google or Apple, we receive limited account information from that provider as part of login. See <a href="#sociallogins">How we handle your social logins</a>.</p>
+  <p><strong>Do we collect information from third parties?</strong> No. RimRun accounts are created with email and password. We do not receive personal information from third-party social login providers. See <a href="#account-auth">Account authentication</a>.</p>
 
   <p><strong>How do we process your information?</strong> We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent. Learn more in <a href="#infouse">How we process your information</a>.</p>
 
@@ -372,7 +372,7 @@
       <li><a href="#infouse">How do we process your information?</a></li>
       <li><a href="#yourcontrols">Your in-app privacy controls</a></li>
       <li><a href="#whoshare">When and with whom do we share your personal information?</a></li>
-      <li><a href="#sociallogins">How do we handle your social logins?</a></li>
+      <li><a href="#account-auth">Account authentication</a></li>
       <li><a href="#inforetain">How long do we keep your information?</a></li>
       <li><a href="#infosafe">How do we keep your information safe?</a></li>
       <li><a href="#minors">Children's privacy</a></li>
@@ -400,12 +400,12 @@
     <li><strong>Chat messages:</strong> Content you send in direct messages, group chats, and court chats. Messages are stored to deliver real-time and historical chat functionality.</li>
     <li><strong>Court contributions:</strong> Courts you submit, edit, or vote on (verify/flag), and courts you subscribe to. When you add a court you provide its <strong>public street address</strong> and map location. This court information is <strong>public</strong> and visible to other users — you should only enter the public address of a basketball court, never a home or private address. Adding a court requires you to be at least 16 years old.</li>
     <li><strong>Content reports:</strong> If you report another user or piece of content, we store the report details to allow moderation review.</li>
-    <li><strong>Blocking:</strong> If you block another user, we store that choice so their messages are hidden from you and they cannot reach you through certain features (such as direct messages and friend search).</li>
+    <li><strong>Blocking:</strong> If you block another user, we store that choice so their messages are hidden from you and they cannot reach you through certain features (such as direct messages and friend search). Blocking also creates an automated report for our moderation team to review.</li>
   </ul>
 
   <p id="sensitiveinfo"><strong>Sensitive information.</strong> We collect date of birth solely for age verification. We do not process other sensitive categories of personal information (such as financial data, biometric identifiers, or health information).</p>
 
-  <p><strong>Social login data.</strong> You may register using a third-party account (Google or Apple). If you do, we collect certain account information as described in <a href="#sociallogins">How do we handle your social logins?</a></p>
+  <p><strong>Account authentication.</strong> You create a RimRun account with an email address and password. We do not use third-party social login providers.</p>
 
   <p><strong>Application data.</strong> If you use our application(s), we may collect the following if you grant access or permission:</p>
   <ul>
@@ -415,9 +415,6 @@
   <p>We do <strong>not</strong> currently send push notifications. This information helps us operate and secure our application(s), troubleshoot, and run internal analytics and reporting.</p>
 
   <p>All personal information you provide must be true, complete, and accurate, and you must notify us of any changes.</p>
-
-  <h3>Google API</h3>
-  <p>Our use of information received from Google APIs follows the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the <a href="https://developers.google.com/terms/api-services-user-data-policy#limited-use" target="_blank" rel="noopener noreferrer">Limited Use requirements</a>.</p>
 
   <h2 id="infouse">2. How do we process your information?</h2>
   <div class="in-short"><strong>In short:</strong> <em>We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law.</em></div>
@@ -494,16 +491,10 @@
     <li><strong>Legal requirements.</strong> We may disclose information if required by law, legal process, or to protect the rights, safety, and security of our users, the app, or others.</li>
   </ul>
 
-  <h2 id="sociallogins">5. How do we handle your social logins?</h2>
-  <div class="in-short"><strong>In short:</strong> <em>If you log in with a third-party account (such as Google or Apple), we may receive certain information about you from that provider.</em></div>
+  <h2 id="account-auth">5. Account authentication</h2>
+  <div class="in-short"><strong>In short:</strong> <em>RimRun accounts use email and password. We do not receive personal information from third-party social login providers.</em></div>
 
-  <p>You may register and log in using <strong>Google Sign-In</strong> or <strong>Sign in with Apple</strong> (iOS).</p>
-
-  <p><strong>Google.</strong> We receive information from Google as needed to create and maintain your account, such as your email address and basic account identifiers. We do not automatically import your Google profile photo. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google's Privacy Policy</a> and the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>.</p>
-
-  <p><strong>Apple.</strong> We receive information from Apple as needed to create and maintain your account, such as your email address or Apple's private relay email, and your name on first sign-in. Apple Hide My Email relay addresses are not shown as your contact email in the app. See <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener noreferrer">Apple's Privacy Policy</a>.</p>
-
-  <p>We use social-login information only for the purposes described in this notice. We do not control how Google or Apple use your data outside of RimRun.</p>
+  <p>You register and sign in with an email address and password. Authentication is handled by our backend provider (Supabase) on our behalf. We do not currently offer Google Sign-In or Sign in with Apple in the app.</p>
 
   <h2 id="inforetain">6. How long do we keep your information?</h2>
   <div class="in-short"><strong>In short:</strong> <em>We keep your information as long as necessary to fulfill the purposes in this notice unless the law requires otherwise.</em></div>

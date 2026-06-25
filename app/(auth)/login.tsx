@@ -15,7 +15,6 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
-import { SocialAuthButtons } from '../../components/SocialAuthButtons';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -23,9 +22,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [appleLoading, setAppleLoading] = useState(false);
-  const { signIn, signInWithGoogle, signInWithApple } = useAuth();
+  const { signIn } = useAuth();
 
   function validateEmailOrUsername(value: string): string | null {
     if (!value.trim()) return 'Email or Username is required';
@@ -58,38 +55,6 @@ export default function LoginScreen() {
       setSubmitting(false);
     } finally {
       clearTimeout(submitTimeout);
-    }
-  }
-
-  async function handleGoogle() {
-    setError('');
-    setGoogleLoading(true);
-    try {
-      await signInWithGoogle();
-      // Auth layout redirects to onboarding or app once session is set.
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Google sign-in failed';
-      if (!msg.toLowerCase().includes('cancel')) {
-        setError(msg);
-      }
-    } finally {
-      setGoogleLoading(false);
-    }
-  }
-
-  async function handleApple() {
-    setError('');
-    setAppleLoading(true);
-    try {
-      await signInWithApple();
-      // Auth layout redirects to onboarding or app once session is set.
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Apple sign-in failed';
-      if (!msg.toLowerCase().includes('cancel')) {
-        setError(msg);
-      }
-    } finally {
-      setAppleLoading(false);
     }
   }
 
@@ -147,7 +112,7 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={styles.button}
             onPress={handleSignIn}
-            disabled={submitting || googleLoading}
+            disabled={submitting}
             activeOpacity={0.8}
           >
             {submitting ? (
@@ -157,14 +122,6 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          <SocialAuthButtons
-            onGooglePress={handleGoogle}
-            onApplePress={handleApple}
-            disabled={submitting}
-            loading={googleLoading}
-            appleLoading={appleLoading}
-          />
-
           <TouchableOpacity
             style={styles.forgotLink}
             onPress={() => router.push('/reset-password')}
@@ -172,6 +129,17 @@ export default function LoginScreen() {
           >
             <Text style={styles.forgotLinkText}>Forgot Password?</Text>
           </TouchableOpacity>
+
+          <Text style={styles.termsFooter}>
+            By signing in, you agree to our{' '}
+            <Text
+              style={styles.termsFooterLink}
+              onPress={() => router.push('/(auth)/terms-of-service')}
+            >
+              Terms of Service
+            </Text>
+            .
+          </Text>
         </View>
 
         <TouchableOpacity
@@ -288,6 +256,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.primaryLight,
     fontWeight: '600',
+  },
+  termsFooter: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xs,
+  },
+  termsFooterLink: {
+    color: colors.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   linkButton: {
     alignSelf: 'center',

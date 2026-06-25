@@ -21,7 +21,7 @@ By using the App, you agree to this Privacy Policy. If you do not agree, please 
 - **Chat messages:** Content you send in direct messages, group chats, and court chats. Messages are stored to deliver chat functionality and may be reviewed for moderation.
 - **Court contributions:** Courts you submit (including the **public street address** and map location), edits, verify/flag votes, and courts you subscribe to. Court information you submit is **public** and visible to other users — only enter the public address of a basketball court, never a home or private address. You must be at least **16 years old** to add a court.
 - **Content reports:** If you report another user or piece of content, we store the report details for moderation review.
-- **Blocking:** If you block another user, we store that choice so their messages are hidden from you and they cannot reach you through certain features (such as direct messages and friend search).
+- **Blocking:** If you block another user, we store that choice so their messages are hidden from you and they cannot reach you through certain features (such as direct messages and friend search). Blocking also creates an automated report for our moderation team to review.
 
 ### Information collected automatically
 
@@ -35,15 +35,6 @@ If you grant access, the App may also use:
 - **Camera and photo library:** To take or choose an optional profile photo. You can decline these permissions and still use the App.
 
 We do **not** currently send push notifications. We do **not** use Google Analytics or similar third-party advertising or analytics SDKs in the App as described in this policy.
-
-### Information from third parties
-
-- **Authentication (Google):** If you sign in with Google, Google processes your login according to Google’s policies. We receive information from that sign-in flow as needed to create and maintain your account (for example, your email address and basic account identifiers). We do not automatically import your Google profile photo. See:
-
-  - [Google Privacy Policy](https://policies.google.com/privacy)
-  - [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy)
-
-- **Authentication (Apple):** If you sign in with Apple on iOS, Apple processes your login according to Apple’s policies. We receive information from that sign-in flow as needed to create and maintain your account (for example, your email address or Apple’s private relay email, and your name on first sign-in). Apple Hide My Email relay addresses are not shown as your contact email in the App. See [Apple’s Privacy Policy](https://www.apple.com/legal/privacy/).
 
 ## How we use your information
 
@@ -82,8 +73,6 @@ We also share some information **with other users** as part of how the App works
 - Messages you send in group and court chats are visible to other participants. Court chat visibility is **filtered by age**: users generally only see messages from others within an age-appropriate range, so users under 18 and adults (18+) do not normally see each other's court-chat messages (with limited exceptions, such as verified professionals).
 
 Your **email address and date of birth are not shared with other users.** Access to those fields is restricted so that only you (and our systems, for the purposes above) can see them.
-
-When you use **Sign in with Google** or **Sign in with Apple**, the provider’s processing is governed by that provider’s policies (links above).
 
 We may disclose information if required by law, legal process, or to protect the rights, safety, and security of our users, the App, or others.
 

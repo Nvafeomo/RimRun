@@ -1,4 +1,7 @@
 import { supabase } from "./supabase";
+import { submitContentReport } from "./reports";
+
+export type BlockReportContext = "profile" | "chat" | "friends";
 
 export type BlockedUserDisplay = {
   id: string;
@@ -121,6 +124,36 @@ export async function blockUser(
   });
   invalidateBlockedUserIdsCache();
   if (error) return { error: new Error(error.message) };
+  return { error: null };
+}
+
+/** Block a user and notify moderators (Apple UGC: block must alert the developer). */
+export async function blockUserWithDeveloperNotification(
+  blockedUserId: string,
+  context: BlockReportContext,
+  contextDetail?: string,
+): Promise<{ error: Error | null }> {
+  const blockResult = await blockUser(blockedUserId);
+  if (blockResult.error) {
+    return blockResult;
+  }
+
+  const detailSuffix = contextDetail?.trim()
+    ? `: ${contextDetail.trim()}`
+    : "";
+  const reportResult = await submitContentReport({
+    reason: "other",
+    details: `Auto-reported when user blocked from ${context}${detailSuffix}.`,
+    reportedUserId: blockedUserId,
+  });
+
+  if (!reportResult.ok) {
+    console.warn(
+      "Block succeeded but developer notification failed:",
+      reportResult.error,
+    );
+  }
+
   return { error: null };
 }
 

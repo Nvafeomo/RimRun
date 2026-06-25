@@ -24,7 +24,7 @@ import { useCourtAliases } from "../../../hooks/useCourtAliases";
 import { colors, spacing, borderRadius, shadows } from "../../../constants/theme";
 import type { ChatSenderProfile } from "../../../lib/chatSenderProfiles";
 import {
-  blockUser,
+  blockUserWithDeveloperNotification,
   unblockUser,
   isBlockedUser,
   fetchUserBlockStatus,
@@ -95,7 +95,7 @@ export default function ChatRouteScreen() {
     const name = displayTitle.trim() || "this user";
     Alert.alert(
       `Block ${name}?`,
-      "Their messages will be hidden and this chat will leave your inbox. Unblock later from Friends → Blocked.",
+      "Their content will be hidden immediately and our moderation team will be notified. Unblock later from Friends → Blocked.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -110,7 +110,11 @@ export default function ChatRouteScreen() {
   const executeBlockPartner = async () => {
     if (!dmPeerId) return;
     setBlockingPartner(true);
-    const { error } = await blockUser(dmPeerId);
+    const { error } = await blockUserWithDeveloperNotification(
+      dmPeerId,
+      "chat",
+      displayTitle.trim() || undefined,
+    );
     setBlockingPartner(false);
     if (error) {
       Alert.alert("Could not block", error.message);
