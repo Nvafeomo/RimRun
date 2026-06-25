@@ -24,6 +24,7 @@ import {
   USERNAME_RULES_USER_HINT,
 } from '../../lib/usernameRules';
 import { TermsAcceptanceRow } from '../../components/TermsAcceptanceRow';
+import { SocialAuthButtons } from '../../components/SocialAuthButtons';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -35,7 +36,15 @@ export default function SignupScreen() {
   const [error, setError] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const { signUp } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const { signUp, signInWithGoogle, signInWithApple } = useAuth();
+
+  function requireTermsAccepted(): boolean {
+    if (acceptedTerms) return true;
+    setError('You must agree to the Terms of Service to create an account.');
+    return false;
+  }
 
   function validateUsername(value: string): string | null {
     return validateUsernameInput(value);
@@ -82,8 +91,7 @@ export default function SignupScreen() {
       );
       return;
     }
-    if (!acceptedTerms) {
-      setError('You must agree to the Terms of Service to create an account.');
+    if (!requireTermsAccepted()) {
       return;
     }
     setSubmitting(true);
@@ -108,6 +116,42 @@ export default function SignupScreen() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Sign up failed');
       setSubmitting(false);
+    }
+  }
+
+  async function handleGoogle() {
+    setError('');
+    if (!requireTermsAccepted()) {
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Google sign-in failed';
+      if (!msg.toLowerCase().includes('cancel')) {
+        setError(msg);
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
+  async function handleApple() {
+    setError('');
+    if (!requireTermsAccepted()) {
+      return;
+    }
+    setAppleLoading(true);
+    try {
+      await signInWithApple();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Apple sign-in failed';
+      if (!msg.toLowerCase().includes('cancel')) {
+        setError(msg);
+      }
+    } finally {
+      setAppleLoading(false);
     }
   }
 
@@ -201,7 +245,7 @@ export default function SignupScreen() {
             <TouchableOpacity
               style={styles.button}
               onPress={handleSignUp}
-              disabled={submitting}
+              disabled={submitting || googleLoading || appleLoading}
               activeOpacity={0.8}
             >
               {submitting ? (
@@ -210,6 +254,14 @@ export default function SignupScreen() {
                 <Text style={styles.buttonText}>Sign Up</Text>
               )}
             </TouchableOpacity>
+
+            <SocialAuthButtons
+              onGooglePress={handleGoogle}
+              onApplePress={handleApple}
+              disabled={submitting}
+              loading={googleLoading}
+              appleLoading={appleLoading}
+            />
           </View>
 
           <TouchableOpacity
