@@ -101,8 +101,7 @@ export default function SignupScreen() {
 
       const dobIso = dateOfBirth.trim();
       await signUp(email.trim(), password, normalizedUsername, dobIso);
-      router.replace('/(auth)/onboarding');
-      // Keep spinner until navigation unmounts this screen.
+      // Auth layout redirects to onboarding or app once session is set.
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Sign up failed');
       setSubmitting(false);
@@ -114,7 +113,7 @@ export default function SignupScreen() {
     setGoogleLoading(true);
     try {
       await signInWithGoogle();
-      router.replace('/(auth)/onboarding');
+      // Auth layout redirects to onboarding or app once session is set.
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Google sign-in failed';
       if (!msg.toLowerCase().includes('cancel')) {
@@ -130,7 +129,7 @@ export default function SignupScreen() {
     setAppleLoading(true);
     try {
       await signInWithApple();
-      router.replace('/(auth)/onboarding');
+      // Auth layout redirects to onboarding or app once session is set.
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Apple sign-in failed';
       if (!msg.toLowerCase().includes('cancel')) {

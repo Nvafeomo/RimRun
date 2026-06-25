@@ -28,6 +28,14 @@ export function isOAuthOnlyUser(user: User | null | undefined): boolean {
   return !providers.includes('email');
 }
 
+/** Email from Sign in with Apple / Google to store on the profile (relay is OK). */
+export function getAuthEmailForProfile(
+  user: User | null | undefined,
+): string | null {
+  const trimmed = user?.email?.trim();
+  return trimmed || null;
+}
+
 /** Prefer profile email, then auth email, when it is a real contact address. */
 export function getDisplayContactEmail(
   user: User | null | undefined,

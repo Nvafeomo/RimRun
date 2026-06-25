@@ -66,7 +66,7 @@ export default function LoginScreen() {
     setGoogleLoading(true);
     try {
       await signInWithGoogle();
-      router.replace('/(auth)/onboarding');
+      // Auth layout redirects to onboarding or app once session is set.
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Google sign-in failed';
       if (!msg.toLowerCase().includes('cancel')) {
@@ -82,7 +82,7 @@ export default function LoginScreen() {
     setAppleLoading(true);
     try {
       await signInWithApple();
-      router.replace('/(auth)/onboarding');
+      // Auth layout redirects to onboarding or app once session is set.
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Apple sign-in failed';
       if (!msg.toLowerCase().includes('cancel')) {

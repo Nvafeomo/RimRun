@@ -1,11 +1,13 @@
 // app/(auth)/_layout.tsx
 import { Stack, Redirect, useSegments } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
+import { useProfile } from '../../context/ProfileContext';
 import { View, ActivityIndicator, Text } from 'react-native';
 import { colors } from '../../constants/theme';
 
 export default function AuthLayout() {
   const { user, loading, banBlocked } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const segments = useSegments();
 
   if (loading) {
@@ -21,19 +23,28 @@ export default function AuthLayout() {
     return <Redirect href="/(banned)" />;
   }
 
-  // Router guard: if user is logged in and on login/signup/reset-password, redirect to app
-  // Allow onboarding — user may be completing it after signup
+  // Router guard: logged-in users leave login/signup; incomplete profiles go to onboarding.
   const currentScreen = segments.at(1) ?? '';
   const isOnAuthScreen = segments[0] === '(auth)' && currentScreen !== '';
   const isOnOnboarding = currentScreen === 'onboarding';
-  // Stay on reset-password until new password is set (recovery session)
-  const shouldRedirectToApp =
-    user && isOnAuthScreen && !isOnOnboarding && currentScreen !== 'reset-password';
+  const isOnResetPassword = currentScreen === 'reset-password';
+  const shouldLeaveAuthScreen =
+    user && isOnAuthScreen && !isOnOnboarding && !isOnResetPassword;
 
   // If not logged in and trying to access onboarding, redirect to login
   const shouldRedirectToLogin = !user && isOnOnboarding;
 
-  if (shouldRedirectToApp) {
+  if (shouldLeaveAuthScreen) {
+    if (profileLoading) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      );
+    }
+    if (!profile?.date_of_birth) {
+      return <Redirect href="/(auth)/onboarding" />;
+    }
     return <Redirect href="/(app)" />;
   }
   if (shouldRedirectToLogin) {

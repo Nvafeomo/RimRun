@@ -32,8 +32,7 @@ import {
   } from '../../lib/usernameRules';
   import { defaultUsernameSearchableForDob } from '../../lib/usernameSearchPolicy';
   import {
-    getDisplayContactEmail,
-    isUsableContactEmail,
+    getAuthEmailForProfile,
   } from '../../lib/accountIdentity';
 
   function validateEmail(value: string): string | null {
@@ -107,10 +106,8 @@ import {
     };
 
     const needsUsername = !profile?.username?.trim();
-    /** Only require email if user has none from auth provider (even Apple relay is acceptable for profile storage).
-     *  After OAuth sign-in (Apple/Google), user already has an email address. Optional real contact email can be added later under Account.
-     */
-    const needsEmail = !user?.email && !isUsableContactEmail(profile?.email);
+    /** Never re-prompt for email after OAuth — Apple/Google already provided one (including Hide My Email). */
+    const needsEmail = !getAuthEmailForProfile(user) && !profile?.email?.trim();
     const needsLegacyDob = !profile?.date_of_birth;
     const hasProfileRow = profile !== null;
 
@@ -171,7 +168,8 @@ import {
             }
         }
 
-        let resolvedEmail: string | null = getDisplayContactEmail(user, profile?.email);
+        let resolvedEmail: string | null =
+            profile?.email?.trim() || getAuthEmailForProfile(user);
         if (needsEmail) {
             const emailErr = validateEmail(email);
             if (emailErr) {
@@ -179,9 +177,6 @@ import {
                 return;
             }
             resolvedEmail = email.trim();
-        } else if (!resolvedEmail && user?.email) {
-            // User signed in via OAuth and has an email (even if relay), use it for profile
-            resolvedEmail = user.email.trim();
         }
 
         setError('');
@@ -247,7 +242,7 @@ import {
                 if (needsLegacyDob) {
                     updates.date_of_birth = dateOfBirth.trim();
                 }
-                if (needsEmail) {
+                if (resolvedEmail && (needsEmail || !profile?.email?.trim())) {
                     updates.email = resolvedEmail;
                 }
                 if (avatarUrl !== null) {
