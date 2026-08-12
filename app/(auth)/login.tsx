@@ -16,6 +16,11 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 import { SocialAuthButtons } from '../../components/SocialAuthButtons';
+import {
+  INVALID_CREDENTIALS,
+  validateEmailOrUsername,
+  validatePasswordForLogin,
+} from '../../lib/security';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -27,25 +32,18 @@ export default function LoginScreen() {
   const [appleLoading, setAppleLoading] = useState(false);
   const { signIn, signInWithGoogle, signInWithApple } = useAuth();
 
-  function validateEmailOrUsername(value: string): string | null {
-    if (!value.trim()) return 'Email or Username is required';
-    if (value.includes('@')) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(value)) return 'Invalid email address';
-    }
-    return null;
+  function validateEmailOrUsernameField(value: string): string | null {
+    return validateEmailOrUsername(value);
   }
   function validatePassword(value: string): string | null {
-    if (!value.trim()) return 'Password is required';
-    if (value.length < 8) return 'Password must be at least 8 characters long';
-    return null;
+    return validatePasswordForLogin(value);
   }
   async function handleSignIn() {
     setError('');
-    const emailOrUsernameError = validateEmailOrUsername(emailOrUsername);
+    const emailOrUsernameError = validateEmailOrUsernameField(emailOrUsername);
     const passwordError = validatePassword(password);
     if (emailOrUsernameError || passwordError) {
-      setError(emailOrUsernameError || passwordError || 'Invalid credentials');
+      setError(emailOrUsernameError || passwordError || INVALID_CREDENTIALS);
       return;
     }
     setSubmitting(true);
@@ -54,7 +52,7 @@ export default function LoginScreen() {
       await signIn(emailOrUsername.trim(), password);
       // Auth layout redirects once user is set; keep spinner until unmount.
     } catch (e: any) {
-      setError(e?.message ?? 'Invalid credentials');
+      setError(e?.message ?? INVALID_CREDENTIALS);
       setSubmitting(false);
     } finally {
       clearTimeout(submitTimeout);
@@ -134,7 +132,8 @@ export default function LoginScreen() {
             placeholderTextColor={colors.textMuted}
             keyboardType="default"
             autoCapitalize="none"
-            autoComplete="password"
+            autoComplete="off"
+            textContentType="password"
             autoCorrect={false}
             secureTextEntry
             style={styles.input}

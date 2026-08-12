@@ -417,7 +417,7 @@ export default function PublicUserProfileScreen() {
         <View style={styles.heroAccent} />
         <View style={styles.centered}>
           <View style={styles.unavailableIconWrap}>
-            <Ionicons name="person-off-outline" size={40} color={colors.textMuted} />
+            <Ionicons name="person-outline" size={40} color={colors.textMuted} />
           </View>
           <Text style={styles.unavailableTitle}>Profile unavailable</Text>
           <Text style={styles.unavailableText}>

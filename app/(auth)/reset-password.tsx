@@ -20,8 +20,17 @@ import {
 } from '../../lib/supabaseAuthDeepLink';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius } from '../../constants/theme';
-
-const MIN_PASSWORD = 8;
+import { RATE_LIMITS } from '../../lib/rateLimitConfig';
+import {
+  consumeRateLimitAttempt,
+  isRateLimitError,
+} from '../../lib/rateLimit';
+import {
+  mapPasswordResetError,
+  sanitizeEmail,
+  validateEmailAddress,
+  validatePasswordForSignup,
+} from '../../lib/security';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
@@ -53,25 +62,33 @@ export default function ResetPasswordScreen() {
   async function handleResetPassword() {
     setError('');
     setSuccess(false);
-    if (!email.trim()) {
-      setError('Enter your email address');
+    const emailError = validateEmailAddress(email);
+    if (emailError) {
+      setError(emailError);
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Invalid email address');
-      return;
-    }
+    const normalizedEmail = sanitizeEmail(email);
 
     setSubmitting(true);
     try {
-      const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      const { maxAttempts, windowMs } = RATE_LIMITS.auth.passwordReset;
+      await consumeRateLimitAttempt(
+        'auth:passwordReset',
+        normalizedEmail,
+        maxAttempts,
+        windowMs,
+      );
+      const { error: err } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: PASSWORD_RESET_REDIRECT_URL,
       });
       if (err) throw err;
       setSuccess(true);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to send reset email');
+      if (isRateLimitError(e)) {
+        setError(e.message);
+      } else {
+        setError(mapPasswordResetError(e).message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -79,8 +96,9 @@ export default function ResetPasswordScreen() {
 
   async function handleSetNewPassword() {
     setError('');
-    if (newPassword.length < MIN_PASSWORD) {
-      setError(`Password must be at least ${MIN_PASSWORD} characters`);
+    const passwordError = validatePasswordForSignup(newPassword);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -138,6 +156,7 @@ export default function ResetPasswordScreen() {
               value={newPassword}
               onChangeText={setNewPassword}
               autoCapitalize="none"
+              autoComplete="new-password"
               autoCorrect={false}
             />
             <TextInput
@@ -148,6 +167,7 @@ export default function ResetPasswordScreen() {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               autoCapitalize="none"
+              autoComplete="new-password"
               autoCorrect={false}
             />
 

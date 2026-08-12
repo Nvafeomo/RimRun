@@ -1,4 +1,11 @@
 import { supabase } from './supabase';
+import { RATE_LIMITS } from './rateLimitConfig';
+import {
+  consumeRateLimitAttempt,
+  isRateLimitError,
+  mapExternalRateLimitError,
+} from './rateLimit';
+import { INPUT_LIMITS, sanitizeBanAppealMessage } from './security';
 
 export type BanAppealStatus = {
   pending: boolean;
@@ -33,9 +40,35 @@ export async function fetchBanAppealStatus(): Promise<BanAppealStatus> {
 export async function submitBanAppeal(
   message: string,
 ): Promise<{ ok: true } | { ok: false; reason?: string; error?: string }> {
-  const trimmed = message.trim();
+  const raw = message.trim();
+  if (raw.length > INPUT_LIMITS.banAppeal) {
+    return { ok: false, error: 'Appeal is too long.' };
+  }
+  const trimmed = sanitizeBanAppealMessage(raw);
   if (trimmed.length < 10) {
     return { ok: false, error: 'Appeal must be at least 10 characters.' };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) {
+    return { ok: false, error: 'Not signed in' };
+  }
+
+  const { maxAttempts, windowMs } = RATE_LIMITS.moderation.banAppeal;
+  try {
+    await consumeRateLimitAttempt(
+      'moderation:banAppeal',
+      user.id,
+      maxAttempts,
+      windowMs,
+    );
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      return { ok: false, error: error.message };
+    }
+    return { ok: false, error: mapExternalRateLimitError(error).message };
   }
 
   const { data, error } = await supabase.rpc('submit_ban_appeal', {

@@ -19,6 +19,14 @@ import {
   parseBlockedSendError,
 } from '../lib/blocking';
 import { useBlockedUserIds } from './useBlockedUserIds';
+import { RATE_LIMITS } from '../lib/rateLimitConfig';
+import {
+  assertChatSendInterval,
+  consumeRateLimitAttempt,
+  isRateLimitError,
+  markChatSend,
+} from '../lib/rateLimit';
+import { sanitizeChatMessage } from '../lib/security';
 
 export type SendMessageResult =
   | { ok: true }
@@ -315,9 +323,14 @@ export function useConversationChat(
 
   const sendMessage = useCallback(
     async (content: string): Promise<SendMessageResult> => {
-      const trimmed = content.trim();
+      const trimmed = sanitizeChatMessage(content);
       if (!trimmed || !conversationId || !user?.id) {
         return { ok: false, blocked: false, error: 'Missing content' };
+      }
+
+      const clientCheck = checkMessageClient(trimmed);
+      if (clientCheck.blocked) {
+        return { ok: false, blocked: true, reason: clientCheck.reason };
       }
 
       const until = profile?.chat_suspended_until;
@@ -328,6 +341,22 @@ export function useConversationChat(
           reason:
             'Your account cannot send messages right now. If you think this is a mistake, contact support.',
         };
+      }
+
+      try {
+        assertChatSendInterval(conversationId);
+        const { maxAttempts, windowMs } = RATE_LIMITS.chat.sendMessage;
+        await consumeRateLimitAttempt(
+          `chat:send:${conversationId}`,
+          user.id,
+          maxAttempts,
+          windowMs,
+        );
+      } catch (error) {
+        if (isRateLimitError(error)) {
+          return { ok: false, blocked: false, error: error.message };
+        }
+        throw error;
       }
 
       setSending(true);
@@ -366,6 +395,7 @@ export function useConversationChat(
         };
       }
 
+      markChatSend(conversationId);
       return { ok: true };
     },
     [conversationId, user?.id, profile?.chat_suspended_until],
@@ -373,7 +403,7 @@ export function useConversationChat(
 
   const editMessage = useCallback(
     async (messageId: string, newContent: string): Promise<MessageActionResult> => {
-      const trimmed = newContent.trim();
+      const trimmed = sanitizeChatMessage(newContent);
       if (!trimmed || !user?.id) {
         return { ok: false, error: 'Message cannot be empty' };
       }

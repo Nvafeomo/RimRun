@@ -29,6 +29,7 @@ import {
   getDisplayContactEmail,
   isOAuthOnlyUser,
 } from "../../lib/accountIdentity";
+import { validatePasswordForSignup } from "../../lib/security";
 
 function formatDateOfBirthDisplay(isoDate: string) {
   const [y, m, d] = isoDate.split("-").map(Number);
@@ -48,9 +49,7 @@ function validateEmailIfProvided(value: string): string | null {
 }
 
 function validatePassword(value: string): string | null {
-  if (!value.trim()) return "Password is required";
-  if (value.length < 8) return "Password must be at least 8 characters";
-  return null;
+  return validatePasswordForSignup(value);
 }
 
 export default function AccountScreen() {

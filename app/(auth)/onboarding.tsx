@@ -168,8 +168,8 @@ import {
             }
         }
 
-        let resolvedEmail: string | null =
-            profile?.email?.trim() || getAuthEmailForProfile(user);
+        let resolvedEmail =
+            profile?.email?.trim() || getAuthEmailForProfile(user) || '';
         if (needsEmail) {
             const emailErr = validateEmail(email);
             if (emailErr) {

@@ -25,6 +25,11 @@ import {
 } from '../../lib/usernameRules';
 import { TermsAcceptanceRow } from '../../components/TermsAcceptanceRow';
 import { SocialAuthButtons } from '../../components/SocialAuthButtons';
+import {
+  PASSWORD_POLICY_HINT,
+  validateEmailAddress,
+  validatePasswordForSignup,
+} from '../../lib/security';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -50,15 +55,10 @@ export default function SignupScreen() {
     return validateUsernameInput(value);
   }
   function validateEmail(value: string): string | null {
-    if (!value.trim()) return 'Email is required';
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(value)) return 'Invalid email address';
-    return null;
+    return validateEmailAddress(value);
   }
   function validatePassword(value: string): string | null {
-    if (!value.trim()) return 'Password is required';
-    if (value.length < 8) return 'Password must be at least 8 characters long';
-    return null;
+    return validatePasswordForSignup(value);
   }
   function validateConfirmPassword(value: string): string | null {
     if (!value.trim()) return 'Confirm Password is required';
@@ -217,19 +217,20 @@ export default function SignupScreen() {
               placeholderTextColor={colors.textMuted}
               keyboardType="default"
               autoCapitalize="none"
-              autoComplete="password"
+              autoComplete="new-password"
               autoCorrect={false}
               secureTextEntry
               style={styles.input}
               value={password}
               onChangeText={setPassword}
             />
+            <Text style={styles.passwordHint}>{PASSWORD_POLICY_HINT}</Text>
             <TextInput
               placeholder="Confirm Password"
               placeholderTextColor={colors.textMuted}
               keyboardType="default"
               autoCapitalize="none"
-              autoComplete="password"
+              autoComplete="new-password"
               autoCorrect={false}
               secureTextEntry
               style={styles.input}
@@ -333,6 +334,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: spacing.md,
     textAlign: 'center',
+  },
+  passwordHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   input: {
     width: '100%',

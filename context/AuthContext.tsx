@@ -18,6 +18,23 @@ import { mapProfileUsernameError } from '../lib/usernameRules';
 import { defaultUsernameSearchableForDob } from '../lib/usernameSearchPolicy';
 import { fetchBanAppealStatus, fetchIsUserBanned, submitBanAppeal } from '../lib/bans';
 import { withTimeout } from '../lib/withTimeout';
+import { RATE_LIMITS } from '../lib/rateLimitConfig';
+import {
+  assertRateLimit,
+  consumeRateLimitAttempt,
+  mapExternalRateLimitError,
+  RateLimitError,
+  recordRateLimitFailure,
+  resetRateLimit,
+} from '../lib/rateLimit';
+import {
+  INVALID_CREDENTIALS,
+  mapSignInError,
+  mapSignUpError,
+  sanitizeEmail,
+  validatePasswordForSignup,
+} from '../lib/security';
+import { formatErrorForLog } from '../lib/security/safeLog';
 
 type AuthContextValue = {
     user: User | null;
@@ -163,7 +180,7 @@ type AuthContextValue = {
   
           if (!isMounted) return;
           if (error) {
-            console.error('Error getting session', error);
+            console.error('Error getting session', formatErrorForLog(error));
             // Invalid refresh token: clear bad session from storage
             await supabase.auth.signOut({ scope: 'local' });
             if (!isMounted) return;
@@ -175,7 +192,7 @@ type AuthContextValue = {
           }
         } catch (err) {
           if (isMounted) {
-            console.error('Auth init error', err);
+            console.error('Auth init error', formatErrorForLog(err));
             setSession(null);
             setUser(null);
             setBanBlocked(false);
@@ -205,27 +222,53 @@ type AuthContextValue = {
   
     // Auth actions
     async function signIn(emailOrUsername: string, password: string) {
-      let email = emailOrUsername;
+      const identifier = emailOrUsername.trim().toLowerCase();
+      const { maxAttempts, windowMs } = RATE_LIMITS.auth.signIn;
+      await assertRateLimit('auth:signIn', identifier, maxAttempts, windowMs);
+
+      let email = sanitizeEmail(emailOrUsername);
       if (!emailOrUsername.includes('@')) {
         const { data: loginEmail, error } = await supabase.rpc(
           'lookup_login_email',
           { p_username: emailOrUsername.trim() },
         );
         if (error || !loginEmail) {
-          throw new Error('Invalid credentials');
+          await recordRateLimitFailure('auth:signIn', identifier, maxAttempts, windowMs);
+          void supabase.rpc('log_security_event', {
+            p_event_type: 'auth_sign_in_failed',
+            p_bucket_key: `auth:signIn:${identifier}`,
+            p_metadata: { reason: 'lookup_failed' },
+          });
+          throw new Error(INVALID_CREDENTIALS);
         }
         email = loginEmail;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) {
-        throw error;
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          await recordRateLimitFailure('auth:signIn', identifier, maxAttempts, windowMs);
+          void supabase.rpc('log_security_event', {
+            p_event_type: 'auth_sign_in_failed',
+            p_bucket_key: `auth:signIn:${identifier}`,
+            p_metadata: { reason: 'password_rejected' },
+          });
+          throw mapSignInError(error);
+        }
+        await resetRateLimit('auth:signIn', identifier);
+        await applySession(data.session);
+      } catch (error) {
+        if (error instanceof RateLimitError) {
+          throw error;
+        }
+        if (error instanceof Error && error.message === INVALID_CREDENTIALS) {
+          throw error;
+        }
+        throw mapSignInError(error);
       }
-      // Apply session before callers navigate so guards see an authenticated user.
-      await applySession(data.session);
     }
   
     async function signUp(
@@ -234,80 +277,108 @@ type AuthContextValue = {
       username: string,
       dateOfBirthIso: string,
     ) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            username,
-            date_of_birth: dateOfBirthIso,
-          },
-        },
-      });
-      if (error) {
-        throw error;
+      const normalizedEmail = sanitizeEmail(email);
+      const passwordError = validatePasswordForSignup(password);
+      if (passwordError) {
+        throw new Error(passwordError);
       }
-      const uid = data.user?.id;
-      if (!uid) {
-        throw new Error('Sign up did not return a user. Try again or confirm your email if required.');
-      }
-      // Persist DOB without wiping other columns (avoid upsert nulling profile_image_url, etc.).
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', uid)
-        .maybeSingle();
 
-      if (existingProfile) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            date_of_birth: dateOfBirthIso,
-            username,
-            email,
-            username_searchable: defaultUsernameSearchableForDob(dateOfBirthIso),
-          })
-          .eq('id', uid);
-        if (profileError) {
-          throw new Error(mapProfileUsernameError(profileError));
-        }
-      } else {
-        const { error: insertErr } = await supabase.from('profiles').insert({
-          id: uid,
-          username,
-          email,
-          date_of_birth: dateOfBirthIso,
-          username_searchable: defaultUsernameSearchableForDob(dateOfBirthIso),
+      const identifier = normalizedEmail;
+      const { maxAttempts, windowMs } = RATE_LIMITS.auth.signUp;
+      await consumeRateLimitAttempt('auth:signUp', identifier, maxAttempts, windowMs);
+
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: {
+            data: {
+              username,
+              date_of_birth: dateOfBirthIso,
+            },
+          },
         });
-        if (insertErr?.code === '23505') {
-          const { error: retryErr } = await supabase
+        if (error) {
+          throw mapSignUpError(error);
+        }
+        const uid = data.user?.id;
+        if (!uid) {
+          throw new Error('Sign up did not return a user. Try again or confirm your email if required.');
+        }
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', uid)
+          .maybeSingle();
+
+        if (existingProfile) {
+          const { error: profileError } = await supabase
             .from('profiles')
             .update({
               date_of_birth: dateOfBirthIso,
               username,
-              email,
+              email: normalizedEmail,
               username_searchable: defaultUsernameSearchableForDob(dateOfBirthIso),
             })
             .eq('id', uid);
-          if (retryErr) {
-            throw new Error(mapProfileUsernameError(retryErr));
+          if (profileError) {
+            throw new Error(mapProfileUsernameError(profileError));
           }
-        } else if (insertErr) {
-          throw new Error(mapProfileUsernameError(insertErr));
+        } else {
+          const { error: insertErr } = await supabase.from('profiles').insert({
+            id: uid,
+            username,
+            email: normalizedEmail,
+            date_of_birth: dateOfBirthIso,
+            username_searchable: defaultUsernameSearchableForDob(dateOfBirthIso),
+          });
+          if (insertErr?.code === '23505') {
+            const { error: retryErr } = await supabase
+              .from('profiles')
+              .update({
+                date_of_birth: dateOfBirthIso,
+                username,
+                email: normalizedEmail,
+                username_searchable: defaultUsernameSearchableForDob(dateOfBirthIso),
+              })
+              .eq('id', uid);
+            if (retryErr) {
+              throw new Error(mapProfileUsernameError(retryErr));
+            }
+          } else if (insertErr) {
+            throw new Error(mapProfileUsernameError(insertErr));
+          }
         }
-      }
 
-      if (data.session) {
-        await applySession(data.session);
+        if (data.session) {
+          await applySession(data.session);
+        }
+      } catch (error) {
+        if (error instanceof RateLimitError) {
+          throw error;
+        }
+        throw mapSignUpError(error);
       }
     }
   
     async function signInWithGoogle() {
-      await oauthGoogle();
+      const { maxAttempts, windowMs } = RATE_LIMITS.auth.oauth;
+      await consumeRateLimitAttempt('auth:oauth', 'device', maxAttempts, windowMs);
+      try {
+        await oauthGoogle();
+      } catch (error) {
+        throw mapExternalRateLimitError(error);
+      }
     }
 
     async function signInWithApple() {
-      await appleSignIn();
+      const { maxAttempts, windowMs } = RATE_LIMITS.auth.oauth;
+      await consumeRateLimitAttempt('auth:oauth', 'device', maxAttempts, windowMs);
+      try {
+        await appleSignIn();
+      } catch (error) {
+        throw mapExternalRateLimitError(error);
+      }
     }
 
     async function signOut() {

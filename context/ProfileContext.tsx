@@ -15,23 +15,10 @@ import { resolveAvatarUriForDisplay } from '../lib/avatarUrls';
 import { useAuth } from './AuthContext';
 import { withTimeout } from '../lib/withTimeout';
 
+import { formatErrorForLog } from '../lib/security/safeLog';
+
 const MY_PROFILE_SELECT =
   'profile_image_url, date_of_birth, username, email, profile_public_show_friends, profile_public_show_courts_joined, profile_public_show_courts_added, messages_only_from_friends, username_searchable, chat_suspended_until, auto_suspension_count, role';
-
-function formatErrorForLog(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'object' && err !== null) {
-    const e = err as {
-      message?: string;
-      code?: string;
-      details?: string;
-      hint?: string;
-    };
-    const parts = [e.message, e.code, e.details, e.hint].filter(Boolean);
-    return parts.length > 0 ? parts.join(' | ') : JSON.stringify(err);
-  }
-  return String(err);
-}
 
 function isUndefinedColumnError(err: unknown): boolean {
   if (err && typeof err === 'object' && 'code' in err) {

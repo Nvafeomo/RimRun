@@ -2,6 +2,19 @@
   "expo": {
     "plugins": [
       [
+        "expo-build-properties",
+        {
+          "ios": {
+            "extraPods": [
+              {
+                "name": "AppCheckCore",
+                "version": "11.2.0"
+              }
+            ]
+          }
+        }
+      ],
+      [
         "@react-native-community/datetimepicker",
         {
           "android": {
@@ -26,7 +39,7 @@
     "name": "RimRun",
     "owner": "nvafeomo",
     "slug": "RimRun",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -41,6 +54,7 @@
       "bundleIdentifier": "com.nvafeomo.RimRun",
       "buildNumber": "1",
       "infoPlist": {
+        "CFBundleDisplayName": "RimRun",
         "NSLocationWhenInUseUsageDescription": "RimRun uses your location to show nearby basketball courts on the map.",
         "NSPhotoLibraryUsageDescription": "RimRun needs access to your photos to set your profile picture.",
         "NSPhotoLibraryAddUsageDescription": "RimRun needs access to your photos to set your profile picture.",

@@ -1,5 +1,11 @@
 import { supabase } from "./supabase";
 import { submitContentReport } from "./reports";
+import { RATE_LIMITS } from "./rateLimitConfig";
+import {
+  consumeRateLimitAttempt,
+  mapExternalRateLimitError,
+  RateLimitError,
+} from "./rateLimit";
 
 export type BlockReportContext = "profile" | "chat" | "friends";
 
@@ -133,6 +139,28 @@ export async function blockUserWithDeveloperNotification(
   context: BlockReportContext,
   contextDetail?: string,
 ): Promise<{ error: Error | null }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) {
+    return { error: new Error("Not signed in") };
+  }
+
+  const { maxAttempts, windowMs } = RATE_LIMITS.social.blockUser;
+  try {
+    await consumeRateLimitAttempt(
+      "social:block",
+      user.id,
+      maxAttempts,
+      windowMs,
+    );
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      return { error };
+    }
+    return { error: mapExternalRateLimitError(error) };
+  }
+
   const blockResult = await blockUser(blockedUserId);
   if (blockResult.error) {
     return blockResult;
@@ -244,6 +272,28 @@ export async function fetchUserBlockStatus(
 export async function sendFriendRequest(
   receiverId: string,
 ): Promise<{ error: Error | null }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) {
+    return { error: new Error("Not signed in") };
+  }
+
+  const { maxAttempts, windowMs } = RATE_LIMITS.social.friendRequest;
+  try {
+    await consumeRateLimitAttempt(
+      "social:friendRequest",
+      user.id,
+      maxAttempts,
+      windowMs,
+    );
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      return { error };
+    }
+    return { error: mapExternalRateLimitError(error) };
+  }
+
   const { error } = await supabase.rpc("send_friend_request", {
     p_receiver_id: receiverId,
   });
@@ -254,13 +304,6 @@ export async function sendFriendRequest(
 
   if (!/could not find|schema cache/i.test(error.message)) {
     return { error: new Error(error.message) };
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.id) {
-    return { error: new Error("Not signed in") };
   }
 
   await supabase
