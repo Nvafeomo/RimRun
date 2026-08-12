@@ -23,14 +23,17 @@ import { SUPPORT_EMAIL } from '../../lib/support';
 export default function BannedScreen() {
   const {
     banAppealPending,
+    banStatusUnknown,
     submitBanAppeal,
     signOut,
     clearBanBlocked,
+    refreshBanAppealStatus,
     user,
   } = useAuth();
   const [appealMessage, setAppealMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   function handleContactSupport() {
     void Linking.openURL(
@@ -68,8 +71,20 @@ export default function BannedScreen() {
     }
   }
 
+  async function handleRetryStatus() {
+    setRetrying(true);
+    try {
+      await refreshBanAppealStatus();
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   const canSubmitAppeal =
-    user && !banAppealPending && appealMessage.trim().length >= 10;
+    user &&
+    !banStatusUnknown &&
+    !banAppealPending &&
+    appealMessage.trim().length >= 10;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -87,15 +102,37 @@ export default function BannedScreen() {
             resizeMode="contain"
           />
           <View style={styles.iconWrap}>
-            <Ionicons name="ban" size={40} color={colors.error} />
+            <Ionicons
+              name={banStatusUnknown ? 'cloud-offline-outline' : 'ban'}
+              size={40}
+              color={colors.error}
+            />
           </View>
-          <Text style={styles.title}>Account suspended</Text>
+          <Text style={styles.title}>
+            {banStatusUnknown ? 'Couldn’t verify account' : 'Account suspended'}
+          </Text>
           <Text style={styles.body}>
-            Your RimRun account has been suspended for violating our community
-            guidelines. You cannot use the app while this suspension is active.
+            {banStatusUnknown
+              ? 'RimRun couldn’t confirm your account status. Check your connection and try again. For safety, access stays locked until verification succeeds.'
+              : 'Your RimRun account has been suspended for violating our community guidelines. You cannot use the app while this suspension is active.'}
           </Text>
 
-          {banAppealPending ? (
+          {banStatusUnknown ? (
+            <Pressable
+              style={[styles.primaryButton, { marginBottom: spacing.lg }]}
+              onPress={() => void handleRetryStatus()}
+              disabled={retrying}
+            >
+              {retrying ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <>
+                  <Ionicons name="refresh" size={20} color={colors.text} />
+                  <Text style={styles.primaryButtonText}>Try again</Text>
+                </>
+              )}
+            </Pressable>
+          ) : banAppealPending ? (
             <View style={styles.pendingBox}>
               <Ionicons name="time-outline" size={22} color={colors.primary} />
               <Text style={styles.pendingTitle}>Appeal under review</Text>

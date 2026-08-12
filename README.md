@@ -1,17 +1,64 @@
 # RimRun
 
-A mobile app for finding pickup basketball: browse courts on a map, save the spots you care about, and coordinate with other players through DMs and court chats. I built RimRun mostly because I play basketball in my free time. I keep shoes and a ball in the trunk in case I stop by a court during the week. The app helps me and other users find nearby courts and communities, and it gave me a reason to practice shipping a full product on real devices, not just tutorials. Along the way I wired up auth, maps, chat, and a Postgres backend with row-level security, plus age-based rules so social features stay consistent from the database down to the UI.
+<p align="center">
+  <img src="docs/assets/rimrun-logo.png" alt="RimRun logo" width="120" />
+</p>
+
+<p align="center">
+  <strong>Find courts. Run the rim.</strong>
+</p>
+
+<p align="center">
+  RimRun is a mobile app for finding pickup basketball courts, discovering local communities, and coordinating games through direct messages and court chats.
+</p>
+
+<p align="center">
+  <a href="https://nvafeomo.github.io/RimRun/">Website</a> ·
+  <a href="https://nvafeomo.github.io/RimRun/#demos">Demo</a> ·
+  <a href="docs/ios-testing.html">TestFlight (beta)</a> ·
+  <a href="docs/android-testing.html">Play (beta)</a>
+</p>
+
+<p align="center">
+  <img alt="Expo" src="https://img.shields.io/badge/Expo-54-000020?logo=expo&logoColor=white" />
+  <img alt="React Native" src="https://img.shields.io/badge/React_Native-0.81-61DAFB?logo=react&logoColor=white" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" />
+  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3ECF8E?logo=supabase&logoColor=white" />
+</p>
+
+---
+
+**Live App:** [App Store](https://nvafeomo.github.io/RimRun/) · [Google Play](https://nvafeomo.github.io/RimRun/) *(public listings in progress — beta via TestFlight / Play Internal Testing)*  
+**Website:** [RimRun landing page](https://nvafeomo.github.io/RimRun/)  
+**Demo:** [Demo videos](https://nvafeomo.github.io/RimRun/#demos) · [Full demo page](docs/Demo/Screenshots/demo.html)
+
+---
+
+## Why I built it
+
+I built RimRun because I regularly play basketball and wanted an easier way to find courts and connect with other players. The project also gave me an opportunity to practice shipping a full mobile product to real devices while working with authentication, maps, real-time communication, and a production-style Postgres backend.
 
 ## What it does
 
-- **Courts:** Map and search, subscribe to courts, and add new ones (address-only vs location flows depend on age, matching how the product handles minors.)
-- **Profile:** Username, optional photo, privacy toggles, and date of birth so age rules can be enforced server-side.
-- **Social:** Friends, direct messages, group chats, and threads tied to a court. Direct chats and court threads follow different visibility rules on purpose.
-- **Auth:** Email and password, native Google and Apple sign-in through Supabase, and password reset via deep link.
+- **Courts** — Browse and search courts on a map, save courts, subscribe to updates, and add new locations.
+- **Profile** — Username, optional photo, privacy toggles, and account settings.
+- **Social** — Friends, direct messages, group chats, and court-specific threads for coordinating games.
+- **Auth** — Email/password, Google, and Apple sign-in, plus password reset through deep links.
 
-## Stack
+## Technical Highlights
 
-**Expo 54 · React 19 · TypeScript · Expo Router · Supabase (Auth, Postgres, Storage) · react-native-maps · NativeWind (Tailwind) · Google sign-in**
+| Area | What I built |
+|------|----------------|
+| **Authentication** | Email/password plus Google and Apple OAuth via Supabase Auth |
+| **Database** | PostgreSQL with Row Level Security policies for access control |
+| **Social** | Direct messaging, court-specific threads, friends, and group chats |
+| **Age-aware access** | Age-based rules enforced at both the database and application layers |
+| **Mobile** | Expo, React Native, TypeScript, and Expo Router |
+| **Deep linking** | Password resets and auth flows use native `rimrun://` deep links |
+| **Storage** | Supabase Storage for user-uploaded profile images |
+| **Maps** | `react-native-maps` for discovery and court location UX |
+
+Age-based behavior (for example, address-only vs location flows for minors) is implemented in SQL/RLS and mirrored in the client (`lib/agePolicy.ts`) so social features stay consistent end to end.
 
 ## Demo
 
@@ -27,15 +74,19 @@ A mobile app for finding pickup basketball: browse courts on a map, save the spo
 
 <img src="docs/Demo/Screenshots/profiledemo.gif" alt="RimRun demo: profile" width="300" />
 
-## Run locally
+## Stack
 
-You will need Node.js (LTS), npm, and a [Supabase](https://supabase.com) project. The quickest way to try the app is [Expo Go](https://expo.dev/go) on a phone; use Android Studio or Xcode if you want a full native build.
+**Expo 54 · React 19 · TypeScript · Expo Router · Supabase (Auth, Postgres, Storage) · react-native-maps · NativeWind (Tailwind) · Google / Apple sign-in**
+
+## Quick start
+
+You need Node.js (LTS), npm, and a [Supabase](https://supabase.com) project. The fastest way to try the app locally is [Expo Go](https://expo.dev/go).
 
 ```bash
 npm install --legacy-peer-deps
 ```
 
-Add a `.env` in the project root with your Supabase values (keep real keys out of git):
+Create a `.env` in the project root (never commit real keys):
 
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -46,31 +97,16 @@ EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=your-ios-client-id.apps.googleusercontent.com
 EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.your-ios-client-id
 ```
 
-Restart the dev server after editing env vars.
-
 ```bash
 npm start
 ```
 
-Then press `a` / `i` / `w` for Android, iOS, or web, or scan the QR code in Expo Go.
+Press `a` / `i` / `w` for Android, iOS, or web, or scan the QR code in Expo Go.
 
-**Android tip:** If you see `Failed to download remote update`, the phone cannot reach Metro on your machine. Try `npm run start:tunnel`, use the same Wi‑Fi as your computer (VPN off if possible), or allow Node through the firewall on port **8081**. Match Expo Go to **SDK 54**.
+For Metro networking tips, firewall notes, native builds, and backend/RLS details, see **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
 
-Native dev builds: `npm run android` · `npm run ios` · `npm run web`
-
-**Landing page (waitlist, demos, tester guides):** [docs/index.html](docs/index.html) → GitHub Pages at `https://nvafeomo.github.io/RimRun/`. Setup: [docs/LANDING_SETUP.md](docs/LANDING_SETUP.md).
-
-**Beta testing (TestFlight / Play):** see [docs/TESTING.md](docs/TESTING.md) — EAS Build setup, secrets, and QA checklist. Tester-facing pages: [docs/android-testing.html](docs/android-testing.html), [docs/ios-testing.html](docs/ios-testing.html).
-
-## Backend notes
-
-The app talks to **Supabase** (Postgres with RLS). Migration-style SQL lives under `scripts/` (policies, RPCs, triggers). You will need to apply whatever subset matches how you run the project: for example, friend and DM age checks, and how messages show up in court threads versus private chat. The client mirrors part of that logic in `lib/agePolicy.ts` and should stay in sync with what you deploy.
-
-Only the **anon** key belongs in the client. Never ship the **service role** key in an app build. Using different Supabase projects or keys for dev and production helps avoid accidents.
-
-## Future features
-
-Personal roadmap notes are kept in `future-features.tex` under a local personal folder (not tracked in this repo).
+**Beta testing (TestFlight / Play):** [docs/TESTING.md](docs/TESTING.md)  
+**Landing page setup:** [docs/LANDING_SETUP.md](docs/LANDING_SETUP.md)
 
 ## Author
 
@@ -81,4 +117,4 @@ Personal roadmap notes are kept in `future-features.tex` under a local personal 
 
 ## License
 
-Proprietary. [All rights reserved](LICENSE). Not licensed for copying or redistribution without written permission. Update the copyright line in `LICENSE` to your legal name if you use one.
+Proprietary. [All rights reserved](LICENSE). Not licensed for copying or redistribution without written permission.

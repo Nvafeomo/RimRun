@@ -12,16 +12,21 @@ export type BanAppealStatus = {
   lastStatus: string | null;
 };
 
-/** Returns true when the user has an active platform ban. */
-export async function fetchIsUserBanned(userId: string): Promise<boolean> {
+/** Result of a ban status lookup. Failures must be treated as blocked (fail closed). */
+export type BanCheckResult =
+  | { ok: true; banned: boolean }
+  | { ok: false; error: string };
+
+/** Returns ban status for a user. On RPC failure, returns ok:false (caller must fail closed). */
+export async function fetchIsUserBanned(userId: string): Promise<BanCheckResult> {
   const { data, error } = await supabase.rpc('is_user_banned', {
     p_user_id: userId,
   });
   if (error) {
     console.warn('is_user_banned RPC failed', error.message);
-    return false;
+    return { ok: false, error: error.message };
   }
-  return data === true;
+  return { ok: true, banned: data === true };
 }
 
 export async function fetchBanAppealStatus(): Promise<BanAppealStatus> {

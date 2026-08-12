@@ -40,8 +40,10 @@ type AuthContextValue = {
     user: User | null;
     session: Session | null;
     loading: boolean;
-    /** True when the signed-in account has an active platform ban. */
+    /** True when the signed-in account is banned, or ban status could not be verified. */
     banBlocked: boolean;
+    /** True when ban status could not be verified (network/timeout) — fail-closed gate. */
+    banStatusUnknown: boolean;
     /** True when a ban appeal is pending review. */
     banAppealPending: boolean;
     signIn: (emailOrUsername: string, password: string) => Promise<void>;
@@ -72,6 +74,7 @@ type AuthContextValue = {
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
     const [banBlocked, setBanBlocked] = useState(false);
+    const [banStatusUnknown, setBanStatusUnknown] = useState(false);
     const [banAppealPending, setBanAppealPending] = useState(false);
 
     async function refreshBanAppealStatus() {
@@ -81,16 +84,36 @@ type AuthContextValue = {
       const uid = currentSession?.user?.id;
       if (!uid) {
         setBanAppealPending(false);
+        setBanStatusUnknown(false);
         return;
       }
-      const banned = await fetchIsUserBanned(uid);
-      setBanBlocked(banned);
-      if (!banned) {
+      try {
+        const result = await withTimeout(
+          fetchIsUserBanned(uid),
+          8_000,
+          'Ban check',
+        );
+        if (!result.ok) {
+          console.warn('Ban check failed closed:', result.error);
+          setBanBlocked(true);
+          setBanStatusUnknown(true);
+          setBanAppealPending(false);
+          return;
+        }
+        setBanStatusUnknown(false);
+        setBanBlocked(result.banned);
+        if (!result.banned) {
+          setBanAppealPending(false);
+          return;
+        }
+        const status = await fetchBanAppealStatus();
+        setBanAppealPending(status.pending);
+      } catch (err) {
+        console.warn('Ban check failed closed (timeout/offline):', err);
+        setBanBlocked(true);
+        setBanStatusUnknown(true);
         setBanAppealPending(false);
-        return;
       }
-      const status = await fetchBanAppealStatus();
-      setBanAppealPending(status.pending);
     }
 
     async function applySession(nextSession: Session | null) {
@@ -98,6 +121,7 @@ type AuthContextValue = {
         setSession(null);
         setUser(null);
         setBanBlocked(false);
+        setBanStatusUnknown(false);
         setBanAppealPending(false);
         return;
       }
@@ -106,14 +130,23 @@ type AuthContextValue = {
       setUser(nextSession.user);
 
       try {
-        const banned = await withTimeout(
+        const result = await withTimeout(
           fetchIsUserBanned(nextSession.user.id),
           8_000,
           'Ban check',
         );
-        setBanBlocked(banned);
+        if (!result.ok) {
+          console.warn('Ban check failed closed:', result.error);
+          setBanBlocked(true);
+          setBanStatusUnknown(true);
+          setBanAppealPending(false);
+          return;
+        }
 
-        if (banned) {
+        setBanStatusUnknown(false);
+        setBanBlocked(result.banned);
+
+        if (result.banned) {
           const status = await withTimeout(
             fetchBanAppealStatus(),
             8_000,
@@ -124,8 +157,10 @@ type AuthContextValue = {
           setBanAppealPending(false);
         }
       } catch (err) {
-        console.warn('Ban check skipped (offline or timeout):', err);
-        setBanBlocked(false);
+        // Fail closed: do not admit users when ban status is unverified.
+        console.warn('Ban check failed closed (timeout/offline):', err);
+        setBanBlocked(true);
+        setBanStatusUnknown(true);
         setBanAppealPending(false);
       }
     }
@@ -399,6 +434,7 @@ type AuthContextValue = {
 
     function clearBanBlocked() {
       setBanBlocked(false);
+      setBanStatusUnknown(false);
       setBanAppealPending(false);
     }
   
@@ -407,6 +443,7 @@ type AuthContextValue = {
       session,
       loading,
       banBlocked,
+      banStatusUnknown,
       banAppealPending,
       signIn,
       signUp,
