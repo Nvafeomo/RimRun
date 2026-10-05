@@ -6,7 +6,6 @@ export const uploadProfilePicture = async (userID: string, imageUri: string) => 
         const fileName = `${userID}/profile.${fileExtension}`;
         const file = new File(imageUri);
         const bytes = await file.bytes();
-        const filePath = `${userID}/${fileName}`;
         const { error } = await supabase.storage.from('Avatars').upload(fileName, bytes, {contentType: `image/${fileExtension}`, upsert: true});
         if (error) {
             console.error('Error uploading profile picture:', error);
