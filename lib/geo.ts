@@ -27,8 +27,7 @@ export function haversineMiles(
 /**
  * Axis-aligned bounding box that fully contains a circle of `radiusMiles` around (lat, lng).
  * Used to narrow the Supabase query; filter again with haversineMiles on the client.
- */
-/**
+ *
  * @param pad - Multiplier on lat/lng span (e.g. 1.08) for a looser prefilter before haversine.
  */
 export function boundingBoxForRadiusMiles(
