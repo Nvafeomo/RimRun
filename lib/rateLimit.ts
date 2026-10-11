@@ -169,8 +169,7 @@ const lastChatSendAt = new Map<string, number>();
 
 export function assertChatSendInterval(conversationId: string): void {
   const minMs = RATE_LIMITS.chat.minIntervalMs;
-  const key = conversationId;
-  const last = lastChatSendAt.get(key) ?? 0;
+  const last = lastChatSendAt.get(conversationId) ?? 0;
   const elapsed = Date.now() - last;
   if (elapsed < minMs) {
     throw new RateLimitError(minMs - elapsed);
