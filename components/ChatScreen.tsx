@@ -48,7 +48,6 @@ function avatarPlaceholderLetter(
 
 export function ChatScreen({
   conversationId,
-  title = "Chat",
   knownPeers,
   composerLocked = false,
   composerLockedMessage,
