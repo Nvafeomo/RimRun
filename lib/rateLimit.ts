@@ -137,7 +137,12 @@ export async function consumeRateLimitAttempt(
   await writeBucket(key, bucket);
 }
 
-/** Increment only after a failed sign-in. */
+/**
+ * Increment only after a failed sign-in.
+ *
+ * `maxAttempts` is not read here (the limit is enforced by `assertRateLimit`);
+ * it is accepted so callers can pass the same config tuple to every helper.
+ */
 export async function recordRateLimitFailure(
   scope: string,
   identifier: string,
