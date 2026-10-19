@@ -1,3 +1,4 @@
+/** Returns a copy of `d` set to local midnight, leaving the input unchanged. */
 function startOfDay(d: Date): Date {
   const copy = new Date(d);
   copy.setHours(0, 0, 0, 0);
