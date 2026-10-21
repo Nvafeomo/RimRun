@@ -17,6 +17,11 @@ export type SubmitReportParams = {
   courtId?: string | null;
 };
 
+/**
+ * Submit a user, message, conversation, or court report after a client-side
+ * rate-limit check. Passes through the server's `deduped` flag on success and
+ * returns a user-facing error message on failure.
+ */
 export async function submitContentReport(
   params: SubmitReportParams,
 ): Promise<{ ok: true; deduped?: boolean } | { ok: false; error: string }> {
