@@ -8,6 +8,10 @@ export type CourtProvenanceFields = {
   created_at?: string | null;
 };
 
+/**
+ * Whether a court was created within the last RECENTLY_ADDED_WINDOW_DAYS.
+ * Returns false when `createdAt` is missing or not a parseable date.
+ */
 export function isCourtRecentlyAdded(
   createdAt: string | null | undefined,
   nowMs = Date.now(),
@@ -19,10 +23,12 @@ export function isCourtRecentlyAdded(
   return nowMs - created <= windowMs;
 }
 
+/** Whether the court was submitted by a user rather than imported. */
 export function isCourtUserAdded(source: string | null | undefined): boolean {
   return source === "user";
 }
 
+/** Builds the "Recently added" / "User added" tags shown on court details. */
 export function buildCourtProvenanceTags(
   court: CourtProvenanceFields,
 ): CourtDetailTagItem[] {
