@@ -62,6 +62,7 @@ export function validateUsernameInput(raw: string): string | null {
 
 export const USERNAME_RULES_USER_HINT = `${USERNAME_MIN_LENGTH}–${USERNAME_MAX_LENGTH} characters, letters, numbers, underscore only`;
 
+/** True when a Supabase/Postgres error is a unique constraint violation (SQLSTATE 23505). */
 export function isPostgresUniqueViolation(
   err: { code?: string } | null | undefined,
 ): boolean {
