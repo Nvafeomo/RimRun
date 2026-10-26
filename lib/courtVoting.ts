@@ -13,6 +13,11 @@ export type CourtVoteState = {
   flagThreshold: number;
 };
 
+/**
+ * Vote counts needed to mark a court verified or flag it for review.
+ * Thresholds scale with subscribers (20% to verify, 30% to flag),
+ * with floors of 3 and 5 so small courts can't be flipped by one or two votes.
+ */
 export function computeVoteThresholds(subscriberCount: number): {
   verifyThreshold: number;
   flagThreshold: number;
