@@ -1,21 +1,21 @@
 import { supabase } from './supabase';
 import { PASSWORD_RESET_REDIRECT_URL } from './authRedirects';
 
-// Sign in with email and password
+/** Sign in with email and password. Throws the Supabase auth error on failure. */
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data;
 }
 
-// Sign up with email and password
+/** Sign up with email and password. Throws the Supabase auth error on failure. */
 export async function signUp(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
   return data;
 }
 
-// Sign out the current user
+/** Sign out the current user. Throws the Supabase auth error on failure. */
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
