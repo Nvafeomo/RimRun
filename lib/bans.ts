@@ -29,6 +29,7 @@ export async function fetchIsUserBanned(userId: string): Promise<BanCheckResult>
   return { ok: true, banned: data === true };
 }
 
+/** Returns the caller's appeal state. On RPC failure, falls back to no pending appeal. */
 export async function fetchBanAppealStatus(): Promise<BanAppealStatus> {
   const { data, error } = await supabase.rpc('my_ban_appeal_status');
   if (error) {
@@ -42,6 +43,10 @@ export async function fetchBanAppealStatus(): Promise<BanAppealStatus> {
   };
 }
 
+/**
+ * Validates and submits a ban appeal for the signed-in user, consuming a rate-limit attempt.
+ * Returns `error` for local or request failures, or `reason` when the RPC declines the appeal.
+ */
 export async function submitBanAppeal(
   message: string,
 ): Promise<{ ok: true } | { ok: false; reason?: string; error?: string }> {
