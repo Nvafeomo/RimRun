@@ -1,12 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 
+/** AsyncStorage flag set after a recovery deep link, until the new password is saved. */
 const PENDING_PASSWORD_RECOVERY_KEY = 'rimrun_pending_password_recovery';
 
+/** True if a recovery deep link was applied and the user still has to set a new password. */
 export async function hasPendingPasswordRecovery(): Promise<boolean> {
   return (await AsyncStorage.getItem(PENDING_PASSWORD_RECOVERY_KEY)) === '1';
 }
 
+/** Clears the recovery flag once the password has been updated or recovery no longer applies. */
 export async function clearPendingPasswordRecovery(): Promise<void> {
   await AsyncStorage.removeItem(PENDING_PASSWORD_RECOVERY_KEY);
 }
