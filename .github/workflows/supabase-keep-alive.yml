@@ -13,11 +13,13 @@ jobs:
       - name: Ping database via keep_alive RPC
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # Accept either secret name; the app's .env calls it EXPO_PUBLIC_SUPABASE_ANON_KEY.
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
           if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
-            echo "Missing SUPABASE_URL or SUPABASE_ANON_KEY repository secrets."
+            [ -z "${SUPABASE_URL:-}" ] && echo "Missing repository secret: SUPABASE_URL"
+            [ -z "${SUPABASE_ANON_KEY:-}" ] && echo "Missing repository secret: SUPABASE_ANON_KEY (or EXPO_PUBLIC_SUPABASE_ANON_KEY)"
             exit 1
           fi
 
