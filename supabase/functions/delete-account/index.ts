@@ -52,6 +52,11 @@ Deno.serve(async (req) => {
   }
 
   const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  // Remove the user's profile photos first; deleting the auth user does not
+  // delete their files in Storage.
+  await removeUserAvatarFiles(supabaseAdmin.storage, user.id);
+
   const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
   if (deleteError) {
     console.error("Delete user error:", deleteError.message);
@@ -68,3 +73,27 @@ Deno.serve(async (req) => {
 
   return jsonResponse(corsHeaders, { success: true });
 });
+
+/** Best-effort removal of everything under `{userId}/` in the Avatars bucket. */
+async function removeUserAvatarFiles(
+  storage: ReturnType<typeof createClient>["storage"],
+  userId: string,
+): Promise<void> {
+  try {
+    const { data: files, error: listError } = await storage
+      .from("Avatars")
+      .list(userId, { limit: 100 });
+    if (listError) {
+      console.warn("avatar list failed:", listError.message);
+      return;
+    }
+    const paths = (files ?? []).map((file) => `${userId}/${file.name}`);
+    if (paths.length === 0) return;
+    const { error: removeError } = await storage.from("Avatars").remove(paths);
+    if (removeError) {
+      console.warn("avatar remove failed:", removeError.message);
+    }
+  } catch (err) {
+    console.warn("avatar cleanup error:", err);
+  }
+}
