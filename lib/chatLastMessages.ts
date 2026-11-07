@@ -1,11 +1,18 @@
 import { supabase } from "./supabase";
 
+/** Text and timestamp of a conversation's most recent message, for chat list rows. */
 export type LastMessagePreview = {
+  /** Message body as stored in `messages.content`. */
   content: string;
+  /** ISO timestamp of when the message was sent. */
   created_at: string;
 };
 
-/** Latest non-deleted preview per conversation (requires DB RPC). */
+/**
+ * Latest non-deleted preview per conversation, keyed by conversation id.
+ * Requires the `get_conversation_last_messages` DB RPC. On error, logs and
+ * returns an empty map so the chat list still renders.
+ */
 export async function fetchLastMessagesByConversation(
   conversationIds: string[],
 ): Promise<Map<string, LastMessagePreview>> {
