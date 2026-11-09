@@ -16,6 +16,10 @@ export type AdminReportRow = {
   court_id: string | null;
 };
 
+/**
+ * Loads up to 50 open user reports for the admin moderation queue.
+ * Maps missing-permission and missing-RPC errors to setup hints for admins.
+ */
 export async function fetchOpenReports(): Promise<
   { ok: true; reports: AdminReportRow[] } | { ok: false; error: string }
 > {
@@ -43,6 +47,7 @@ export async function fetchOpenReports(): Promise<
   return { ok: true, reports: (data ?? []) as AdminReportRow[] };
 }
 
+/** Marks a report as dismissed without taking action against the reported user. */
 export async function dismissReport(
   reportId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -62,6 +67,10 @@ export type BanUserParams = {
   reportId?: string;
 };
 
+/**
+ * Bans a user through the `ban-user` Edge Function using the caller's session token.
+ * Optionally links the ban to the report that prompted it.
+ */
 export async function banUserViaEdge(
   params: BanUserParams,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -90,6 +99,7 @@ export async function banUserViaEdge(
   return { ok: true };
 }
 
+/** Returns true when a profile role grants access to admin moderation tools. */
 export function isAdminRole(role: string | null | undefined): boolean {
   return role === 'admin';
 }
