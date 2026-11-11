@@ -28,6 +28,7 @@ export function computeVoteThresholds(subscriberCount: number): {
   };
 }
 
+/** Builds a CourtVoteState from a courts row, defaulting missing counts and flags. */
 export function buildCourtVoteState(params: {
   verified?: boolean | null;
   flagged_for_review?: boolean | null;
@@ -48,6 +49,10 @@ export function buildCourtVoteState(params: {
   };
 }
 
+/**
+ * Loads a court's vote counts, subscriber count, and the signed-in user's vote.
+ * Returns null if the court row can't be fetched.
+ */
 export async function fetchCourtVoteState(
   courtId: string,
   userId: string | undefined,
@@ -89,6 +94,7 @@ export async function fetchCourtVoteState(
   };
 }
 
+/** Submits the current user's vote for a court via the cast_court_vote RPC. */
 export async function castCourtVote(
   courtId: string,
   voteType: VoteType,
@@ -112,6 +118,7 @@ export type AdminFlaggedCourtRow = {
   verified: boolean;
 };
 
+/** Admin only: lists up to 50 courts currently flagged for review. */
 export async function fetchFlaggedCourts(): Promise<
   { ok: true; courts: AdminFlaggedCourtRow[] } | { ok: false; error: string }
 > {
@@ -122,6 +129,7 @@ export async function fetchFlaggedCourts(): Promise<
   return { ok: true, courts: (data ?? []) as AdminFlaggedCourtRow[] };
 }
 
+/** Admin only: clears the review flag on a court. */
 export async function clearCourtFlag(
   courtId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -132,6 +140,7 @@ export async function clearCourtFlag(
   return { ok: true };
 }
 
+/** Admin only: deletes a court via the admin_delete_court RPC. */
 export async function adminDeleteCourt(
   courtId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
