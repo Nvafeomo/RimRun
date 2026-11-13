@@ -15,12 +15,19 @@ export type BlockedUserDisplay = {
   profile_image_url: string | null;
 };
 
+/** In-memory cache of the signed-in viewer's blocked IDs, keyed by viewer. */
 let blockedIdsCache: { userId: string; ids: Set<string> } | null = null;
 
+/** Clears the blocked-IDs cache so the next fetch reads fresh rows. */
 export function invalidateBlockedUserIdsCache(): void {
   blockedIdsCache = null;
 }
 
+/**
+ * Returns the IDs of users that `viewerId` has blocked.
+ * Served from the in-memory cache when available; on a query error it logs
+ * and returns an empty set (the failure is not cached).
+ */
 export async function fetchBlockedUserIds(
   viewerId: string,
 ): Promise<Set<string>> {
