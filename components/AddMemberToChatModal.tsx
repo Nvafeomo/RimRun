@@ -166,7 +166,13 @@ export function AddMemberToChatModal({
       >
       <View style={styles.sheet}>
         <View style={styles.header}>
-          <Pressable onPress={onClose} style={styles.iconBtn} hitSlop={12}>
+          <Pressable
+            onPress={onClose}
+            style={styles.iconBtn}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
             <Ionicons name="close" size={26} color={colors.text} />
           </Pressable>
           <Text style={styles.title}>

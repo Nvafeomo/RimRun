@@ -101,7 +101,13 @@ export function ReportUserModal({
         ]}
       >
         <View style={styles.header}>
-          <Pressable onPress={handleClose} style={styles.iconBtn} hitSlop={12}>
+          <Pressable
+            onPress={handleClose}
+            style={styles.iconBtn}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
             <Ionicons name="close" size={26} color={colors.text} />
           </Pressable>
           <Text style={styles.title}>Report</Text>

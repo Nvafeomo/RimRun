@@ -406,7 +406,12 @@ export default function PublicUserProfileScreen() {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.headerSide}>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.headerSide}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </Pressable>
           <Text style={styles.headerTitleCenter} numberOfLines={1}>
@@ -435,7 +440,12 @@ export default function PublicUserProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.headerSide}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.headerSide}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
         <Text style={styles.headerTitleCenter} numberOfLines={1}>
