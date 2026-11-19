@@ -86,8 +86,12 @@ export function validateDateOfBirthForSignup(
 
 /** Latest calendar date a user can be born on to be at least MIN_ACCOUNT_AGE today (local). */
 export function maxBirthDateForMinAge(reference: Date = new Date()): Date {
-  const d = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+  const month = reference.getMonth();
+  const d = new Date(reference.getFullYear(), month, reference.getDate());
   d.setFullYear(d.getFullYear() - MIN_ACCOUNT_AGE);
+  // Feb 29 in a non-leap target year rolls over to Mar 1, which is still too young;
+  // clamp back to the last day of the intended month (Feb 28).
+  if (d.getMonth() !== month) d.setDate(0);
   return d;
 }
 
