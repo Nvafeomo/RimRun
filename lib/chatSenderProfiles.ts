@@ -5,6 +5,10 @@ export type ChatSenderProfile = {
   profile_image_url: string | null;
 };
 
+/**
+ * Fetch one user's public username and avatar via RPC. Used as a fallback for
+ * IDs the batch chat-display RPC did not return. Resolves to null on any error.
+ */
 async function fetchPublicProfileSummary(
   userId: string,
 ): Promise<ChatSenderProfile | null> {
@@ -68,6 +72,10 @@ export async function fetchChatSenderProfiles(
   return result;
 }
 
+/**
+ * List the distinct user IDs participating in a conversation.
+ * Logs and resolves to an empty array if the query fails.
+ */
 export async function fetchConversationParticipantIds(
   conversationId: string,
 ): Promise<string[]> {
