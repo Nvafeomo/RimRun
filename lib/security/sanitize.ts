@@ -9,20 +9,24 @@ export function sanitizePlainText(input: string, maxLength: number): string {
     .slice(0, maxLength);
 }
 
+/** Cleans a chat message body and caps it at the chat message length limit. */
 export function sanitizeChatMessage(input: string): string {
   return sanitizePlainText(input, INPUT_LIMITS.chatMessage);
 }
 
+/** Cleans optional report details; returns null when nothing is left after cleaning. */
 export function sanitizeReportDetails(input: string | undefined): string | null {
   if (!input?.trim()) return null;
   const cleaned = sanitizePlainText(input, INPUT_LIMITS.reportDetails);
   return cleaned || null;
 }
 
+/** Cleans a ban appeal message and caps it at the appeal length limit. */
 export function sanitizeBanAppealMessage(input: string): string {
   return sanitizePlainText(input, INPUT_LIMITS.banAppeal);
 }
 
+/** Trims and lowercases an email address and caps it at the email length limit. */
 export function sanitizeEmail(input: string): string {
   return input.trim().toLowerCase().slice(0, INPUT_LIMITS.email);
 }
