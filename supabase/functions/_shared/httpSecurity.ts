@@ -37,6 +37,38 @@ export function sanitizeText(value: string | undefined, maxLength: number): stri
     .slice(0, maxLength);
 }
 
+/**
+ * Read the body as UTF-8 text, counting bytes as they arrive. Returns null and
+ * cancels the stream as soon as the body passes `maxBytes`, so a client that
+ * omits or lies about content-length cannot make the function buffer it all.
+ */
+async function readBodyTextCapped(
+  req: Request,
+  maxBytes: number,
+): Promise<string | null> {
+  if (!req.body) return "";
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 /** Read JSON body with size cap. Returns null on invalid/oversized input. */
 export async function readJsonBody<T extends Record<string, unknown>>(
   req: Request,
@@ -47,8 +79,8 @@ export async function readJsonBody<T extends Record<string, unknown>>(
     return null;
   }
 
-  const raw = await req.text();
-  if (raw.length > maxBytes) return null;
+  const raw = await readBodyTextCapped(req, maxBytes);
+  if (raw === null) return null;
   if (!raw.trim()) return {} as T;
 
   try {
