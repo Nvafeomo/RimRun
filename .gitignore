@@ -52,3 +52,5 @@ docs/personal/
 scripts/
 
 .cursor/
+# Supabase CLI local state (project link, versions)
+supabase/.temp/
