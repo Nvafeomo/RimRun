@@ -66,7 +66,8 @@ triggers AS (
                                'conversation_participants', 'friendships')
 ),
 buckets AS (
-  SELECT coalesce(jsonb_agg(jsonb_build_object('bucket', name, 'public', public)
+  SELECT coalesce(jsonb_agg(jsonb_build_object('bucket', name, 'public', public,
+           'file_size_limit', file_size_limit, 'allowed_mime_types', allowed_mime_types)
          ORDER BY name), '[]'::jsonb) AS v
   FROM storage.buckets
 ),
