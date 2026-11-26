@@ -69,7 +69,36 @@ type AuthContextValue = {
     children: ReactNode;
   };
   
-  export function AuthProvider({ children }: AuthProviderProps) {
+  /**
+ * Resolves a username to the email used for sign-in.
+ *
+ * Prefers `lookup_login_email_verified`, which only returns the email when the password is
+ * also correct, so usernames cannot be used to collect other users' emails. Falls back to the
+ * older `lookup_login_email` until the database migration that adds the verified function
+ * is applied (PostgREST reports a missing function as PGRST202).
+ */
+async function resolveLoginEmail(username: string, password: string): Promise<string | null> {
+  const verified = await supabase.rpc('lookup_login_email_verified', {
+    p_username: username,
+    p_password: password,
+  });
+  if (!verified.error) {
+    return typeof verified.data === 'string' && verified.data ? verified.data : null;
+  }
+  if (/rate_limit:/i.test(verified.error.message)) {
+    throw new RateLimitError(15 * 60 * 1000);
+  }
+  if (verified.error.code !== 'PGRST202') {
+    return null;
+  }
+  const legacy = await supabase.rpc('lookup_login_email', { p_username: username });
+  if (legacy.error) {
+    return null;
+  }
+  return typeof legacy.data === 'string' && legacy.data ? legacy.data : null;
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
@@ -263,11 +292,8 @@ type AuthContextValue = {
 
       let email = sanitizeEmail(emailOrUsername);
       if (!emailOrUsername.includes('@')) {
-        const { data: loginEmail, error } = await supabase.rpc(
-          'lookup_login_email',
-          { p_username: emailOrUsername.trim() },
-        );
-        if (error || !loginEmail) {
+        const loginEmail = await resolveLoginEmail(emailOrUsername.trim(), password);
+        if (!loginEmail) {
           await recordRateLimitFailure('auth:signIn', identifier, maxAttempts, windowMs);
           void supabase.rpc('log_security_event', {
             p_event_type: 'auth_sign_in_failed',
