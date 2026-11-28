@@ -18,6 +18,7 @@ export class RateLimitError extends Error {
   }
 }
 
+/** User-facing "try again" message, rounded up to whole seconds or minutes. */
 export function formatRateLimitMessage(retryAfterMs: number): string {
   const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
   if (seconds < 60) {
@@ -27,6 +28,7 @@ export function formatRateLimitMessage(retryAfterMs: number): string {
   return `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
 }
 
+/** Type guard for errors thrown by the local rate-limit helpers. */
 export function isRateLimitError(error: unknown): error is RateLimitError {
   return error instanceof RateLimitError;
 }
@@ -80,6 +82,7 @@ function freshBucket(now: number): Bucket {
   return { count: 0, windowStart: now };
 }
 
+/** Read-only check: reports whether another attempt is allowed without counting one. */
 export async function checkRateLimit(
   scope: string,
   identifier: string,
@@ -102,6 +105,7 @@ export async function checkRateLimit(
   return { allowed: true };
 }
 
+/** Throw a `RateLimitError` if the bucket is already at `maxAttempts`; does not count an attempt. */
 export async function assertRateLimit(
   scope: string,
   identifier: string,
@@ -162,6 +166,7 @@ export async function recordRateLimitFailure(
   await writeBucket(key, bucket);
 }
 
+/** Clear the stored bucket, e.g. after a successful sign-in. */
 export async function resetRateLimit(
   scope: string,
   identifier: string,
@@ -172,6 +177,7 @@ export async function resetRateLimit(
 /** In-memory min interval between chat sends (per conversation). */
 const lastChatSendAt = new Map<string, number>();
 
+/** Throw a `RateLimitError` if the last send in this conversation was too recent. */
 export function assertChatSendInterval(conversationId: string): void {
   const minMs = RATE_LIMITS.chat.minIntervalMs;
   const last = lastChatSendAt.get(conversationId) ?? 0;
@@ -181,6 +187,7 @@ export function assertChatSendInterval(conversationId: string): void {
   }
 }
 
+/** Record a chat send so `assertChatSendInterval` can enforce the minimum gap. */
 export function markChatSend(conversationId: string): void {
   lastChatSendAt.set(conversationId, Date.now());
 }
